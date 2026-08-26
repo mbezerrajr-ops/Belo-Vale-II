@@ -880,11 +880,12 @@
   };
 
   // ================= PRINT / PDF =================
-  function abrirModalImpressao(tipo) { modal = { tipo, lote: vacasF.lote, status: vacasF.status }; renderModal(); }
+  function abrirModalImpressao(tipo) { modal = { tipo, lote: vacasF.lote, status: vacasF.status, stage: "filtros" }; renderModal(); }
   function fecharModal() { modal = null; renderModal(); }
   function renderModal() {
     const root = document.getElementById("modalRoot");
     if (!modal) { root.innerHTML = ""; return; }
+    if (modal.stage === "pronto") { renderModalPronto(root); return; }
     const base = selecionadas.size > 0 ? state.vacas.filter((v) => selecionadas.has(v.id)) : vacasFiltradas();
     const filtradas = base.filter((v) => (modal.lote === "Todos" || v.lote === modal.lote) && (modal.status === "Todos" || v.status === modal.status)).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
     root.innerHTML = `<div class="modal-overlay" id="modalOverlay"><div class="modal">
@@ -901,9 +902,31 @@
     document.getElementById("mCancel").addEventListener("click", fecharModal);
     document.getElementById("mLote").addEventListener("change", (e) => { modal.lote = e.target.value; renderModal(); });
     document.getElementById("mStatus").addEventListener("change", (e) => { modal.status = e.target.value; renderModal(); });
-    document.getElementById("mGo").addEventListener("click", () => { imprimir(modal.tipo, filtradas); fecharModal(); });
+    document.getElementById("mGo").addEventListener("click", () => { imprimir(modal.tipo, filtradas); });
   }
-  function imprimir(tipo, vacasFiltradas) {
+  // Confirmation step shown after "Gerar PDF / Imprimir": stays on screen (no auto-dismiss)
+  // so the user sees exactly what was generated and gets an unmissable Ctrl+P instruction —
+  // the artifact sandbox blocks window.print() silently, so this replaces relying on a toast alone.
+  function renderModalPronto(root) {
+    const p = modal.preview;
+    root.innerHTML = `<div class="modal-overlay" id="modalOverlay"><div class="modal" style="max-width:640px;">
+      <h3>✅ Conteúdo pronto — falta só imprimir</h3>
+      <div class="infobar" style="font-size:13.5px;line-height:1.7;margin-bottom:14px;">
+        Agora pressione <b>Ctrl+P</b> (ou <b>Cmd+P</b> no Mac) para abrir a caixa de impressão do navegador e escolher "Salvar como PDF" ou enviar para a impressora.<br>
+        Isso não acontece sozinho porque o navegador bloqueia impressão automática dentro desta página — é um passo manual mesmo.
+      </div>
+      <p class="desc2" style="margin-bottom:8px;">Prévia do que foi preparado (${p.count} vacas):</p>
+      <div style="max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:#fff;color:#111;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:2px;">${esc(p.titulo)}</div>
+        <div style="font-size:10.5px;color:#555;margin-bottom:8px;">${esc(p.filtrosDesc)}</div>
+        ${p.linhas}
+      </div>
+      <div class="modal-actions" style="margin-top:16px;"><button type="button" class="btn primary" id="mFechar">Fechar</button></div>
+    </div></div>`;
+    document.getElementById("modalOverlay").addEventListener("click", (e) => { if (e.target.id === "modalOverlay") fecharModal(); });
+    document.getElementById("mFechar").addEventListener("click", fecharModal);
+  }
+  function montarConteudoImpressao(tipo, vacasFiltradas) {
     const titulo = tipo === "completo" ? "Lista de Vacas — Belo Vale II" : "Formulário de Produção — Belo Vale II";
     const filtrosDesc = `Data: ${new Date().toLocaleDateString("pt-BR")} | ${vacasFiltradas.length} vacas`;
     let linhas;
@@ -914,12 +937,18 @@
       linhas = `<table><thead><tr><th>Nº</th><th>Nome</th><th>Lote</th><th>Parto</th><th>Média (L/dia)</th></tr></thead><tbody>` +
         vacasFiltradas.map((v) => `<tr><td>${esc(v.numero)}</td><td>${esc(v.nome)}</td><td>${esc(loteLabel(v.lote))}</td><td>${v.parto ? new Date(v.parto + "T00:00").toLocaleDateString("pt-BR") : "—"}</td><td style="min-width:80px"></td></tr>`).join("") + `</tbody></table>`;
     }
+    return { titulo, filtrosDesc, linhas };
+  }
+  function imprimir(tipo, vacasFiltradas) {
+    const { titulo, filtrosDesc, linhas } = montarConteudoImpressao(tipo, vacasFiltradas);
     const area = document.getElementById("printArea");
     area.innerHTML = `<h1>${esc(titulo)}</h1><div class="sub">${esc(filtrosDesc)}</div>${linhas}`;
     // Best-effort: works in some viewers. The artifact sandbox blocks window.print()
-    // in most, so we never rely on this alone — the toast below is the real instruction.
+    // in most, so we never rely on this alone — the confirmation screen below is the real instruction.
     try { window.print(); } catch (e) {}
-    showToast("Pronto para imprimir — pressione Ctrl+P (ou Cmd+P no Mac) para abrir a caixa de impressão / salvar como PDF.");
+    modal.stage = "pronto";
+    modal.preview = { titulo, filtrosDesc, linhas, count: vacasFiltradas.length };
+    renderModal();
   }
 
   // ================= EVENT WIRING =================
