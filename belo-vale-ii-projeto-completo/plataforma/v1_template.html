@@ -1,0 +1,1060 @@
+<title>Belo Vale II</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --axis:           #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --good-text:      #006300;
+    --series-1:       #2a78d6;
+    --series-2:       #eb6834;
+    --series-3:       #1baf7a;
+    --series-4:       #eda100;
+    --status-good:    #0ca30c;
+    --status-critical:#d03b3b;
+    --shadow: 0 1px 2px rgba(11,11,11,0.04), 0 6px 20px rgba(11,11,11,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:#1a1a19; --page-plane:#0d0d0d; --text-primary:#fff; --text-secondary:#c3c2b7;
+      --text-muted:#898781; --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+      --good-text:#0ca30c; --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-4:#c98500;
+      --status-critical:#e66767;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:#1a1a19; --page-plane:#0d0d0d; --text-primary:#fff; --text-secondary:#c3c2b7;
+    --text-muted:#898781; --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --good-text:#0ca30c; --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-4:#c98500;
+    --status-critical:#e66767;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 24px rgba(0,0,0,0.35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  .viz-root { background: var(--page-plane); color: var(--text-primary); font-family: system-ui,-apple-system,"Segoe UI",sans-serif; min-height: 100vh; }
+  .wrap { max-width: 1260px; margin: 0 auto; padding: 0 20px 60px; }
+
+  /* ---------- LOGIN SCREEN ---------- */
+  #loginScreen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .login-card { width: 100%; max-width: 380px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 32px 28px; }
+  .login-card .logo { font-size: 34px; text-align: center; margin-bottom: 6px; }
+  .login-card h1 { font-size: 19px; font-weight: 700; text-align: center; margin: 0 0 4px; }
+  .login-card .tag { font-size: 12.5px; color: var(--text-secondary); text-align: center; margin-bottom: 24px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--text-muted); margin-bottom: 6px; }
+  .field input { width: 100%; font: inherit; font-size: 14px; padding: 10px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--page-plane); color: var(--text-primary); }
+  .field input:focus { outline: 2px solid var(--series-1); outline-offset: 1px; }
+  .login-btn { width: 100%; font: inherit; font-size: 14px; font-weight: 700; padding: 11px; border-radius: 9px; border: none; background: var(--series-1); color: #fff; cursor: pointer; margin-top: 6px; }
+  .login-btn:hover { filter: brightness(1.06); }
+  .login-error { font-size: 12.5px; color: var(--status-critical); font-weight: 600; margin-top: 10px; min-height: 16px; }
+  .login-note { font-size: 11.5px; color: var(--text-muted); line-height: 1.5; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+  /* ---------- APP CHROME ---------- */
+  #app { display: none; }
+  #app.visible { display: block; }
+  .topbar { position: sticky; top: 0; z-index: 30; background: var(--surface-1); border-bottom: 1px solid var(--border); }
+  .topbar-inner { max-width: 1260px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 20px; }
+  .brand { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .tabs { display: flex; gap: 2px; flex: 1; }
+  .tabs button { font: inherit; font-size: 13px; font-weight: 600; color: var(--text-secondary); background: none; border: none; padding: 9px 14px; border-radius: 8px; cursor: pointer; }
+  .tabs button:hover { color: var(--text-primary); background: var(--grid); }
+  .tabs button.active { color: #fff; background: var(--series-1); }
+  .who { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .logout-btn { font: inherit; font-size: 12px; font-weight: 600; color: var(--text-secondary); background: none; border: 1px solid var(--border); border-radius: 999px; padding: 6px 13px; cursor: pointer; white-space: nowrap; }
+  .logout-btn:hover { color: var(--text-primary); }
+  @media (max-width: 880px) { .topbar-inner { flex-wrap: wrap; } .tabs { order: 3; width: 100%; overflow-x: auto; } }
+
+  .tabpanel { display: none; padding-top: 24px; }
+  .tabpanel.active { display: block; }
+
+  header.top { margin-bottom: 22px; }
+  header.top h1 { font-size: 24px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.01em; }
+  header.top .sub { color: var(--text-secondary); font-size: 13.5px; line-height: 1.5; }
+  header.top .sub b { color: var(--text-primary); font-weight: 600; }
+
+  .section { margin-top: 36px; }
+  .section h2 { font-size: 17px; font-weight: 700; margin: 0 0 4px; }
+  .section .desc { color: var(--text-secondary); font-size: 13px; margin: 0 0 16px; max-width: 780px; line-height: 1.5; }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 20px; }
+
+  .filterbar { position: sticky; top: 53px; z-index: 20; background: var(--page-plane); padding: 12px 0 14px; margin: -8px 0 8px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; gap: 18px 22px; }
+  .fgroup { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .fgroup .flabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin-right: 2px; }
+  .seg { display: inline-flex; background: var(--surface-1); border: 1px solid var(--border); border-radius: 999px; padding: 3px; box-shadow: var(--shadow); }
+  .seg button { appearance: none; border: none; background: transparent; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); padding: 6px 13px; border-radius: 999px; white-space: nowrap; }
+  .seg button:hover { color: var(--text-primary); }
+  .seg button.active { background: var(--chip-accent, var(--text-primary)); color: var(--chip-accent-ink, var(--surface-1)); }
+  .seg button[data-value="LOTE 1"].active { --chip-accent: var(--series-1); --chip-accent-ink: #fff; }
+  .seg button[data-value="LOTE 2"].active { --chip-accent: var(--series-2); --chip-accent-ink: #fff; }
+  .seg button[data-value="LOTE 3"].active { --chip-accent: var(--series-3); --chip-accent-ink: #fff; }
+  .searchwrap { position: relative; }
+  .searchwrap input { font: inherit; font-size: 12.5px; padding: 7px 12px 7px 30px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); width: 210px; box-shadow: var(--shadow); }
+  .searchwrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+  .searchwrap svg path { stroke: var(--text-muted); }
+  .clearbtn { font: inherit; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); background: none; border: 1px solid var(--border); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
+  .clearbtn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+  .fsummary { margin-left: auto; font-size: 12.5px; color: var(--text-secondary); font-weight: 600; white-space: nowrap; }
+  .fsummary b { color: var(--text-primary); }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  @media (max-width: 980px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 620px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  .kpi { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px 16px 14px; box-shadow: var(--shadow); }
+  .kpi .label { font-size: 11.5px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .kpi .value { font-size: 25px; font-weight: 700; margin-top: 6px; font-variant-numeric: proportional-nums; }
+  .kpi .delta { font-size: 12px; margin-top: 4px; color: var(--text-muted); }
+  .kpi .delta.good { color: var(--good-text); font-weight: 600; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+  .stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-top: 14px; }
+  @media (max-width: 700px) { .stat-row { grid-template-columns: repeat(2,1fr); } }
+  .stat-row .mini { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .stat-row .mini .l { font-size: 11px; color: var(--text-muted); }
+  .stat-row .mini .v { font-size: 16px; font-weight: 700; margin-top: 2px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 10px; font-size: 12.5px; color: var(--text-secondary); }
+  .legend .item { display: flex; align-items: center; gap: 6px; }
+  .legend .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  svg text { fill: var(--text-secondary); font-family: system-ui,-apple-system,"Segoe UI",sans-serif; }
+  svg .axis-label { fill: var(--text-muted); font-size: 11px; }
+  svg .value-label { fill: var(--text-primary); font-size: 12px; font-weight: 600; }
+  svg .cat-label { fill: var(--text-secondary); font-size: 12px; }
+  .gridline { stroke: var(--grid); stroke-width: 1; }
+  .baseline { stroke: var(--axis); stroke-width: 1; }
+  .tooltip { position: absolute; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border); box-shadow: var(--shadow); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; color: var(--text-primary); line-height: 1.5; opacity: 0; transition: opacity .08s ease; z-index: 5; white-space: nowrap; }
+  .tooltip .t-label { color: var(--text-secondary); }
+  .chart-wrap { position: relative; }
+  details.tbl { margin-top: 12px; }
+  details.tbl summary { cursor: pointer; font-size: 12.5px; color: var(--text-secondary); font-weight: 600; user-select: none; }
+  table.datatable { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12.5px; }
+  table.datatable th, table.datatable td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  table.datatable th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .02em; }
+  table.datatable td.num, table.datatable th.num { text-align: right; }
+  .note-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: var(--surface-1); font-size: 12.5px; color: var(--text-secondary); line-height: 1.6; }
+  .note-card b { color: var(--text-primary); }
+  footer.foot { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px; line-height: 1.6; }
+
+  /* ---------- CADASTRO TABLES ---------- */
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .add-btn { font: inherit; font-size: 12.5px; font-weight: 700; color: #fff; background: var(--series-1); border: none; border-radius: 9px; padding: 8px 15px; cursor: pointer; }
+  .add-btn:hover { filter: brightness(1.06); }
+  .tablecard { padding: 0; overflow: hidden; }
+  .table-scroll { max-height: 600px; overflow: auto; }
+  table.cadtable { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.cadtable thead th { position: sticky; top: 0; background: var(--surface-1); z-index: 2; text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text-muted); font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+  table.cadtable tbody td { padding: 6px 12px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; vertical-align: middle; }
+  table.cadtable tbody tr:hover td { background: var(--grid); }
+  table.cadtable .ed { display: inline-block; min-width: 60px; padding: 3px 5px; border-radius: 6px; cursor: text; }
+  table.cadtable .ed:hover { background: var(--grid); }
+  table.cadtable .ed:focus { outline: 2px solid var(--series-1); background: var(--surface-1); }
+  table.cadtable input[type="date"], table.cadtable input[type="number"] {
+    font: inherit; font-size: 12.5px; padding: 4px 6px; border-radius: 6px; border: 1px solid transparent;
+    background: transparent; color: var(--text-primary); width: 108px; font-variant-numeric: tabular-nums;
+  }
+  table.cadtable input[type="number"] { width: 76px; }
+  table.cadtable input:hover { border-color: var(--border); }
+  table.cadtable input:focus { outline: none; border-color: var(--series-1); background: var(--surface-1); }
+  .pill { font: inherit; font-size: 12px; font-weight: 700; border: none; border-radius: 999px; padding: 4px 11px; cursor: pointer; white-space: nowrap; }
+  .pill:hover { filter: brightness(0.97); }
+  .lote-pill.lote-1 { background: color-mix(in srgb, var(--series-1) 18%, transparent); color: var(--series-1); }
+  .lote-pill.lote-2 { background: color-mix(in srgb, var(--series-2) 18%, transparent); color: var(--series-2); }
+  .lote-pill.lote-3 { background: color-mix(in srgb, var(--series-3) 18%, transparent); color: var(--series-3); }
+  .lote-pill.lote-none { background: var(--grid); color: var(--text-muted); }
+  .sit-pill.sit-vl { background: color-mix(in srgb, var(--series-1) 18%, transparent); color: var(--series-1); }
+  .sit-pill.sit-vs { background: var(--grid); color: var(--text-secondary); }
+  .status-pill.status-ativa { background: color-mix(in srgb, var(--status-good) 18%, transparent); color: var(--good-text); }
+  .status-pill.status-inativa { background: color-mix(in srgb, var(--status-critical) 16%, transparent); color: var(--status-critical); }
+  .row-del { font: inherit; font-size: 13px; color: var(--text-muted); background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+  .row-del:hover { color: var(--status-critical); background: var(--grid); }
+  .custo-cell, .media-cell { color: var(--text-secondary); font-weight: 600; }
+  .empty-state { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+  .role-pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--grid); color: var(--text-secondary); }
+</style>
+
+<div class="viz-root">
+
+  <!-- ============ LOGIN SCREEN ============ -->
+  <div id="loginScreen">
+    <div class="login-card">
+      <div class="logo">🐄</div>
+      <h1>Belo Vale II</h1>
+      <div class="tag">Plataforma de gestão do rebanho leiteiro</div>
+      <form id="loginForm">
+        <div class="field">
+          <label for="loginEmail">E-mail</label>
+          <input type="email" id="loginEmail" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="loginPass">Senha</label>
+          <input type="password" id="loginPass" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="login-btn">Entrar</button>
+        <div class="login-error" id="loginError"></div>
+      </form>
+      <div class="login-note">
+        Esta tela é uma cortina de acesso, não uma autenticação com backend seguro — qualquer pessoa com o
+        código-fonte da página pode ver as credenciais cadastradas na aba Usuários. A proteção real deste painel
+        é o compartilhamento privado do link (você decide quem recebe acesso). Não use senhas que você reutiliza
+        em outro lugar.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ APP ============ -->
+  <div id="app">
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">🐄 Belo Vale II</div>
+        <nav class="tabs" id="tabNav">
+          <button type="button" data-tab="dashboard" class="active">Dashboard</button>
+          <button type="button" data-tab="vacas">Vacas</button>
+          <button type="button" data-tab="insumos">Insumos</button>
+          <button type="button" data-tab="usuarios">Usuários</button>
+        </nav>
+        <span class="who" id="whoLabel"></span>
+        <button type="button" class="logout-btn" id="logoutBtn">Sair</button>
+      </div>
+    </div>
+
+    <div class="wrap">
+
+      <!-- ============ DASHBOARD TAB ============ -->
+      <div class="tabpanel active" id="tab-dashboard" artifact-local>
+        <header class="top">
+          <h1>Painel do rebanho</h1>
+          <div class="sub">
+            Lê ao vivo das abas <b>Vacas</b> e <b>Insumos</b> — qualquer edição feita lá recalcula os números aqui.
+            Leitura de produção: coluna "Última medição" de cada vaca.
+          </div>
+        </header>
+
+        <div class="filterbar">
+          <div class="fgroup">
+            <span class="flabel">Lote</span>
+            <div class="seg" id="segLote">
+              <button data-value="all" class="active">Todos</button>
+              <button data-value="LOTE 1">Lote 1</button>
+              <button data-value="LOTE 2">Lote 2</button>
+              <button data-value="LOTE 3">Lote 3</button>
+              <button data-value="null">Sem lote</button>
+            </div>
+          </div>
+          <div class="fgroup">
+            <span class="flabel">Situação</span>
+            <div class="seg" id="segSit">
+              <button data-value="all" class="active">Todas</button>
+              <button data-value="VL">Em lactação</button>
+              <button data-value="VS">Secas</button>
+            </div>
+          </div>
+          <div class="fgroup searchwrap">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9.5 9.5L13 13M11 6a5 5 0 1 1-10 0 5 5 0 0 1 10 0Z" stroke-width="1.4" stroke-linecap="round"/></svg>
+            <input type="text" id="searchInput" placeholder="Buscar por nome ou nº...">
+          </div>
+          <button class="clearbtn" id="clearFilters">Limpar filtros</button>
+          <div class="fsummary" id="filterSummary"></div>
+        </div>
+
+        <div class="kpi-grid" id="kpiRow"></div>
+        <p class="desc" style="margin-top:8px;">"Vacas na seleção" e "Produção/dia" seguem todos os filtros (lote, situação, busca). Os 3 KPIs financeiros (Receita/Custo/Lucro) mostram sempre o total do(s) lote(s) selecionado(s) — a dieta é por lote, não por vaca, então situação e busca não os afetam.</p>
+
+        <div class="section">
+          <h2>Composição do rebanho</h2>
+          <p class="desc" id="herdDesc"></p>
+          <div class="grid2">
+            <div class="card">
+              <div class="legend" id="herdLegend"></div>
+              <div class="chart-wrap"><svg id="herdBar" width="100%" height="140"></svg></div>
+            </div>
+            <div class="card">
+              <div class="legend" id="activeLegend"></div>
+              <div class="chart-wrap"><svg id="activeBar" width="100%" height="140"></svg></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Comparativo por lote</h2>
+          <p class="desc">Produção, custo e receita aqui são sempre o total de cada lote — só reagem ao filtro de Lote (que esmaece os não selecionados), nunca a situação/busca.</p>
+          <div class="grid2">
+            <div class="card">
+              <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Produção diária de leite (L)</div>
+              <div class="chart-wrap"><svg id="prodLoteBar" width="100%" height="150"></svg></div>
+            </div>
+            <div class="card">
+              <div class="legend" id="finLegend"></div>
+              <div class="chart-wrap"><svg id="finLoteBar" width="100%" height="150"></svg></div>
+            </div>
+          </div>
+          <div class="stat-row" id="loteStats"></div>
+          <details class="tbl"><summary>Ver tabela — comparativo por lote</summary>
+            <table class="datatable" id="loteTable"></table>
+          </details>
+        </div>
+
+        <div class="section">
+          <h2>Composição do custo de alimentação</h2>
+          <p class="desc">Custo diário de ração por lote, usando o preço/kg atual da aba Insumos.</p>
+          <div class="card">
+            <div class="legend" id="feedLegend"></div>
+            <div class="chart-wrap"><svg id="feedBar" width="100%" height="130"></svg></div>
+            <details class="tbl"><summary>Ver tabela — custo de alimentação (R$/dia)</summary>
+              <table class="datatable" id="feedTable"></table>
+            </details>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Estágio de lactação</h2>
+          <p class="desc" id="delDesc"></p>
+          <div class="card">
+            <div style="font-size:13px;font-weight:600;margin-bottom:10px;" id="delTitle">Fase DEL</div>
+            <div class="chart-wrap"><svg id="delBar" width="100%" height="140"></svg></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Vacas de maior e menor produção</h2>
+          <p class="desc" id="topBottomDesc"></p>
+          <div class="legend" id="topBottomLegend"></div>
+          <div class="grid2">
+            <div class="card">
+              <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Top 10 — maior produção (L)</div>
+              <div class="chart-wrap"><svg id="topBar" width="100%" height="240"></svg></div>
+            </div>
+            <div class="card">
+              <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Bottom 10 — menor produção (L)</div>
+              <div class="chart-wrap"><svg id="bottomBar" width="100%" height="240"></svg></div>
+            </div>
+          </div>
+        </div>
+
+        <footer class="foot" id="footerNote"></footer>
+      </div>
+
+      <!-- ============ VACAS TAB ============ -->
+      <div class="tabpanel" id="tab-vacas" artifact-local>
+        <header class="top">
+          <h1>Cadastro de vacas</h1>
+          <div class="sub">
+            Clique num nome/média para editar o texto; clique num selo (Lote, Situação, Status) para alternar o valor; use os campos de data e peso normalmente.
+            Toda edição aqui é salva e aparece para quem mais tiver acesso a este link.
+          </div>
+        </header>
+        <div class="toolbar">
+          <button type="button" class="add-btn" id="addVacaBtn">+ Nova vaca</button>
+          <div class="fgroup searchwrap">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9.5 9.5L13 13M11 6a5 5 0 1 1-10 0 5 5 0 0 1 10 0Z" stroke-width="1.4" stroke-linecap="round"/></svg>
+            <input type="text" id="vacasSearch" placeholder="Buscar por nome ou nº...">
+          </div>
+          <div class="fsummary" id="vacasCount"></div>
+        </div>
+        <div class="card tablecard">
+          <div class="table-scroll">
+            <table class="cadtable">
+              <thead>
+                <tr>
+                  <th>Nº</th><th>Nome</th><th>Lote</th><th>Nascimento</th><th>Parto</th><th>Peso (kg)</th>
+                  <th>Média (L/dia)</th><th>Situação</th><th>Custo/dia (R$)</th><th>Última medição</th><th>Status</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="vacasBody" artifact-sync>
+__VACAS_ROWS__
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ INSUMOS TAB ============ -->
+      <div class="tabpanel" id="tab-insumos" artifact-local>
+        <header class="top">
+          <h1>Cadastro de insumos</h1>
+          <div class="sub">Preço/kg atual de cada item da dieta. A média é calculada a partir do histórico de preços logo abaixo — registre um novo preço sempre que reabastecer.</div>
+        </header>
+        <div class="card tablecard">
+          <div class="table-scroll">
+            <table class="cadtable">
+              <thead><tr><th>Item</th><th>Preço/kg atual (R$)</th><th>Média dos últimos preços</th><th>Data última atualização</th></tr></thead>
+              <tbody id="insumosBody" artifact-sync>
+__INSUMOS_ROWS__
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Histórico de preços</h2>
+          <p class="desc">Cada linha é um preço registrado numa data. A "Média" da tabela acima soma todas as linhas de cada item.</p>
+          <div class="toolbar">
+            <button type="button" class="add-btn" id="addHistBtn">+ Registrar preço</button>
+          </div>
+          <div class="card tablecard">
+            <div class="table-scroll">
+              <table class="cadtable">
+                <thead><tr><th>Item</th><th>Data</th><th>Preço/kg (R$)</th><th></th></tr></thead>
+                <tbody id="insumosHistBody" artifact-sync>
+__INSUMOS_HIST_ROWS__
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Dieta por lote (kg/dia)</h2>
+          <p class="desc">Quantidade fixa de cada insumo por lote — usada junto com o preço/kg acima para calcular o custo do Dashboard e da aba Vacas.</p>
+          <div class="card tablecard">
+            <div class="table-scroll">
+              <table class="cadtable">
+                <thead><tr><th>Lote</th><th>Concentrado (kg)</th><th>Caroço (kg)</th><th>Silagem (kg)</th><th>Casca de Mandioca (kg)</th></tr></thead>
+                <tbody id="dietaBody" artifact-sync>
+                  <tr data-lote="LOTE 1"><td><span class="pill lote-pill lote-1">Lote 1</span></td><td><input type="number" step="1" value="480"></td><td><input type="number" step="1" value="60"></td><td><input type="number" step="1" value="1800"></td><td><input type="number" step="1" value="400"></td></tr>
+                  <tr data-lote="LOTE 2"><td><span class="pill lote-pill lote-2">Lote 2</span></td><td><input type="number" step="1" value="400"></td><td><input type="number" step="1" value="60"></td><td><input type="number" step="1" value="1800"></td><td><input type="number" step="1" value="400"></td></tr>
+                  <tr data-lote="LOTE 3"><td><span class="pill lote-pill lote-3">Lote 3</span></td><td><input type="number" step="1" value="80"></td><td><input type="number" step="1" value="0"></td><td><input type="number" step="1" value="600"></td><td><input type="number" step="1" value="100"></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Preço do leite</h2>
+          <div class="card" style="max-width:280px;">
+            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted);">R$ por litro</label>
+            <div style="margin-top:8px;"><input type="number" step="0.01" id="precoLeite" value="2.59" style="font:inherit;font-size:20px;font-weight:700;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--page-plane);color:var(--text-primary);width:120px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ USUARIOS TAB ============ -->
+      <div class="tabpanel" id="tab-usuarios" artifact-local>
+        <header class="top">
+          <h1>Usuários</h1>
+          <div class="sub">Quem pode entrar na plataforma pela tela de login. Lembre-se: as senhas aqui ficam visíveis a quem tiver acesso a esta aba — não é um cofre de senhas.</div>
+        </header>
+        <div class="toolbar">
+          <button type="button" class="add-btn" id="addUserBtn">+ Novo usuário</button>
+        </div>
+        <div class="card tablecard">
+          <div class="table-scroll">
+            <table class="cadtable">
+              <thead><tr><th>Nome</th><th>E-mail</th><th>Senha</th><th>Perfil</th><th></th></tr></thead>
+              <tbody id="usersBody" artifact-sync>
+                <tr data-id="u1">
+                  <td><span class="ed" contenteditable="true">Marcelo Bezerra</span></td>
+                  <td><span class="ed" contenteditable="true">mbezerrajr@gmail.com</span></td>
+                  <td><span class="ed" contenteditable="true">belovale2026</span></td>
+                  <td><button type="button" class="pill role-pill" data-cycle="role" data-value="Administrador">Administrador</button></td>
+                  <td><button type="button" class="row-del" title="Remover" aria-label="Remover">✕</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ================= LOGIN =================
+  const loginScreen = document.getElementById("loginScreen");
+  const appEl = document.getElementById("app");
+
+  function normalize(s) { return (s || "").toString().trim().toLowerCase(); }
+
+  function tryLogin(email, pass) {
+    const rows = document.querySelectorAll("#usersBody tr");
+    for (const row of rows) {
+      const cells = row.querySelectorAll("td");
+      const uEmail = normalize(cells[1] && cells[1].textContent);
+      const uPass = (cells[2] && cells[2].textContent || "").trim();
+      const uName = (cells[0] && cells[0].textContent || "").trim();
+      if (uEmail === normalize(email) && uPass === pass) return { ok: true, name: uName, email: cells[1].textContent.trim() };
+    }
+    return { ok: false };
+  }
+
+  function showApp(who) {
+    loginScreen.style.display = "none";
+    appEl.classList.add("visible");
+    document.getElementById("whoLabel").textContent = who || "";
+    renderAll();
+  }
+
+  document.getElementById("loginForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const email = document.getElementById("loginEmail").value;
+    const pass = document.getElementById("loginPass").value;
+    const res = tryLogin(email, pass);
+    if (res.ok) {
+      sessionStorage.setItem("bv2_session", JSON.stringify({ email: res.email, name: res.name }));
+      showApp(res.name + " · " + res.email);
+    } else {
+      document.getElementById("loginError").textContent = "E-mail ou senha incorretos.";
+    }
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    sessionStorage.removeItem("bv2_session");
+    appEl.classList.remove("visible");
+    loginScreen.style.display = "flex";
+    document.getElementById("loginPass").value = "";
+  });
+
+  (function initSession() {
+    try {
+      const raw = sessionStorage.getItem("bv2_session");
+      if (raw) {
+        const s = JSON.parse(raw);
+        // re-validate against current users table (in case it changed)
+        const rows = document.querySelectorAll("#usersBody tr");
+        let stillValid = false;
+        rows.forEach((row) => {
+          const cells = row.querySelectorAll("td");
+          if (normalize(cells[1] && cells[1].textContent) === normalize(s.email)) stillValid = true;
+        });
+        if (stillValid) { showApp(s.name + " · " + s.email); return; }
+      }
+    } catch (e) {}
+  })();
+
+  // ================= TABS =================
+  document.getElementById("tabNav").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-tab]");
+    if (!btn) return;
+    document.querySelectorAll("#tabNav button").forEach((b) => b.classList.toggle("active", b === btn));
+    document.querySelectorAll(".tabpanel").forEach((p) => p.classList.toggle("active", p.id === "tab-" + btn.dataset.tab));
+    if (btn.dataset.tab === "dashboard") renderAll();
+  });
+
+  // ================= ROW ADD / DELETE (delegated) =================
+  document.addEventListener("click", (e) => {
+    const del = e.target.closest(".row-del");
+    if (del) {
+      const tr = del.closest("tr");
+      if (tr) tr.remove();
+      recomputeDerived();
+      return;
+    }
+    const cyc = e.target.closest("[data-cycle]");
+    if (cyc) {
+      cycle(cyc);
+      recomputeDerived();
+      return;
+    }
+  });
+
+  const CYCLES = {
+    lote: [
+      { value: "LOTE 1", label: "Lote 1", cls: "lote-1" },
+      { value: "LOTE 2", label: "Lote 2", cls: "lote-2" },
+      { value: "LOTE 3", label: "Lote 3", cls: "lote-3" },
+      { value: "", label: "Sem lote", cls: "lote-none" }
+    ],
+    sit: [
+      { value: "VL", label: "Lactação", cls: "sit-vl" },
+      { value: "VS", label: "Seca", cls: "sit-vs" }
+    ],
+    status: [
+      { value: "Ativa", label: "Ativa", cls: "status-ativa" },
+      { value: "Inativa", label: "Inativa", cls: "status-inativa" }
+    ],
+    role: [
+      { value: "Administrador", label: "Administrador", cls: "" },
+      { value: "Editor", label: "Editor", cls: "" },
+      { value: "Leitura", label: "Somente leitura", cls: "" }
+    ]
+  };
+  function cycle(btn) {
+    const kind = btn.dataset.cycle;
+    const opts = CYCLES[kind];
+    if (!opts) return;
+    const cur = opts.findIndex((o) => o.value === btn.dataset.value);
+    const next = opts[(cur + 1) % opts.length];
+    btn.dataset.value = next.value;
+    btn.textContent = next.label;
+    opts.forEach((o) => { if (o.cls) btn.classList.remove(o.cls); });
+    if (next.cls) btn.classList.add(next.cls);
+    const tr = btn.closest("tr");
+    if (tr && kind === "lote") tr.dataset.lote = next.value;
+    if (tr && kind === "sit") tr.dataset.sit = next.value;
+  }
+
+  document.getElementById("addVacaBtn").addEventListener("click", () => {
+    const tbody = document.getElementById("vacasBody");
+    const n = tbody.querySelectorAll("tr").length;
+    const tr = document.createElement("tr");
+    tr.dataset.id = "novo" + Date.now();
+    tr.dataset.lote = "";
+    tr.dataset.sit = "VL";
+    tr.innerHTML = `<td>—</td>
+      <td><span class="ed" contenteditable="true">Nova vaca</span></td>
+      <td><button type="button" class="pill lote-pill lote-none" data-cycle="lote" data-value="">Sem lote</button></td>
+      <td><input type="date" value=""></td>
+      <td><input type="date" value=""></td>
+      <td><input type="number" step="1" placeholder="—"></td>
+      <td><span class="ed" contenteditable="true"></span></td>
+      <td><button type="button" class="pill sit-pill sit-vl" data-cycle="sit" data-value="VL">Lactação</button></td>
+      <td class="custo-cell" data-live="custo">—</td>
+      <td><input type="date" value=""></td>
+      <td><button type="button" class="pill status-pill status-ativa" data-cycle="status" data-value="Ativa">Ativa</button></td>
+      <td><button type="button" class="row-del" title="Remover vaca" aria-label="Remover vaca">✕</button></td>`;
+    tbody.appendChild(tr);
+    tr.querySelector(".ed").focus();
+    recomputeDerived();
+  });
+
+  document.getElementById("addHistBtn").addEventListener("click", () => {
+    const tbody = document.getElementById("insumosHistBody");
+    const firstItem = document.querySelector("#insumosBody tr");
+    const itemId = firstItem ? firstItem.dataset.id : "concentrado";
+    const itemName = firstItem ? firstItem.querySelector("td").textContent.trim() : "Concentrado";
+    const today = new Date().toISOString().slice(0, 10);
+    const tr = document.createElement("tr");
+    tr.dataset.item = itemId;
+    tr.innerHTML = `<td><span class="pill hist-item-pill" data-item-label="${itemName}">${itemName}</span></td>
+      <td><input type="date" value="${today}"></td>
+      <td><input type="number" step="0.00001" value="0"></td>
+      <td><button type="button" class="row-del" title="Remover" aria-label="Remover">✕</button></td>`;
+    tbody.appendChild(tr);
+    recomputeDerived();
+  });
+
+  document.getElementById("addUserBtn").addEventListener("click", () => {
+    const tbody = document.getElementById("usersBody");
+    const tr = document.createElement("tr");
+    tr.dataset.id = "u" + Date.now();
+    tr.innerHTML = `<td><span class="ed" contenteditable="true">Novo usuário</span></td>
+      <td><span class="ed" contenteditable="true">email@exemplo.com</span></td>
+      <td><span class="ed" contenteditable="true">trocar123</span></td>
+      <td><button type="button" class="pill role-pill" data-cycle="role" data-value="Editor">Editor</button></td>
+      <td><button type="button" class="row-del" title="Remover" aria-label="Remover">✕</button></td>`;
+    tbody.appendChild(tr);
+    tr.querySelector(".ed").focus();
+  });
+
+  // recompute on any input change in vacas/insumos/dieta/preco
+  ["vacasBody", "insumosBody", "insumosHistBody", "dietaBody"].forEach((id) => {
+    document.getElementById(id).addEventListener("input", () => recomputeDerived());
+  });
+  document.getElementById("precoLeite").addEventListener("input", () => recomputeDerived());
+
+  // ================= DERIVED FIELDS (custo/vaca, media insumo) =================
+  function getInsumosPrices() {
+    const prices = {};
+    document.querySelectorAll("#insumosBody tr").forEach((tr) => {
+      const id = tr.dataset.id;
+      const input = tr.querySelector(".preco-atual");
+      prices[id] = input ? parseFloat(input.value) || 0 : 0;
+    });
+    return prices;
+  }
+  function getDieta() {
+    const dieta = {};
+    document.querySelectorAll("#dietaBody tr").forEach((tr) => {
+      const inputs = tr.querySelectorAll("input");
+      dieta[tr.dataset.lote] = {
+        concentrado: parseFloat(inputs[0].value) || 0,
+        caroco: parseFloat(inputs[1].value) || 0,
+        silagem: parseFloat(inputs[2].value) || 0,
+        casca: parseFloat(inputs[3].value) || 0
+      };
+    });
+    return dieta;
+  }
+  function custoPorLote() {
+    const prices = getInsumosPrices();
+    const dieta = getDieta();
+    const out = {};
+    for (const lote of ["LOTE 1", "LOTE 2", "LOTE 3"]) {
+      const d = dieta[lote] || { concentrado: 0, caroco: 0, silagem: 0, casca: 0 };
+      out[lote] = d.concentrado * (prices.concentrado || 0) + d.caroco * (prices.caroco || 0) +
+                  d.silagem * (prices.silagem || 0) + d.casca * (prices.casca || 0);
+    }
+    return out;
+  }
+  function vacasCountPorLote() {
+    const out = { "LOTE 1": 0, "LOTE 2": 0, "LOTE 3": 0 };
+    document.querySelectorAll("#vacasBody tr").forEach((tr) => {
+      const l = tr.dataset.lote;
+      if (out[l] !== undefined) out[l]++;
+    });
+    return out;
+  }
+  function recomputeDerived() {
+    const custos = custoPorLote();
+    const counts = vacasCountPorLote();
+    document.querySelectorAll("#vacasBody tr").forEach((tr) => {
+      const cell = tr.querySelector(".custo-cell");
+      if (!cell) return;
+      const l = tr.dataset.lote;
+      if (l && counts[l]) {
+        cell.textContent = "R$ " + (custos[l] / counts[l]).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      } else {
+        cell.textContent = "—";
+      }
+    });
+    document.querySelectorAll("#insumosBody tr").forEach((tr) => {
+      const id = tr.dataset.id;
+      const entries = Array.from(document.querySelectorAll(`#insumosHistBody tr[data-item="${id}"] input[type="number"]`))
+        .map((i) => parseFloat(i.value)).filter((v) => !isNaN(v));
+      const mediaCell = tr.querySelector(".media-cell");
+      if (mediaCell) {
+        mediaCell.textContent = entries.length ? "R$ " + (entries.reduce((a, b) => a + b, 0) / entries.length).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
+      }
+    });
+  }
+
+  // ================= DASHBOARD (reads live from Vacas/Insumos DOM) =================
+  const state = { lote: "all", sit: "all", search: "" };
+  const cssv = (name) => getComputedStyle(document.querySelector(".viz-root")).getPropertyValue(name).trim();
+  const NS = "http://www.w3.org/2000/svg";
+  const fmtL = (v) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " L";
+  const fmtR = (v) => "R$ " + v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtPct = (v) => (v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
+  const resolveColor = (c) => c.startsWith("var(") ? cssv(c.slice(4, -1)) : c;
+  const loteColorVar = (lote) => lote === "LOTE 1" ? "var(--series-1)" : lote === "LOTE 2" ? "var(--series-2)" : lote === "LOTE 3" ? "var(--series-3)" : "var(--text-muted)";
+  const stripAccents = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function clearSvg(svg) { while (svg.firstChild) svg.removeChild(svg.firstChild); }
+  function svgSize(svg) { const r = svg.getBoundingClientRect(); return { w: Math.max(r.width, 280), h: parseFloat(svg.getAttribute("height")) }; }
+
+  function readCowsFromDom() {
+    const cows = [];
+    document.querySelectorAll("#vacasBody tr").forEach((tr) => {
+      const tds = tr.children;
+      const id = tds[0].textContent.trim();
+      const nome = tds[1].querySelector(".ed").textContent.trim();
+      const lote = tr.dataset.lote || "";
+      const nascimento = tds[3].querySelector("input").value || null;
+      const parto = tds[4].querySelector("input").value || null;
+      const peso = parseFloat(tds[5].querySelector("input").value) || null;
+      const mediaTxt = tds[6].querySelector(".ed").textContent.trim();
+      const media = mediaTxt ? parseFloat(mediaTxt.replace(",", ".")) : null;
+      const sit = tr.dataset.sit || "VL";
+      const ultima = tds[9].querySelector("input").value || null;
+      const statusBtn = tds[10].querySelector("[data-cycle]");
+      const status = statusBtn ? statusBtn.dataset.value : "Ativa";
+      // "av" (producao no dia de referencia) = media historica como proxy de producao/dia atual
+      cows.push({ id, nome, lote: lote || null, sit, parto, av: media, peso, nascimento, ultima, status });
+    });
+    return cows;
+  }
+
+  function matchesSitSearch(c) {
+    if (state.sit !== "all" && c.sit !== state.sit) return false;
+    if (state.search) {
+      const q = stripAccents(state.search);
+      if (!stripAccents(c.nome).includes(q) && !String(c.id).includes(q)) return false;
+    }
+    return true;
+  }
+  function matchesAll(c) {
+    if (state.lote !== "all") { const lv = c.lote || "null"; if (lv !== state.lote) return false; }
+    return matchesSitSearch(c);
+  }
+
+  function renderAll() {
+    if (!document.getElementById("tab-dashboard").classList.contains("active")) return;
+    const cows = readCowsFromDom();
+    const prices = getInsumosPrices();
+    const dieta = getDieta();
+    const precoLeite = parseFloat(document.getElementById("precoLeite").value) || 0;
+    const custos = custoPorLote();
+
+    function cowsInLote(loteName, opts) {
+      opts = opts || {};
+      return cows.filter((c) => (c.lote || "null") === loteName && (opts.ignoreCowFilters || matchesSitSearch(c)));
+    }
+    function loteIsDimmed(loteName) { return state.lote !== "all" && state.lote !== loteName; }
+    function loteStats(loteName, opts) {
+      const inLote = cowsInLote(loteName, opts);
+      const n = inLote.length;
+      const prod = inLote.reduce((s, c) => s + (c.av || 0), 0);
+      const custo = custos[loteName] || 0;
+      const receita = prod * precoLeite;
+      return { lote: loteName, vacas: n, producao: prod, custo, receita, lucro: receita - custo,
+        custoVaca: n ? custo / n : 0, vendaVaca: n ? receita / n : 0, mediaVaca: n ? prod / n : 0,
+        pctCusto: receita ? custo / receita : 0 };
+    }
+
+    function renderFilterSummary() {
+      const n = cows.filter(matchesAll).length;
+      const parts = [];
+      if (state.lote !== "all") parts.push(state.lote === "null" ? "sem lote" : state.lote.toLowerCase().replace("lote", "Lote"));
+      if (state.sit !== "all") parts.push(state.sit === "VL" ? "em lactação" : "secas");
+      if (state.search) parts.push(`"${state.search}"`);
+      const suffix = parts.length ? " — " + parts.join(", ") : "";
+      document.getElementById("filterSummary").innerHTML = `<b>${n}</b> de ${cows.length} vacas${suffix}`;
+    }
+
+    function renderLegend(containerId, items) {
+      const c = document.getElementById(containerId);
+      c.innerHTML = "";
+      items.forEach((it) => {
+        const d = document.createElement("div");
+        d.className = "item";
+        d.innerHTML = `<span class="swatch" style="background:${resolveColor(it.color)}"></span>`;
+        const label = document.createElement("span");
+        label.textContent = it.label;
+        d.appendChild(label);
+        c.appendChild(d);
+      });
+    }
+
+    function horizontalBar(svgId, items, opts) {
+      opts = opts || {};
+      const svg = document.getElementById(svgId);
+      clearSvg(svg);
+      if (!items.length) {
+        const { w, h } = svgSize(svg); svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+        el("text", { x: w / 2, y: h / 2, "text-anchor": "middle", class: "axis-label" }, svg).textContent = "Sem dados para este filtro";
+        return;
+      }
+      const { w, h } = svgSize(svg);
+      svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      const labelW = opts.labelW || 150, valueW = opts.valueW || 70;
+      const padTop = 8, padBottom = 8;
+      const rowH = (h - padTop - padBottom) / items.length;
+      const barH = Math.min(20, rowH - 10);
+      const maxV = opts.max || Math.max(...items.map((i) => i.value), 1) * 1.12;
+      const plotX0 = labelW, plotX1 = w - valueW;
+      const maxChars = Math.max(6, Math.floor((labelW - 14) / 6.4));
+      items.forEach((it, i) => {
+        const cy = padTop + rowH * i + rowH / 2;
+        const truncated = it.label.length > maxChars ? it.label.slice(0, maxChars - 1) + "…" : it.label;
+        const txt = el("text", { x: labelW - 10, y: cy + 4, "text-anchor": "end", class: "cat-label" }, svg);
+        txt.textContent = truncated;
+        if (truncated !== it.label) el("title", {}, txt).textContent = it.label;
+        const bw = Math.max(2, (it.value / maxV) * (plotX1 - plotX0));
+        el("rect", { x: plotX0, y: cy - barH / 2, width: bw, height: barH, rx: 4, ry: 4, fill: resolveColor(it.color || "var(--series-1)"), opacity: it.dimmed ? 0.28 : 1 }, svg);
+        el("text", { x: plotX0 + bw + 8, y: cy + 4, class: "value-label" }, svg).textContent = opts.fmt ? opts.fmt(it.value) : it.value;
+      });
+    }
+
+    function groupedBar(svgId, categories, series, opts) {
+      opts = opts || {};
+      const svg = document.getElementById(svgId);
+      clearSvg(svg);
+      const { w, h } = svgSize(svg);
+      svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      const padL = 10, padR = 10, padT = 22, padB = 28;
+      const plotW = w - padL - padR, plotH = h - padT - padB;
+      const maxV = opts.max || Math.max(...series.flatMap((s) => s.values), 1) * 1.15;
+      const groupW = plotW / categories.length;
+      const barGap = 4;
+      const barW = Math.min(24, (groupW - 20) / series.length - barGap);
+      el("line", { x1: padL, x2: padL + plotW, y1: h - padB, y2: h - padB, class: "baseline" }, svg);
+      categories.forEach((cat, ci) => {
+        const gx0 = padL + groupW * ci + (groupW - (barW + barGap) * series.length + barGap) / 2;
+        const dimmed = opts.dimFn ? opts.dimFn(cat) : false;
+        series.forEach((s, si) => {
+          const v = s.values[ci];
+          const bh = Math.max(2, (v / maxV) * plotH);
+          const bx = gx0 + si * (barW + barGap);
+          const by = h - padB - bh;
+          el("rect", { x: bx, y: by, width: barW, height: bh, rx: 4, ry: 4, fill: resolveColor(s.color), opacity: dimmed ? 0.28 : 1 }, svg);
+        });
+        el("text", { x: padL + groupW * ci + groupW / 2, y: h - padB + 18, "text-anchor": "middle", class: "cat-label" }, svg).textContent = cat;
+      });
+    }
+
+    function stackedBarH(svgId, rows, categories, colors, opts) {
+      opts = opts || {};
+      const svg = document.getElementById(svgId);
+      clearSvg(svg);
+      const { w, h } = svgSize(svg);
+      svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      const labelW = 70, padR = 16, padTop = 10;
+      const rowH = (h - padTop * 2) / rows.length;
+      const barH = Math.min(30, rowH - 14);
+      const plotX0 = labelW, plotX1 = w - padR;
+      const maxTotal = Math.max(...rows.map((r) => r.values.reduce((a, b) => a + b, 0)), 1) * 1.05;
+      const gap = 2;
+      rows.forEach((row, ri) => {
+        const cy = padTop + rowH * ri + rowH / 2;
+        const dimmed = opts.dimFn ? opts.dimFn(row.lote) : false;
+        el("text", { x: labelW - 10, y: cy + 4, "text-anchor": "end", class: "cat-label", opacity: dimmed ? 0.4 : 1 }, svg).textContent = row.lote;
+        let x = plotX0;
+        row.values.forEach((v, vi) => {
+          const segW = Math.max(0, (v / maxTotal) * (plotX1 - plotX0) - gap);
+          if (segW > 0) {
+            el("rect", { x, y: cy - barH / 2, width: segW, height: barH, rx: 3, ry: 3, fill: resolveColor(colors[vi]), opacity: dimmed ? 0.28 : 1 }, svg);
+            if (segW > 46) {
+              const t = el("text", { x: x + segW / 2, y: cy + 4, "text-anchor": "middle", style: "font-size:10.5px;font-weight:600;fill:#fff", opacity: dimmed ? 0.6 : 1 }, svg);
+              t.textContent = "R$" + Math.round(v);
+            }
+          }
+          x += segW + gap;
+        });
+      });
+    }
+
+    // herd composition
+    const inFilter = cows.filter(matchesAll);
+    const vl = inFilter.filter((c) => c.sit === "VL").length;
+    const vs = inFilter.filter((c) => c.sit === "VS").length;
+    const comLote = inFilter.filter((c) => c.lote).length;
+    const semLote = inFilter.length - comLote;
+    renderFilterSummary();
+
+    document.getElementById("herdDesc").textContent = `${inFilter.length} vaca(s) na seleção atual. ${comLote} têm lote de manejo ativo — ${semLote} não têm lote preenchido.`;
+    renderLegend("herdLegend", [{ label: "Em lactação (VL)", value: vl, color: "var(--series-1)" }, { label: "Secas (VS)", value: vs, color: "var(--series-2)" }]);
+    horizontalBar("herdBar", [{ label: "Em lactação (VL)", value: vl, color: "var(--series-1)" }, { label: "Secas (VS)", value: vs, color: "var(--series-2)" }], { fmt: (v) => v + " vacas" });
+    renderLegend("activeLegend", [{ label: "Com lote ativo", value: comLote, color: "var(--series-1)" }, { label: "Sem lote ativo", value: semLote, color: "var(--text-muted)" }]);
+    horizontalBar("activeBar", [{ label: "Com lote ativo", value: comLote, color: "var(--series-1)" }, { label: "Sem lote ativo", value: semLote, color: "var(--text-muted)" }], { fmt: (v) => v + " vacas" });
+
+    // KPIs
+    const kpiRow = document.getElementById("kpiRow");
+    kpiRow.innerHTML = "";
+    const lotesAtivos = state.lote === "all" ? ["LOTE 1", "LOTE 2", "LOTE 3"] : (state.lote === "null" ? [] : [state.lote]);
+    const stats2 = lotesAtivos.map((l) => loteStats(l, { ignoreCowFilters: true }));
+    const custoTot = stats2.reduce((s, l) => s + l.custo, 0);
+    const receitaTot = stats2.reduce((s, l) => s + l.receita, 0);
+    const lucroTot = receitaTot - custoTot;
+    const semDieta = state.lote === "null";
+    const nSel = cows.filter(matchesAll).length;
+    [
+      { label: "Vacas na seleção", value: nSel.toLocaleString("pt-BR") },
+      { label: "Produção / dia (seleção)", value: fmtL(cows.filter(matchesAll).reduce((s, c) => s + (c.av || 0), 0)) },
+      { label: "Receita / dia (lote)", value: semDieta ? "—" : fmtR(receitaTot) },
+      { label: "Custo / dia (lote)", value: semDieta ? "—" : fmtR(custoTot) },
+      { label: "Lucro / dia (lote)", value: semDieta ? "—" : fmtR(lucroTot), good: !semDieta },
+      { label: "% custo de produção", value: semDieta ? "—" : fmtPct(receitaTot ? custoTot / receitaTot : 0) }
+    ].forEach((it) => {
+      const t = document.createElement("div");
+      t.className = "kpi";
+      t.innerHTML = `<div class="label">${it.label}</div><div class="value">${it.value}</div>` + (it.good ? `<div class="delta good">margem positiva</div>` : "");
+      kpiRow.appendChild(t);
+    });
+
+    // lote comparison
+    const loteNames = ["LOTE 1", "LOTE 2", "LOTE 3"];
+    const stats = loteNames.map((l) => loteStats(l, { ignoreCowFilters: true }));
+    horizontalBar("prodLoteBar", stats.map((l) => ({ label: l.lote.replace("LOTE ", "Lote "), value: l.producao, color: loteColorVar(l.lote), dimmed: loteIsDimmed(l.lote) })), { fmt: fmtL });
+    renderLegend("finLegend", [{ label: "Custo/dia", color: "var(--series-1)" }, { label: "Receita/dia", color: "var(--series-2)" }, { label: "Lucro/dia", color: "var(--series-3)" }]);
+    groupedBar("finLoteBar", loteNames.map((l) => l.replace("LOTE ", "Lote ")), [
+      { color: "var(--series-1)", values: stats.map((l) => l.custo) },
+      { color: "var(--series-2)", values: stats.map((l) => l.receita) },
+      { color: "var(--series-3)", values: stats.map((l) => l.lucro) }
+    ], { dimFn: (cat) => loteIsDimmed("LOTE " + cat.replace("Lote ", "")) });
+
+    const loteStatsEl = document.getElementById("loteStats");
+    loteStatsEl.innerHTML = "";
+    stats.forEach((l) => {
+      const dimmed = loteIsDimmed(l.lote);
+      [
+        [l.lote.replace("LOTE ", "Lote ") + " · custo/vaca", fmtR(l.custoVaca)],
+        [l.lote.replace("LOTE ", "Lote ") + " · venda/vaca", fmtR(l.vendaVaca)],
+        [l.lote.replace("LOTE ", "Lote ") + " · média/vaca", l.mediaVaca.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + " L"],
+        [l.lote.replace("LOTE ", "Lote ") + " · % custo", fmtPct(l.pctCusto)]
+      ].forEach(([lab, val]) => {
+        const d = document.createElement("div");
+        d.className = "mini";
+        if (dimmed) d.style.opacity = 0.4;
+        d.innerHTML = `<div class="l">${lab}</div><div class="v">${val}</div>`;
+        loteStatsEl.appendChild(d);
+      });
+    });
+    document.getElementById("loteTable").innerHTML = `<thead><tr><th>Lote</th><th class="num">Vacas</th><th class="num">Produção (L)</th><th class="num">Custo (R$)</th><th class="num">Receita (R$)</th><th class="num">Lucro (R$)</th><th class="num">% Custo</th></tr></thead><tbody>` +
+      stats.map((l) => `<tr><td>${l.lote}</td><td class="num">${l.vacas}</td><td class="num">${l.producao.toFixed(1)}</td><td class="num">${l.custo.toFixed(2)}</td><td class="num">${l.receita.toFixed(2)}</td><td class="num">${l.lucro.toFixed(2)}</td><td class="num">${(l.pctCusto * 100).toFixed(1)}%</td></tr>`).join("") + `</tbody>`;
+
+    // feed composition
+    const feedCats = ["Concentrado", "Caroço", "Silagem", "Casca de Mandioca"];
+    const feedColors = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];
+    renderLegend("feedLegend", feedCats.map((c, i) => ({ label: c, color: feedColors[i] })));
+    const feedRows = loteNames.map((l) => {
+      const d = dieta[l] || { concentrado: 0, caroco: 0, silagem: 0, casca: 0 };
+      return { lote: l, values: [d.concentrado * (prices.concentrado || 0), d.caroco * (prices.caroco || 0), d.silagem * (prices.silagem || 0), d.casca * (prices.casca || 0)] };
+    });
+    stackedBarH("feedBar", feedRows, feedCats, feedColors, { dimFn: loteIsDimmed });
+    document.getElementById("feedTable").innerHTML = `<thead><tr><th>Lote</th>${feedCats.map((c) => `<th class="num">${c}</th>`).join("")}<th class="num">Total</th></tr></thead><tbody>` +
+      feedRows.map((r) => `<tr><td>${r.lote}</td>${r.values.map((v) => `<td class="num">R$ ${v.toFixed(2)}</td>`).join("")}<td class="num">R$ ${r.values.reduce((a, b) => a + b, 0).toFixed(2)}</td></tr>`).join("") + `</tbody>`;
+
+    // DEL
+    const delPool = inFilter.filter((c) => c.sit === "VL" && c.lote);
+    document.getElementById("delTitle").textContent = `Fase DEL — ${delPool.length} vaca(s) na seleção (aproximada, ver aba Vacas)`;
+    document.getElementById("delDesc").textContent = "Estimativa a partir da data de parto cadastrada (só vacas em lactação, com lote ativo, dentro do filtro atual).";
+    const TODAY = new Date();
+    const delCounts = { ">200 dias": 0, "85-200 dias": 0, "40-85 dias": 0, "<40 dias": 0, "Sem data de parto": 0 };
+    delPool.forEach((c) => {
+      if (!c.parto) { delCounts["Sem data de parto"]++; return; }
+      const d = (TODAY - new Date(c.parto)) / 86400000;
+      if (d > 200) delCounts[">200 dias"]++;
+      else if (d > 85) delCounts["85-200 dias"]++;
+      else if (d > 40) delCounts["40-85 dias"]++;
+      else delCounts["<40 dias"]++;
+    });
+    horizontalBar("delBar", Object.entries(delCounts).filter(([, v]) => v > 0).map(([label, value]) => ({ label, value, color: "var(--series-1)" })), { fmt: (v) => v + " vacas" });
+
+    // top/bottom
+    const withAv = inFilter.filter((c) => c.av !== null).sort((a, b) => b.av - a.av);
+    document.getElementById("topBottomDesc").textContent = `Top 10 e bottom 10 entre as ${withAv.length} vaca(s) com média de produção cadastrada, dentro do filtro atual.`;
+    renderLegend("topBottomLegend", [{ label: "Lote 1", color: "var(--series-1)" }, { label: "Lote 2", color: "var(--series-2)" }, { label: "Lote 3", color: "var(--series-3)" }, { label: "Sem lote", color: "var(--text-muted)" }]);
+    horizontalBar("topBar", withAv.slice(0, 10).map((c) => ({ label: `${c.nome} - ${c.id}`, value: c.av, color: loteColorVar(c.lote) })), { fmt: fmtL, labelW: 168, valueW: 50 });
+    horizontalBar("bottomBar", withAv.slice(-10).reverse().map((c) => ({ label: `${c.nome} - ${c.id}`, value: c.av, color: loteColorVar(c.lote) })), { fmt: fmtL, labelW: 168, valueW: 50 });
+
+    document.getElementById("footerNote").innerHTML = `Dados: aba Vacas (${cows.length} cadastradas, ${cows.filter((c) => c.lote).length} com lote ativo) e aba Insumos.
+      Preço do leite: R$ ${precoLeite.toFixed(2)}/L. Edite qualquer valor nas abas Vacas/Insumos e volte aqui — os números recalculam sozinhos.`;
+  }
+
+  function wireSeg(containerId, key) {
+    document.getElementById(containerId).querySelectorAll("button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state[key] = btn.dataset.value;
+        document.getElementById(containerId).querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
+        renderAll();
+      });
+    });
+  }
+  wireSeg("segLote", "lote");
+  wireSeg("segSit", "sit");
+  document.getElementById("searchInput").addEventListener("input", (e) => { state.search = e.target.value.trim(); renderAll(); });
+  document.getElementById("clearFilters").addEventListener("click", () => {
+    state.lote = "all"; state.sit = "all"; state.search = "";
+    document.getElementById("searchInput").value = "";
+    document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("active", b.dataset.value === "all"));
+    renderAll();
+  });
+
+  // vacas tab local search (filters visible rows only, does not touch synced content)
+  document.getElementById("vacasSearch").addEventListener("input", (e) => {
+    const q = stripAccents(e.target.value.trim());
+    let shown = 0;
+    document.querySelectorAll("#vacasBody tr").forEach((tr) => {
+      const nome = tr.children[1].textContent;
+      const id = tr.children[0].textContent;
+      const match = !q || stripAccents(nome).includes(q) || id.includes(q);
+      tr.style.display = match ? "" : "none";
+      if (match) shown++;
+    });
+    document.getElementById("vacasCount").textContent = `${shown} de ${document.querySelectorAll("#vacasBody tr").length} vacas`;
+  });
+  document.getElementById("vacasCount").textContent = document.querySelectorAll("#vacasBody tr").length + " vacas";
+
+  recomputeDerived();
+  let resizeT;
+  window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(renderAll, 150); });
+})();
+</script>

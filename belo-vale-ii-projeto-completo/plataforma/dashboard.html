@@ -1,0 +1,779 @@
+<title>Painel Belo Vale II</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --axis:           #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --good-text:      #006300;
+    --series-1:       #2a78d6; /* blue   */
+    --series-2:       #eb6834; /* orange */
+    --series-3:       #1baf7a; /* aqua   */
+    --series-4:       #eda100; /* yellow */
+    --status-good:    #0ca30c;
+    --seq-100:        #cde2fb;
+    --seq-700:        #0d366b;
+    --shadow: 0 1px 2px rgba(11,11,11,0.04), 0 6px 20px rgba(11,11,11,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page-plane:     #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --grid:           #2c2c2a;
+      --axis:           #383835;
+      --border:         rgba(255,255,255,0.10);
+      --good-text:      #0ca30c;
+      --series-1:       #3987e5;
+      --series-2:       #d95926;
+      --series-3:       #199e70;
+      --series-4:       #c98500;
+      --seq-100:        #184f95;
+      --seq-700:        #cde2fb;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page-plane:     #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --grid:           #2c2c2a;
+    --axis:           #383835;
+    --border:         rgba(255,255,255,0.10);
+    --good-text:      #0ca30c;
+    --series-1:       #3987e5;
+    --series-2:       #d95926;
+    --series-3:       #199e70;
+    --series-4:       #c98500;
+    --seq-100:        #184f95;
+    --seq-700:        #cde2fb;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 24px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  .viz-root {
+    background: var(--page-plane);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    min-height: 100%;
+    padding: 28px 20px 60px;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  header.top { margin-bottom: 28px; }
+  header.top h1 { font-size: 26px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.01em; }
+  header.top .sub { color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
+  header.top .sub b { color: var(--text-primary); font-weight: 600; }
+
+  .section { margin-top: 40px; }
+  .section h2 { font-size: 17px; font-weight: 700; margin: 0 0 4px; }
+  .section .desc { color: var(--text-secondary); font-size: 13px; margin: 0 0 16px; max-width: 760px; line-height: 1.5; }
+
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 20px;
+  }
+
+  /* KPI tiles */
+  .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  @media (max-width: 980px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 620px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  .kpi {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 16px 14px;
+    box-shadow: var(--shadow);
+  }
+  .kpi .label { font-size: 11.5px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .kpi .value { font-size: 25px; font-weight: 700; margin-top: 6px; font-variant-numeric: proportional-nums; }
+  .kpi .delta { font-size: 12px; margin-top: 4px; color: var(--text-muted); }
+  .kpi .delta.good { color: var(--good-text); font-weight: 600; }
+
+  /* generic grid of cards */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-top: 14px; }
+  @media (max-width: 700px) { .stat-row { grid-template-columns: repeat(2,1fr); } }
+  .stat-row .mini { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .stat-row .mini .l { font-size: 11px; color: var(--text-muted); }
+  .stat-row .mini .v { font-size: 16px; font-weight: 700; margin-top: 2px; }
+
+  /* legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 10px; font-size: 12.5px; color: var(--text-secondary); }
+  .legend .item { display: flex; align-items: center; gap: 6px; }
+  .legend .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+  svg text { fill: var(--text-secondary); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  svg .axis-label { fill: var(--text-muted); font-size: 11px; }
+  svg .value-label { fill: var(--text-primary); font-size: 12px; font-weight: 600; }
+  svg .cat-label { fill: var(--text-secondary); font-size: 12px; }
+  .gridline { stroke: var(--grid); stroke-width: 1; }
+  .baseline { stroke: var(--axis); stroke-width: 1; }
+
+  .tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12.5px;
+    color: var(--text-primary);
+    line-height: 1.5;
+    opacity: 0;
+    transition: opacity .08s ease;
+    z-index: 5;
+    white-space: nowrap;
+  }
+  .tooltip .t-label { color: var(--text-secondary); }
+  .chart-wrap { position: relative; }
+
+  details.tbl { margin-top: 12px; }
+  details.tbl summary {
+    cursor: pointer; font-size: 12.5px; color: var(--text-secondary);
+    font-weight: 600; user-select: none;
+  }
+  details.tbl summary:hover { color: var(--text-primary); }
+  table.datatable { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12.5px; }
+  table.datatable th, table.datatable td {
+    text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid);
+    font-variant-numeric: tabular-nums;
+  }
+  table.datatable th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .02em; }
+  table.datatable td.num, table.datatable th.num { text-align: right; }
+
+  .note-card {
+    border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px;
+    background: var(--surface-1); font-size: 12.5px; color: var(--text-secondary); line-height: 1.6;
+  }
+  .note-card b { color: var(--text-primary); }
+  .badge {
+    display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px;
+    border-radius: 999px; background: var(--grid); color: var(--text-secondary);
+  }
+
+  footer.foot { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px; line-height: 1.6; }
+</style>
+
+<div class="viz-root">
+<div class="wrap">
+
+  <header class="top">
+    <h1>🐄 Belo Vale II — Painel do Rebanho Leiteiro</h1>
+    <div class="sub">
+      Fonte: <b>PLANILHA DO UMAR — PESAGEM DO LEITE.xlsx</b> (Google Drive, pasta "Leo Figueiroa") + registros diários da pasta <b>MEDICOES</b>.
+      Última pesagem completa: <b>22/07/2026</b>. Painel gerado em 19/08/2026.
+    </div>
+  </header>
+
+  <!-- KPI ROW -->
+  <div class="kpi-grid" id="kpiRow"></div>
+
+  <!-- HERD OVERVIEW -->
+  <div class="section">
+    <h2>Composição do rebanho</h2>
+    <p class="desc">276 animais no cadastro (253 originais + 23 identificadas nas fichas de 22/07/2026). Apenas as vacas alocadas a um lote de manejo (144) têm pesagem e dieta acompanhadas diariamente — as demais aparecem no histórico, mas sem lote de acompanhamento ativo.</p>
+    <div class="grid2">
+      <div class="card">
+        <div class="legend" id="herdLegend"></div>
+        <div class="chart-wrap"><svg id="herdBar" width="100%" height="140"></svg></div>
+      </div>
+      <div class="card">
+        <div class="legend" id="activeLegend"></div>
+        <div class="chart-wrap"><svg id="activeBar" width="100%" height="140"></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOTE COMPARISON -->
+  <div class="section">
+    <h2>Comparativo por lote (dia de referência: 22/07/2026)</h2>
+    <p class="desc">Após a atualização de 22/07/2026, os três lotes têm vacas e dieta ativas. O Lote 3 reúne as vacas de menor produção e passou a entrar nos totais de custo/receita pela primeira vez.</p>
+    <div class="grid2">
+      <div class="card">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Produção diária de leite (L)</div>
+        <div class="chart-wrap"><svg id="prodLoteBar" width="100%" height="150"></svg></div>
+      </div>
+      <div class="card">
+        <div class="legend" id="finLegend"></div>
+        <div class="chart-wrap"><svg id="finLoteBar" width="100%" height="150"></svg></div>
+      </div>
+    </div>
+    <div class="stat-row" id="loteStats"></div>
+    <details class="tbl"><summary>Ver tabela — comparativo por lote</summary>
+      <table class="datatable" id="loteTable"></table>
+    </details>
+  </div>
+
+  <!-- FEED COST COMPOSITION -->
+  <div class="section">
+    <h2>Composição do custo de alimentação</h2>
+    <p class="desc">Custo diário de ração por lote, segundo a dieta configurada na aba "CUSTO DA RAÇÃO" (preço do leite: R$ 2,59/L).</p>
+    <div class="card">
+      <div class="legend" id="feedLegend"></div>
+      <div class="chart-wrap"><svg id="feedBar" width="100%" height="130"></svg></div>
+      <details class="tbl"><summary>Ver tabela — custo de alimentação (R$/dia)</summary>
+        <table class="datatable" id="feedTable"></table>
+      </details>
+    </div>
+    <div class="note-card" style="margin-top:14px;">
+      <b>Dieta atualizada</b> com os insumos efetivamente registrados em 22/07/2026 (ficha "Insumos para as vacas", pasta MEDICOES).
+      Também corrigimos um erro na fórmula de custo do Lote 3, que somava só 3 dos 4 insumos (faltava o Concentrado) —
+      por isso o custo do Lote 3 nunca tinha aparecido corretamente antes.
+    </div>
+  </div>
+
+  <!-- PRODUCTION TREND -->
+  <div class="section">
+    <h2>Produção total de leite ao longo do tempo</h2>
+    <p class="desc">Soma da pesagem de todas as vacas registradas em cada data de controle leiteiro, de nov/2022 a jul/2026. O nº de vacas pesadas varia a cada data — passe o mouse para ver o total, a média por vaca e quantas vacas entraram na conta.</p>
+    <div class="card">
+      <div class="chart-wrap" id="trendWrap">
+        <svg id="trendChart" width="100%" height="280"></svg>
+        <div class="tooltip" id="trendTooltip"></div>
+      </div>
+      <div class="note-card" style="margin-top:14px;">
+        <b>Atenção:</b> não há registro de pesagem entre 02/12/2025 e 22/07/2026 (7 meses de intervalo) — o gráfico
+        mostra os dois pontos conectados por uma linha pontilhada apenas para orientação visual, não porque a produção
+        caiu de forma contínua nesse período.
+      </div>
+      <details class="tbl"><summary>Ver tabela — todas as datas de pesagem</summary>
+        <table class="datatable" id="trendTable"></table>
+      </details>
+    </div>
+  </div>
+
+  <!-- DEL + CALVING -->
+  <div class="section">
+    <h2>Estágio de lactação e sazonalidade de partos</h2>
+    <p class="desc">DEL = dias em lactação desde o último parto, calculado para as 144 vacas ativas por lote (22 delas são novas e ainda sem data de parto registrada). À direita, o número de partos por mês (todo o rebanho, desde fev/2023) — mostra a concentração de nascimentos em meados de 2025.</p>
+    <div class="grid2">
+      <div class="card">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Fase DEL — rebanho ativo (144 vacas)</div>
+        <div class="chart-wrap"><svg id="delBar" width="100%" height="140"></svg></div>
+      </div>
+      <div class="card">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Partos por mês</div>
+        <div class="chart-wrap" id="partoWrap">
+          <svg id="partoBar" width="100%" height="220"></svg>
+          <div class="tooltip" id="partoTooltip"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP / BOTTOM PRODUCERS -->
+  <div class="section">
+    <h2>Vacas de maior e menor produção (22/07/2026)</h2>
+    <p class="desc">Top 10 e bottom 10 entre as vacas pesadas no último controle leiteiro, coloridas pelo lote. Útil para decidir remanejamento entre lotes ou avaliar candidatas à secagem.</p>
+    <div class="legend" id="topBottomLegend"></div>
+    <div class="grid2">
+      <div class="card">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Top 10 — maior produção (L)</div>
+        <div class="chart-wrap"><svg id="topBar" width="100%" height="240"></svg></div>
+      </div>
+      <div class="card">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Bottom 10 — menor produção (L)</div>
+        <div class="chart-wrap"><svg id="bottomBar" width="100%" height="240"></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="foot">
+    Dados brutos: planilha "PLANILHA DO UMAR — PESAGEM DO LEITE.xlsx" (abas LOTES, CUSTO DA RAÇÃO, Tabela, Dashboard) e a pasta
+    MEDICOES/22.07.2026 (controle leiteiro fotografado e nota de insumos), já com a atualização de lotes, produção total e dieta
+    aplicada em 19/08/2026. 132 vacas do cadastro (VL sem lote ativo + VS secas) não têm lote de acompanhamento preenchido na
+    planilha — ficaram fora dos gráficos de custo/receita por lote, mas contam na composição geral do rebanho. 10 lançamentos das
+    fichas de 22/07 ficaram pendentes de conferência manual (caligrafia ilegível ou ID ambíguo) — veja a aba "REVISAR 22-07-2026"
+    na planilha. Nenhum valor foi estimado: o que não está na planilha não aparece aqui.
+  </footer>
+
+</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- DATA ----------
+  const data = {
+    kpis: {
+      producao_dia: 3102.1, receita_dia: 8034.44, custo_dia: 4194.6, lucro_dia: 3839.84,
+      lucro_mes: 115195.17, pct_custo: 0.5221
+    },
+    herd: [
+      { label: "Em lactação (VL)", value: 208, color: "var(--series-1)" },
+      { label: "Secas (VS)", value: 68, color: "var(--series-2)" }
+    ],
+    active: [
+      { label: "Monitoradas por lote", value: 144, color: "var(--series-1)" },
+      { label: "Sem lote ativo", value: 132, color: "var(--text-muted)" }
+    ],
+    lotes: [
+      { lote: "Lote 1", vacas: 63, producao: 1653.5, custo: 1964.8, receita: 4282.57, lucro: 2317.77, custoVaca: 31.19, vendaVaca: 67.98, mediaVaca: 26.25, pctCusto: 0.4588 },
+      { lote: "Lote 2", vacas: 59, producao: 1186.1, custo: 1795.1, receita: 3072.00, lucro: 1276.90, custoVaca: 30.43, vendaVaca: 52.07, mediaVaca: 20.10, pctCusto: 0.5843 },
+      { lote: "Lote 3", vacas: 22, producao: 262.5, custo: 434.7, receita: 679.88, lucro: 245.18, custoVaca: 19.76, vendaVaca: 30.90, mediaVaca: 11.93, pctCusto: 0.6394 }
+    ],
+    feed: {
+      categories: ["Concentrado", "Caroço", "Silagem", "Casca de Mandioca"],
+      colors: ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"],
+      lotes: [
+        { lote: "Lote 1", values: [1018.2, 96.6, 630.0, 220.0] },
+        { lote: "Lote 2", values: [848.5, 96.6, 630.0, 220.0] },
+        { lote: "Lote 3", values: [169.7, 0.0, 210.0, 55.0] }
+      ]
+    },
+    trend: [
+      {"date":"2022-11-14","n_vacas":111,"total_L":2044.0,"media_L_vaca":18.41},
+      {"date":"2022-12-08","n_vacas":114,"total_L":2108.0,"media_L_vaca":18.49},
+      {"date":"2022-12-25","n_vacas":108,"total_L":2040.0,"media_L_vaca":18.89},
+      {"date":"2023-01-08","n_vacas":27,"total_L":321.5,"media_L_vaca":11.91},
+      {"date":"2023-01-17","n_vacas":101,"total_L":1894.0,"media_L_vaca":18.75},
+      {"date":"2023-02-15","n_vacas":106,"total_L":1814.0,"media_L_vaca":17.11},
+      {"date":"2023-03-01","n_vacas":100,"total_L":1749.5,"media_L_vaca":17.5},
+      {"date":"2023-03-13","n_vacas":24,"total_L":643.0,"media_L_vaca":26.79},
+      {"date":"2023-03-27","n_vacas":100,"total_L":1736.0,"media_L_vaca":17.36},
+      {"date":"2023-04-17","n_vacas":102,"total_L":1755.0,"media_L_vaca":17.21},
+      {"date":"2023-05-09","n_vacas":118,"total_L":1815.5,"media_L_vaca":15.39},
+      {"date":"2023-05-22","n_vacas":118,"total_L":1734.5,"media_L_vaca":14.7},
+      {"date":"2023-06-10","n_vacas":114,"total_L":1782.5,"media_L_vaca":15.64},
+      {"date":"2023-07-04","n_vacas":80,"total_L":1686.0,"media_L_vaca":21.07},
+      {"date":"2023-07-19","n_vacas":87,"total_L":1788.0,"media_L_vaca":20.55},
+      {"date":"2023-08-28","n_vacas":95,"total_L":1965.5,"media_L_vaca":20.69},
+      {"date":"2023-09-11","n_vacas":98,"total_L":1957.5,"media_L_vaca":19.97},
+      {"date":"2023-10-04","n_vacas":101,"total_L":2017.5,"media_L_vaca":19.98},
+      {"date":"2023-10-19","n_vacas":75,"total_L":1163.5,"media_L_vaca":15.51},
+      {"date":"2023-10-28","n_vacas":106,"total_L":2080.0,"media_L_vaca":19.62},
+      {"date":"2023-11-28","n_vacas":113,"total_L":2278.0,"media_L_vaca":20.16},
+      {"date":"2023-12-22","n_vacas":115,"total_L":2354.6,"media_L_vaca":20.47},
+      {"date":"2024-01-27","n_vacas":129,"total_L":2666.5,"media_L_vaca":20.67},
+      {"date":"2024-03-05","n_vacas":123,"total_L":2691.3,"media_L_vaca":21.88},
+      {"date":"2024-04-19","n_vacas":120,"total_L":1953.0,"media_L_vaca":16.27},
+      {"date":"2024-05-17","n_vacas":106,"total_L":1815.0,"media_L_vaca":17.12},
+      {"date":"2024-06-03","n_vacas":110,"total_L":1905.5,"media_L_vaca":17.32},
+      {"date":"2024-07-02","n_vacas":117,"total_L":2126.5,"media_L_vaca":18.18},
+      {"date":"2024-07-19","n_vacas":121,"total_L":2449.0,"media_L_vaca":20.24},
+      {"date":"2024-08-22","n_vacas":125,"total_L":2538.0,"media_L_vaca":20.3},
+      {"date":"2024-09-26","n_vacas":138,"total_L":2758.0,"media_L_vaca":19.99},
+      {"date":"2024-11-08","n_vacas":143,"total_L":2855.5,"media_L_vaca":19.97},
+      {"date":"2025-01-07","n_vacas":138,"total_L":2964.5,"media_L_vaca":21.48},
+      {"date":"2025-03-06","n_vacas":122,"total_L":2602.5,"media_L_vaca":21.33},
+      {"date":"2025-04-16","n_vacas":122,"total_L":2439.0,"media_L_vaca":19.99},
+      {"date":"2025-06-18","n_vacas":126,"total_L":2467.5,"media_L_vaca":19.58},
+      {"date":"2025-07-21","n_vacas":125,"total_L":2720.0,"media_L_vaca":21.76},
+      {"date":"2025-09-05","n_vacas":119,"total_L":2734.0,"media_L_vaca":22.97},
+      {"date":"2025-10-06","n_vacas":129,"total_L":2748.5,"media_L_vaca":21.31},
+      {"date":"2025-11-04","n_vacas":127,"total_L":2822.5,"media_L_vaca":22.22},
+      {"date":"2025-12-02","n_vacas":126,"total_L":2850.0,"media_L_vaca":22.62},
+      {"date":"2026-07-22","n_vacas":145,"total_L":3104.1,"media_L_vaca":21.41}
+    ],
+    del: [
+      { label: ">200 dias", value: 110 },
+      { label: "85–200 dias", value: 12 },
+      { label: "Sem registro", value: 22 }
+    ],
+    partoMonth: {"2023-02":1,"2023-03":2,"2023-04":6,"2023-05":5,"2023-06":2,"2023-09":4,"2023-10":2,"2023-11":2,"2023-12":4,"2024-01":2,"2024-02":4,"2024-03":2,"2024-04":2,"2024-05":9,"2024-06":4,"2024-07":6,"2024-08":9,"2024-09":4,"2024-10":5,"2024-11":5,"2024-12":6,"2025-01":7,"2025-02":6,"2025-03":9,"2025-04":8,"2025-05":18,"2025-06":14,"2025-07":14,"2025-08":10,"2025-09":10,"2025-10":11,"2025-11":10,"2025-12":1,"2026-01":9,"2026-02":12},
+    top10: [
+      ["GAÚCHA - 586","LOTE 1",42],["BAHIA - 591","LOTE 1",38.5],["CHIQUINHA - 323","LOTE 1",38],
+      ["NEGUINHA - 647","LOTE 2",36],["NEBLINA - 767","LOTE 1",35.5],["AMANDA - 026","LOTE 1",35.5],
+      ["Cabelo De Fogo - 008","LOTE 1",35],["PEITUDA - 599","LOTE 1",34.5],["Rainha - 682","LOTE 1",34],
+      ["ANGÉLICA - 596","LOTE 1",33]
+    ],
+    bottom10: [
+      ["UBERÁBA - 003 AMARELO","LOTE 1",8],["PRETINHA - 853","LOTE 3",8],["REDONDA - 649","LOTE 3",8],
+      ["SUZANA - 567","LOTE 3",6.5],["LAVAREDA - 560","LOTE 2",6],["MAYARA - 573","LOTE 3",6],
+      ["PIQUENA - 701","LOTE 3",6],["SERTANEJA - 671","LOTE 3",6],["MAROCA - 657","LOTE 3",2],
+      ["Machada - 967",null,2]
+    ]
+  };
+
+  const cssv = (name) => getComputedStyle(document.querySelector(".viz-root")).getPropertyValue(name).trim();
+  const NS = "http://www.w3.org/2000/svg";
+  const fmtL = (v) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " L";
+  const fmtR = (v) => "R$ " + v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtPct = (v) => (v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
+  const resolveColor = (c) => c.startsWith("var(") ? cssv(c.slice(4, -1)) : c;
+
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  function clearSvg(svg) { while (svg.firstChild) svg.removeChild(svg.firstChild); }
+
+  function svgSize(svg) {
+    const r = svg.getBoundingClientRect();
+    return { w: Math.max(r.width, 280), h: parseFloat(svg.getAttribute("height")) };
+  }
+
+  // ---------- KPI ROW ----------
+  function renderKpis() {
+    const row = document.getElementById("kpiRow");
+    row.innerHTML = "";
+    const items = [
+      { label: "Produção / dia (rebanho ativo)", value: fmtL(data.kpis.producao_dia) },
+      { label: "Receita / dia", value: fmtR(data.kpis.receita_dia) },
+      { label: "Custo / dia", value: fmtR(data.kpis.custo_dia) },
+      { label: "Lucro / dia", value: fmtR(data.kpis.lucro_dia), good: true },
+      { label: "Lucro projetado / mês", value: fmtR(data.kpis.lucro_mes), good: true },
+      { label: "% custo de produção", value: fmtPct(data.kpis.pct_custo) }
+    ];
+    items.forEach((it) => {
+      const t = document.createElement("div");
+      t.className = "kpi";
+      t.innerHTML = `<div class="label">${it.label}</div><div class="value">${it.value}</div>` +
+        (it.good ? `<div class="delta good">margem positiva</div>` : "");
+      row.appendChild(t);
+    });
+  }
+
+  // ---------- LEGEND ----------
+  function renderLegend(containerId, items) {
+    const c = document.getElementById(containerId);
+    c.innerHTML = "";
+    items.forEach((it) => {
+      const d = document.createElement("div");
+      d.className = "item";
+      d.innerHTML = `<span class="swatch" style="background:${resolveColor(it.color)}"></span>${it.label}`;
+      c.appendChild(d);
+    });
+  }
+
+  // ---------- HORIZONTAL BAR CHART ----------
+  function horizontalBar(svgId, items, opts) {
+    opts = opts || {};
+    const svg = document.getElementById(svgId);
+    clearSvg(svg);
+    const { w, h } = svgSize(svg);
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    const labelW = opts.labelW || 150;
+    const valueW = opts.valueW || 70;
+    const padTop = 8, padBottom = 8;
+    const rowH = (h - padTop - padBottom) / items.length;
+    const barH = Math.min(20, rowH - 10);
+    const maxV = opts.max || Math.max(...items.map((i) => i.value)) * 1.12;
+    const plotX0 = labelW, plotX1 = w - valueW;
+
+    const maxChars = Math.max(6, Math.floor((labelW - 14) / 6.4));
+    items.forEach((it, i) => {
+      const cy = padTop + rowH * i + rowH / 2;
+      const truncated = it.label.length > maxChars ? it.label.slice(0, maxChars - 1) + "…" : it.label;
+      const txt = el("text", { x: labelW - 10, y: cy + 4, "text-anchor": "end", class: "cat-label" }, svg);
+      txt.textContent = truncated;
+      if (truncated !== it.label) el("title", {}, txt).textContent = it.label;
+      const bw = Math.max(2, (it.value / maxV) * (plotX1 - plotX0));
+      el("rect", {
+        x: plotX0, y: cy - barH / 2, width: bw, height: barH, rx: 4, ry: 4,
+        fill: resolveColor(it.color || "var(--series-1)")
+      }, svg);
+      el("text", {
+        x: plotX0 + bw + 8, y: cy + 4, class: "value-label"
+      }, svg).textContent = opts.fmt ? opts.fmt(it.value) : it.value;
+    });
+  }
+
+  // ---------- VERTICAL GROUPED BAR ----------
+  function groupedBar(svgId, categories, series, opts) {
+    opts = opts || {};
+    const svg = document.getElementById(svgId);
+    clearSvg(svg);
+    const { w, h } = svgSize(svg);
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    const padL = 10, padR = 10, padT = 22, padB = 28;
+    const plotW = w - padL - padR, plotH = h - padT - padB;
+    const maxV = opts.max || Math.max(...series.flatMap((s) => s.values)) * 1.15;
+    const groupW = plotW / categories.length;
+    const barGap = 4;
+    const barW = Math.min(24, (groupW - 20) / series.length - barGap);
+
+    // baseline
+    el("line", { x1: padL, x2: padL + plotW, y1: h - padB, y2: h - padB, class: "baseline" }, svg);
+
+    categories.forEach((cat, ci) => {
+      const gx0 = padL + groupW * ci + (groupW - (barW + barGap) * series.length + barGap) / 2;
+      series.forEach((s, si) => {
+        const v = s.values[ci];
+        const bh = Math.max(2, (v / maxV) * plotH);
+        const bx = gx0 + si * (barW + barGap);
+        const by = h - padB - bh;
+        el("rect", { x: bx, y: by, width: barW, height: bh, rx: 4, ry: 4, fill: resolveColor(s.color) }, svg);
+        if (opts.showValues) {
+          el("text", { x: bx + barW / 2, y: by - 6, "text-anchor": "middle", class: "value-label", style: "font-size:10.5px" }, svg)
+            .textContent = opts.fmt ? opts.fmt(v) : v;
+        }
+      });
+      el("text", { x: padL + groupW * ci + groupW / 2, y: h - padB + 18, "text-anchor": "middle", class: "cat-label" }, svg)
+        .textContent = cat;
+    });
+  }
+
+  // ---------- HORIZONTAL STACKED BAR ----------
+  function stackedBarH(svgId, rows, categories, colors, opts) {
+    opts = opts || {};
+    const svg = document.getElementById(svgId);
+    clearSvg(svg);
+    const { w, h } = svgSize(svg);
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    const labelW = 70, padR = 16, padTop = 10;
+    const rowH = (h - padTop * 2) / rows.length;
+    const barH = Math.min(30, rowH - 14);
+    const plotX0 = labelW, plotX1 = w - padR;
+    const maxTotal = Math.max(...rows.map((r) => r.values.reduce((a, b) => a + b, 0))) * 1.05;
+    const gap = 2;
+
+    rows.forEach((row, ri) => {
+      const cy = padTop + rowH * ri + rowH / 2;
+      el("text", { x: labelW - 10, y: cy + 4, "text-anchor": "end", class: "cat-label" }, svg).textContent = row.lote;
+      let x = plotX0;
+      row.values.forEach((v, vi) => {
+        const segW = Math.max(0, (v / maxTotal) * (plotX1 - plotX0) - gap);
+        if (segW > 0) {
+          el("rect", { x, y: cy - barH / 2, width: segW, height: barH, rx: 3, ry: 3, fill: resolveColor(colors[vi]) }, svg);
+          if (segW > 46) {
+            const t = el("text", { x: x + segW / 2, y: cy + 4, "text-anchor": "middle", style: "font-size:10.5px;font-weight:600;fill:#fff" }, svg);
+            t.textContent = "R$" + Math.round(v);
+          }
+        }
+        x += segW + gap;
+      });
+    });
+  }
+
+  // ---------- LINE CHART w/ TOOLTIP ----------
+  function lineChart(svgId, series, opts) {
+    opts = opts || {};
+    const svg = document.getElementById(svgId);
+    clearSvg(svg);
+    const { w, h } = svgSize(svg);
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    const padL = 46, padR = 16, padT = 16, padB = 34;
+    const plotW = w - padL - padR, plotH = h - padT - padB;
+    const values = series.map((d) => d.total_L);
+    const maxV = Math.max(...values) * 1.12;
+    const minV = 0;
+    const n = series.length;
+    const x = (i) => padL + (plotW * i) / (n - 1);
+    const y = (v) => padT + plotH - ((v - minV) / (maxV - minV)) * plotH;
+
+    // gridlines (4 steps)
+    const steps = 4;
+    for (let s = 0; s <= steps; s++) {
+      const v = (maxV / steps) * s;
+      const gy = y(v);
+      el("line", { x1: padL, x2: padL + plotW, y1: gy, y2: gy, class: "gridline" }, svg);
+      el("text", { x: padL - 10, y: gy + 4, "text-anchor": "end", class: "axis-label" }, svg)
+        .textContent = Math.round(v).toLocaleString("pt-BR");
+    }
+
+    // x labels: show a subset (every ~5th point + first/last)
+    series.forEach((d, i) => {
+      if (i === 0 || i === n - 1 || i % 6 === 0) {
+        const [yy, mm] = d.date.split("-");
+        el("text", { x: x(i), y: h - padB + 18, "text-anchor": "middle", class: "axis-label" }, svg)
+          .textContent = mm + "/" + yy.slice(2);
+      }
+    });
+
+    // find the big gap (>150 days) to draw dashed
+    const segments = [];
+    let cur = [0];
+    for (let i = 1; i < n; i++) {
+      const d0 = new Date(series[i - 1].date), d1 = new Date(series[i].date);
+      const days = (d1 - d0) / 86400000;
+      if (days > 150) { segments.push({ pts: cur, gapAfter: true }); cur = [i]; }
+      else cur.push(i);
+    }
+    segments.push({ pts: cur, gapAfter: false });
+
+    segments.forEach((seg) => {
+      if (seg.pts.length > 1) {
+        const d = seg.pts.map((i) => `${i === seg.pts[0] ? "M" : "L"} ${x(i)} ${y(series[i].total_L)}`).join(" ");
+        el("path", { d, fill: "none", stroke: resolveColor("var(--series-1)"), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+        // area wash
+        const first = seg.pts[0], last = seg.pts[seg.pts.length - 1];
+        const area = `M ${x(first)} ${y(0)} ` + seg.pts.map((i) => `L ${x(i)} ${y(series[i].total_L)}`).join(" ") + ` L ${x(last)} ${y(0)} Z`;
+        el("path", { d: area, fill: resolveColor("var(--series-1)"), opacity: 0.1 }, svg);
+      }
+      if (seg.gapAfter) {
+        const lastI = seg.pts[seg.pts.length - 1], nextI = lastI + 1;
+        el("line", {
+          x1: x(lastI), y1: y(series[lastI].total_L), x2: x(nextI), y2: y(series[nextI].total_L),
+          stroke: resolveColor("var(--text-muted)"), "stroke-width": 1.5, "stroke-dasharray": "3,4"
+        }, svg);
+      }
+    });
+
+    // markers
+    series.forEach((d, i) => {
+      el("circle", { cx: x(i), cy: y(d.total_L), r: 4, fill: resolveColor("var(--series-1)"), stroke: resolveColor("var(--surface-1)"), "stroke-width": 2 }, svg);
+    });
+
+    // hover targets
+    const tooltip = document.getElementById("trendTooltip");
+    const wrap = document.getElementById("trendWrap");
+    series.forEach((d, i) => {
+      const hit = el("circle", { cx: x(i), cy: y(d.total_L), r: 10, fill: "transparent" }, svg);
+      hit.addEventListener("mouseenter", (ev) => {
+        tooltip.innerHTML = `<div><b>${d.date.split("-").reverse().join("/")}</b></div>` +
+          `<div><span class="t-label">Total:</span> ${fmtL(d.total_L)}</div>` +
+          `<div><span class="t-label">Média/vaca:</span> ${d.media_L_vaca.toLocaleString("pt-BR")} L</div>` +
+          `<div><span class="t-label">Vacas pesadas:</span> ${d.n_vacas}</div>`;
+        tooltip.style.opacity = 1;
+        const wr = wrap.getBoundingClientRect(), sr = svg.getBoundingClientRect();
+        const px = sr.left - wr.left + (x(i) / w) * sr.width;
+        const py = sr.top - wr.top + (y(d.total_L) / h) * sr.height;
+        tooltip.style.left = Math.min(px + 12, wr.width - 170) + "px";
+        tooltip.style.top = Math.max(py - 50, 0) + "px";
+      });
+      hit.addEventListener("mouseleave", () => { tooltip.style.opacity = 0; });
+    });
+  }
+
+  // ---------- MONTH BAR (calving) ----------
+  function monthBar(svgId, tooltipId, wrapId, monthMap) {
+    const svg = document.getElementById(svgId);
+    clearSvg(svg);
+    const { w, h } = svgSize(svg);
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    const entries = Object.entries(monthMap);
+    const padL = 30, padR = 10, padT = 10, padB = 34;
+    const plotW = w - padL - padR, plotH = h - padT - padB;
+    const maxV = Math.max(...entries.map((e) => e[1])) * 1.15;
+    const gap = 3;
+    const barW = plotW / entries.length - gap;
+
+    el("line", { x1: padL, x2: padL + plotW, y1: h - padB, y2: h - padB, class: "baseline" }, svg);
+
+    const tooltip = document.getElementById(tooltipId);
+    const wrap = document.getElementById(wrapId);
+
+    entries.forEach(([month, count], i) => {
+      const bh = Math.max(2, (count / maxV) * plotH);
+      const bx = padL + i * (barW + gap);
+      const by = h - padB - bh;
+      const rect = el("rect", { x: bx, y: by, width: barW, height: bh, rx: 3, ry: 3, fill: resolveColor("var(--series-1)") }, svg);
+      if (month.endsWith("-01") || i === 0 || i % 6 === 0) {
+        el("text", { x: bx + barW / 2, y: h - padB + 16, "text-anchor": "middle", class: "axis-label", style: "font-size:9.5px" }, svg)
+          .textContent = month;
+      }
+      rect.addEventListener("mouseenter", () => {
+        tooltip.innerHTML = `<b>${month}</b><br>${count} parto${count > 1 ? "s" : ""}`;
+        tooltip.style.opacity = 1;
+        const wr = wrap.getBoundingClientRect(), sr = svg.getBoundingClientRect();
+        const px = sr.left - wr.left + ((bx + barW / 2) / w) * sr.width;
+        const py = sr.top - wr.top + (by / h) * sr.height;
+        tooltip.style.left = Math.min(Math.max(px - 30, 0), wr.width - 120) + "px";
+        tooltip.style.top = Math.max(py - 46, 0) + "px";
+      });
+      rect.addEventListener("mouseleave", () => { tooltip.style.opacity = 0; });
+    });
+  }
+
+  function loteColor(lote) {
+    if (lote === "LOTE 1") return "var(--series-1)";
+    if (lote === "LOTE 2") return "var(--series-2)";
+    if (lote === "LOTE 3") return "var(--series-3)";
+    return "var(--text-muted)";
+  }
+
+  // ---------- RENDER ALL ----------
+  function renderAll() {
+    renderKpis();
+
+    renderLegend("herdLegend", data.herd);
+    horizontalBar("herdBar", data.herd, { fmt: (v) => v + " vacas" });
+
+    renderLegend("activeLegend", data.active);
+    horizontalBar("activeBar", data.active, { fmt: (v) => v + " vacas" });
+
+    horizontalBar("prodLoteBar", data.lotes.map((l) => ({ label: l.lote, value: l.producao, color: loteColor(l.lote.toUpperCase()) })), { fmt: fmtL });
+
+    renderLegend("finLegend", [
+      { label: "Custo/dia", color: "var(--series-1)" },
+      { label: "Receita/dia", color: "var(--series-2)" },
+      { label: "Lucro/dia", color: "var(--series-3)" }
+    ]);
+    groupedBar("finLoteBar", data.lotes.map((l) => l.lote), [
+      { color: "var(--series-1)", values: data.lotes.map((l) => l.custo) },
+      { color: "var(--series-2)", values: data.lotes.map((l) => l.receita) },
+      { color: "var(--series-3)", values: data.lotes.map((l) => l.lucro) }
+    ], { fmt: (v) => "R$" + Math.round(v) });
+
+    const loteStats = document.getElementById("loteStats");
+    loteStats.innerHTML = "";
+    data.lotes.forEach((l) => {
+      ["custoVaca", "vendaVaca", "mediaVaca", "pctCusto"].forEach((k) => { });
+      const items = [
+        [l.lote + " · custo/vaca", fmtR(l.custoVaca)],
+        [l.lote + " · venda/vaca", fmtR(l.vendaVaca)],
+        [l.lote + " · média/vaca", l.mediaVaca.toLocaleString("pt-BR") + " L"],
+        [l.lote + " · % custo", fmtPct(l.pctCusto)]
+      ];
+      items.forEach(([lab, val]) => {
+        const d = document.createElement("div");
+        d.className = "mini";
+        d.innerHTML = `<div class="l">${lab}</div><div class="v">${val}</div>`;
+        loteStats.appendChild(d);
+      });
+    });
+
+    const loteTable = document.getElementById("loteTable");
+    loteTable.innerHTML = `<thead><tr><th>Lote</th><th class="num">Vacas</th><th class="num">Produção (L)</th>
+      <th class="num">Custo (R$)</th><th class="num">Receita (R$)</th><th class="num">Lucro (R$)</th>
+      <th class="num">% Custo</th></tr></thead><tbody>` +
+      data.lotes.map((l) => `<tr><td>${l.lote}</td><td class="num">${l.vacas}</td><td class="num">${l.producao}</td>
+        <td class="num">${l.custo.toFixed(2)}</td><td class="num">${l.receita.toFixed(2)}</td>
+        <td class="num">${l.lucro.toFixed(2)}</td><td class="num">${(l.pctCusto * 100).toFixed(1)}%</td></tr>`).join("") +
+      `</tbody>`;
+
+    renderLegend("feedLegend", data.feed.categories.map((c, i) => ({ label: c, color: data.feed.colors[i] })));
+    stackedBarH("feedBar", data.feed.lotes, data.feed.categories, data.feed.colors);
+    const feedTable = document.getElementById("feedTable");
+    feedTable.innerHTML = `<thead><tr><th>Lote</th>${data.feed.categories.map((c) => `<th class="num">${c}</th>`).join("")}<th class="num">Total</th></tr></thead><tbody>` +
+      data.feed.lotes.map((r) => `<tr><td>${r.lote}</td>${r.values.map((v) => `<td class="num">R$ ${v.toFixed(2)}</td>`).join("")}<td class="num">R$ ${r.values.reduce((a, b) => a + b, 0).toFixed(2)}</td></tr>`).join("") + `</tbody>`;
+
+    lineChart("trendChart", data.trend);
+    const trendTable = document.getElementById("trendTable");
+    trendTable.innerHTML = `<thead><tr><th>Data</th><th class="num">Vacas pesadas</th><th class="num">Total (L)</th><th class="num">Média/vaca (L)</th></tr></thead><tbody>` +
+      data.trend.map((d) => `<tr><td>${d.date.split("-").reverse().join("/")}</td><td class="num">${d.n_vacas}</td><td class="num">${d.total_L}</td><td class="num">${d.media_L_vaca}</td></tr>`).join("") + `</tbody>`;
+
+    horizontalBar("delBar", data.del.map((d, i) => ({ label: d.label, value: d.value, color: "var(--series-1)" })), { fmt: (v) => v + " vacas" });
+
+    monthBar("partoBar", "partoTooltip", "partoWrap", data.partoMonth);
+
+    renderLegend("topBottomLegend", [
+      { label: "Lote 1", color: "var(--series-1)" },
+      { label: "Lote 2", color: "var(--series-2)" },
+      { label: "Lote 3", color: "var(--series-3)" },
+      { label: "Sem lote (seca)", color: "var(--text-muted)" }
+    ]);
+    horizontalBar("topBar", data.top10.map((r) => ({ label: r[0], value: r[2], color: loteColor(r[1]) })), { fmt: fmtL, labelW: 168, valueW: 50 });
+    horizontalBar("bottomBar", data.bottom10.map((r) => ({ label: r[0], value: r[2], color: loteColor(r[1]) })), { fmt: fmtL, labelW: 168, valueW: 50 });
+  }
+
+  renderAll();
+  let resizeT;
+  window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(renderAll, 150); });
+})();
+</script>

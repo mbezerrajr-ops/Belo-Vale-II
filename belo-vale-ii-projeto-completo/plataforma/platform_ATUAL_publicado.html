@@ -1,0 +1,1029 @@
+<title>Belo Vale II</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:#fcfcfb; --page-plane:#f9f9f7; --text-primary:#0b0b0b; --text-secondary:#52514e;
+    --text-muted:#898781; --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+    --good-text:#006300; --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a; --series-4:#eda100;
+    --status-good:#0ca30c; --status-warn:#c98500; --status-critical:#d03b3b;
+    --shadow: 0 1px 2px rgba(11,11,11,0.04), 0 6px 20px rgba(11,11,11,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:#1a1a19; --page-plane:#0d0d0d; --text-primary:#fff; --text-secondary:#c3c2b7;
+      --text-muted:#898781; --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+      --good-text:#0ca30c; --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-4:#c98500;
+      --status-warn:#e0a731; --status-critical:#e66767;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:#1a1a19; --page-plane:#0d0d0d; --text-primary:#fff; --text-secondary:#c3c2b7;
+    --text-muted:#898781; --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --good-text:#0ca30c; --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-4:#c98500;
+    --status-warn:#e0a731; --status-critical:#e66767;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 24px rgba(0,0,0,0.35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  .viz-root { background: var(--page-plane); color: var(--text-primary); font-family: system-ui,-apple-system,"Segoe UI",sans-serif; min-height: 100vh; }
+  input, select, button { font-family: inherit; }
+  a { color: inherit; }
+  .wrap { max-width: 1260px; margin: 0 auto; padding: 0 20px 60px; }
+
+  #loginScreen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .login-card { width: 100%; max-width: 380px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 32px 28px; }
+  .login-card .logo { font-size: 34px; text-align: center; margin-bottom: 6px; }
+  .login-card h1 { font-size: 19px; font-weight: 700; text-align: center; margin: 0 0 4px; }
+  .login-card .tag { font-size: 12.5px; color: var(--text-secondary); text-align: center; margin-bottom: 24px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--text-muted); margin-bottom: 6px; }
+  .field input, .field select { width: 100%; font-size: 14px; padding: 10px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--page-plane); color: var(--text-primary); }
+  .field input:focus, .field select:focus { outline: 2px solid var(--series-1); outline-offset: 1px; }
+  .login-btn { width: 100%; font-size: 14px; font-weight: 700; padding: 11px; border-radius: 9px; border: none; background: var(--series-1); color: #fff; cursor: pointer; margin-top: 6px; }
+  .login-btn:hover { filter: brightness(1.06); }
+  .login-error { font-size: 12.5px; color: var(--status-critical); font-weight: 600; margin-top: 10px; min-height: 16px; }
+  .login-note { font-size: 11.5px; color: var(--text-muted); line-height: 1.5; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .db-warn { background: color-mix(in srgb, var(--status-warn) 16%, transparent); color: var(--status-warn); border-radius: 8px; padding: 8px 12px; font-size: 12px; margin-bottom: 16px; }
+
+  #app { display: none; }
+  #app.visible { display: block; }
+  .topbar { position: sticky; top: 0; z-index: 30; background: var(--surface-1); border-bottom: 1px solid var(--border); }
+  .topbar-inner { max-width: 1260px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 20px; }
+  .brand { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .tabs { display: flex; gap: 2px; flex: 1; }
+  .tabs button { font-size: 13px; font-weight: 600; color: var(--text-secondary); background: none; border: none; padding: 9px 14px; border-radius: 8px; cursor: pointer; }
+  .tabs button:hover { color: var(--text-primary); background: var(--grid); }
+  .tabs button.active { color: #fff; background: var(--series-1); }
+  .who { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .savechip { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .savechip.saving { background: color-mix(in srgb, var(--status-warn) 18%, transparent); color: var(--status-warn); }
+  .savechip.saved { background: color-mix(in srgb, var(--status-good) 16%, transparent); color: var(--good-text); }
+  .savechip.local { background: var(--grid); color: var(--text-muted); }
+  .logout-btn { font-size: 12px; font-weight: 600; color: var(--text-secondary); background: none; border: 1px solid var(--border); border-radius: 999px; padding: 6px 13px; cursor: pointer; white-space: nowrap; }
+  .logout-btn:hover { color: var(--text-primary); }
+  @media (max-width: 900px) { .topbar-inner { flex-wrap: wrap; } .tabs { order: 3; width: 100%; overflow-x: auto; } }
+
+  .tabpanel { padding-top: 24px; }
+  header.top { margin-bottom: 22px; }
+  header.top h1 { font-size: 24px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.01em; }
+  header.top .sub { color: var(--text-secondary); font-size: 13.5px; line-height: 1.5; }
+  header.top .sub b { color: var(--text-primary); font-weight: 600; }
+  .section { margin-top: 36px; }
+  .section h2 { font-size: 17px; font-weight: 700; margin: 0 0 4px; }
+  .section .desc { color: var(--text-secondary); font-size: 13px; margin: 0 0 16px; max-width: 780px; line-height: 1.5; }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 20px; }
+
+  .filterbar { position: sticky; top: 53px; z-index: 20; background: var(--page-plane); padding: 12px 0 14px; margin: -8px 0 8px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; gap: 18px 22px; }
+  .fgroup { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .fgroup .flabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin-right: 2px; }
+  .seg { display: inline-flex; background: var(--surface-1); border: 1px solid var(--border); border-radius: 999px; padding: 3px; box-shadow: var(--shadow); }
+  .seg button { appearance: none; border: none; background: transparent; cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); padding: 6px 13px; border-radius: 999px; white-space: nowrap; }
+  .seg button:hover { color: var(--text-primary); }
+  .seg button.active { background: var(--chip-accent, var(--text-primary)); color: var(--chip-accent-ink, var(--surface-1)); }
+  .seg button[data-value="LOTE 1"].active { --chip-accent: var(--series-1); --chip-accent-ink: #fff; }
+  .seg button[data-value="LOTE 2"].active { --chip-accent: var(--series-2); --chip-accent-ink: #fff; }
+  .seg button[data-value="LOTE 3"].active { --chip-accent: var(--series-3); --chip-accent-ink: #fff; }
+  .searchwrap { position: relative; }
+  .searchwrap input { font-size: 12.5px; padding: 7px 12px 7px 30px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); width: 200px; box-shadow: var(--shadow); }
+  .searchwrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+  .searchwrap svg path { stroke: var(--text-muted); }
+  select.selfilter { font-size: 12.5px; font-weight: 600; padding: 7px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); box-shadow: var(--shadow); }
+  .clearbtn { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); background: none; border: 1px solid var(--border); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
+  .clearbtn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+  .fsummary { margin-left: auto; font-size: 12.5px; color: var(--text-secondary); font-weight: 600; white-space: nowrap; }
+  .fsummary b { color: var(--text-primary); }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  @media (max-width: 980px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 620px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  .kpi { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px 16px 14px; box-shadow: var(--shadow); }
+  .kpi .label { font-size: 11.5px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .kpi .value { font-size: 25px; font-weight: 700; margin-top: 6px; font-variant-numeric: proportional-nums; }
+  .kpi .delta { font-size: 12px; margin-top: 4px; color: var(--text-muted); }
+  .kpi .delta.good { color: var(--good-text); font-weight: 600; }
+  .kpi .delta.bad { color: var(--status-critical); font-weight: 600; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+  .stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-top: 14px; }
+  @media (max-width: 700px) { .stat-row { grid-template-columns: repeat(2,1fr); } }
+  .stat-row .mini { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .stat-row .mini .l { font-size: 11px; color: var(--text-muted); }
+  .stat-row .mini .v { font-size: 16px; font-weight: 700; margin-top: 2px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 10px; font-size: 12.5px; color: var(--text-secondary); }
+  .legend .item { display: flex; align-items: center; gap: 6px; }
+  .legend .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  svg text { fill: var(--text-secondary); font-family: system-ui,-apple-system,"Segoe UI",sans-serif; }
+  svg .axis-label { fill: var(--text-muted); font-size: 11px; }
+  svg .value-label { fill: var(--text-primary); font-size: 12px; font-weight: 600; }
+  svg .cat-label { fill: var(--text-secondary); font-size: 12px; }
+  .gridline { stroke: var(--grid); stroke-width: 1; }
+  .baseline { stroke: var(--axis); stroke-width: 1; }
+  .chart-wrap { position: relative; }
+  details.tbl { margin-top: 12px; }
+  details.tbl summary { cursor: pointer; font-size: 12.5px; color: var(--text-secondary); font-weight: 600; user-select: none; }
+  table.datatable { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12.5px; }
+  table.datatable th, table.datatable td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  table.datatable th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .02em; }
+  table.datatable td.num, table.datatable th.num { text-align: right; }
+  footer.foot { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px; line-height: 1.6; }
+
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .btn { font-size: 12.5px; font-weight: 700; padding: 8px 15px; border-radius: 9px; cursor: pointer; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); display: inline-flex; align-items: center; gap: 6px; }
+  .btn:hover { background: var(--grid); }
+  .btn.primary { background: var(--series-1); color: #fff; border-color: transparent; }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn.danger { color: var(--status-critical); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .tablecard { padding: 0; overflow: hidden; }
+  .table-scroll { max-height: 620px; overflow: auto; }
+  table.cadtable { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.cadtable thead th { position: sticky; top: 0; background: var(--surface-1); z-index: 2; text-align: left; padding: 10px 10px; border-bottom: 1px solid var(--border); color: var(--text-muted); font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+  table.cadtable tbody td { padding: 5px 10px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; vertical-align: middle; }
+  table.cadtable tbody tr:hover td { background: var(--grid); }
+  table.cadtable tbody tr.sel td { background: color-mix(in srgb, var(--series-1) 8%, transparent); }
+  table.cadtable input[type="date"], table.cadtable input[type="number"], table.cadtable input[type="text"] {
+    font-size: 12.5px; padding: 4px 6px; border-radius: 6px; border: 1px solid transparent;
+    background: transparent; color: var(--text-primary); width: 108px; font-variant-numeric: tabular-nums;
+  }
+  table.cadtable input[type="number"] { width: 70px; }
+  table.cadtable input:hover { border-color: var(--border); }
+  table.cadtable input:focus { outline: none; border-color: var(--series-1); background: var(--page-plane); }
+  .ed-text { display: inline-block; min-width: 60px; padding: 3px 5px; border-radius: 6px; cursor: text; }
+  .ed-text:hover { background: var(--grid); }
+  .pill { font-size: 11.5px; font-weight: 700; border: none; border-radius: 999px; padding: 4px 10px; cursor: pointer; white-space: nowrap; }
+  .pill:hover { filter: brightness(0.97); }
+  .pill.ro { cursor: default; }
+  .pill.ro:hover { filter: none; }
+  .c-lote-1 { background: color-mix(in srgb, var(--series-1) 18%, transparent); color: var(--series-1); }
+  .c-lote-2 { background: color-mix(in srgb, var(--series-2) 18%, transparent); color: var(--series-2); }
+  .c-lote-3 { background: color-mix(in srgb, var(--series-3) 18%, transparent); color: var(--series-3); }
+  .c-lote-none { background: var(--grid); color: var(--text-muted); }
+  .c-sit-lactacao { background: color-mix(in srgb, var(--series-1) 18%, transparent); color: var(--series-1); }
+  .c-sit-seca { background: var(--grid); color: var(--text-secondary); }
+  .c-sit-gestante { background: color-mix(in srgb, var(--series-4) 22%, transparent); color: color-mix(in srgb, var(--series-4) 70%, black); }
+  .c-sit-descarte { background: color-mix(in srgb, var(--status-critical) 16%, transparent); color: var(--status-critical); }
+  .c-status-ativo { background: color-mix(in srgb, var(--status-good) 18%, transparent); color: var(--good-text); }
+  .c-status-inativo { background: var(--grid); color: var(--text-muted); }
+  .c-status-vendida { background: color-mix(in srgb, var(--status-warn) 18%, transparent); color: var(--status-warn); }
+  .row-del { font-size: 13px; color: var(--text-muted); background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+  .row-del:hover { color: var(--status-critical); background: var(--grid); }
+  .empty-state { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+  .role-pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--grid); color: var(--text-secondary); }
+  .role-pill.admin { background: color-mix(in srgb, var(--series-1) 18%, transparent); color: var(--series-1); }
+
+  .ins-card { margin-bottom: 16px; }
+  .ins-card .ins-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .ins-card h3 { font-size: 15px; font-weight: 700; margin: 0; }
+  .ins-card .price-now { font-size: 13px; font-weight: 700; color: var(--series-1); }
+  .ins-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 14px; }
+  .ins-form .f label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 3px; }
+  .ins-form .f input { font-size: 13px; padding: 6px 9px; border-radius: 7px; border: 1px solid var(--border); background: var(--page-plane); color: var(--text-primary); }
+  .dieta-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
+  .dieta-row .d { display: flex; align-items: center; gap: 6px; }
+  .dieta-row .d input { width: 64px; font-size: 12.5px; padding: 5px 7px; border-radius: 6px; border: 1px solid var(--border); background: var(--page-plane); color: var(--text-primary); }
+  .hist-chip { font-size: 11px; background: var(--page-plane); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; color: var(--text-secondary); }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+  .modal { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 26px; width: 100%; max-width: 460px; box-shadow: var(--shadow); }
+  .modal h3 { font-size: 16px; font-weight: 700; margin: 0 0 14px; }
+  .modal p.desc2 { font-size: 12.5px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 18px; }
+  .modal .grid2f { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .modal .grid2f label { font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; display: block; margin-bottom: 4px; }
+  .modal .grid2f select { width: 100%; font-size: 13px; padding: 7px 9px; border-radius: 7px; border: 1px solid var(--border); background: var(--page-plane); color: var(--text-primary); }
+  .modal .infobar { background: var(--page-plane); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 12px; color: var(--text-secondary); margin-bottom: 18px; }
+  .modal .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  #bv2Toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(0); background: var(--text-primary); color: var(--surface-1); font-size: 12.5px; font-weight: 600; padding: 10px 18px; border-radius: 999px; box-shadow: var(--shadow); z-index: 200; opacity: 0; pointer-events: none; transition: opacity .25s ease; max-width: 90vw; text-align: center; }
+  #bv2Toast.show { opacity: 1; }
+  #bv2Toast.err { background: var(--status-critical); color: #fff; }
+  #bv2Toast.warn { background: var(--status-warn); color: #1a1a19; }
+
+  #printArea { display: none; }
+  #printArea h1 { font-size: 15pt; font-weight: 700; margin: 0 0 4px; color: #111; font-family: Arial, sans-serif; }
+  #printArea .sub { font-size: 9pt; color: #555; margin: 0 0 14px; font-family: Arial, sans-serif; }
+  #printArea table { width: 100%; border-collapse: collapse; font-size: 9.5pt; font-family: Arial, sans-serif; }
+  #printArea th { background: #1a1a1a; color: #fff; padding: 6px 8px; text-align: left; font-weight: 600; }
+  #printArea td { padding: 5px 8px; border-bottom: 0.5px solid #ddd; color: #111; }
+  #printArea tr:nth-child(even) td { background: #f7f7f5; }
+  @media print {
+    body > *:not(#printArea) { display: none !important; }
+    #printArea { display: block !important; background: #fff; padding: 16px 20px; }
+    @page { margin: 12mm 10mm; }
+  }
+</style>
+
+<div class="viz-root">
+
+  <div id="loginScreen">
+    <div class="login-card">
+      <div class="logo">🐄</div>
+      <h1>Belo Vale II</h1>
+      <div class="tag">Plataforma de gestão do rebanho leiteiro</div>
+      <div id="loginDbWarn"></div>
+      <form id="loginForm">
+        <div class="field"><label for="loginEmail">E-mail</label><input type="email" id="loginEmail" autocomplete="username" required></div>
+        <div class="field"><label for="loginPass">Senha</label><input type="password" id="loginPass" autocomplete="current-password" required></div>
+        <button type="submit" class="login-btn">Entrar</button>
+        <div class="login-error" id="loginError"></div>
+      </form>
+      <div class="login-note">
+        Esta tela é uma cortina de acesso por senha compartilhada, não uma autenticação com backend seguro — quem tiver
+        acesso a este link pode ver as credenciais na aba Usuários. A proteção real deste painel é o compartilhamento
+        privado do link — você decide quem recebe acesso.
+      </div>
+    </div>
+  </div>
+
+  <div id="app">
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">🐄 Belo Vale II</div>
+        <nav class="tabs" id="tabNav"></nav>
+        <span class="savechip" id="saveChip"></span>
+        <span class="who" id="whoLabel"></span>
+        <button type="button" class="logout-btn" id="logoutBtn">Sair</button>
+      </div>
+    </div>
+    <div class="wrap" id="tabContent"></div>
+  </div>
+
+  <div id="modalRoot"></div>
+</div>
+
+<div id="bv2Toast"></div>
+<div id="printArea"></div>
+
+<script id="state-data" type="application/json">{"vacas":[{"id":"v389","numero":"389","nome":"ÁGATA","lote":"LOTE 3","nascimento":"","parto":"2026-01-20","peso":"","media":19.81,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v204","numero":"204","nome":"ALINE","lote":"LOTE 1","nascimento":"","parto":"2025-06-10","peso":"","media":22.47,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v468","numero":"468","nome":"AMORA","lote":"LOTE 1","nascimento":"","parto":"2025-09-21","peso":"","media":19.23,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v596","numero":"596","nome":"ANGÉLICA","lote":"LOTE 1","nascimento":"","parto":"2025-06-11","peso":"","media":26.65,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v692","numero":"692","nome":"ARRUPIADA","lote":"LOTE 1","nascimento":"","parto":"2025-07-15","peso":"","media":25.75,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v117","numero":"117","nome":"AZEITONA","lote":"LOTE 3","nascimento":"","parto":"2025-05-28","peso":"","media":19.56,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v304","numero":"304","nome":"BABALU","lote":"LOTE 1","nascimento":"","parto":"2026-02-20","peso":"","media":27.82,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v523","numero":"523","nome":"BARONEZA","lote":"LOTE 3","nascimento":"","parto":"2025-10-31","peso":"","media":19.56,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v333","numero":"333","nome":"BATATA","lote":"LOTE 1","nascimento":"","parto":"2026-02-22","peso":"","media":21.5,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v525","numero":"525","nome":"BIÁ","lote":"LOTE 1","nascimento":"","parto":"2025-04-01","peso":"","media":28.38,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v549","numero":"549","nome":"BRANQUINHA","lote":"LOTE 1","nascimento":"","parto":"2026-02-16","peso":"","media":20.21,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v433","numero":"433","nome":"BRUNA","lote":"LOTE 1","nascimento":"","parto":"2026-01-13","peso":"","media":18.85,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v1008","numero":"1008","nome":"CABELO DE FOGO","lote":"LOTE 1","nascimento":"","parto":"2025-08-07","peso":"","media":15.65,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v658","numero":"658","nome":"CARINA","lote":"LOTE 1","nascimento":"","parto":"2024-10-14","peso":"","media":19.62,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v528","numero":"528","nome":"CARMÉLIA","lote":"LOTE 1","nascimento":"","parto":"2025-07-30","peso":"","media":21,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v612","numero":"612","nome":"CATARINA","lote":"LOTE 1","nascimento":"","parto":"2025-11-14","peso":"","media":17.48,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v241","numero":"241","nome":"CEBOLA","lote":"LOTE 3","nascimento":"","parto":"2025-09-06","peso":"","media":20.25,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v323","numero":"323","nome":"CHIQUINHA","lote":"LOTE 1","nascimento":"","parto":"2025-02-08","peso":"","media":24.24,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v320","numero":"320","nome":"COCADA","lote":"LOTE 1","nascimento":"","parto":"2025-08-29","peso":"","media":25.04,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v151","numero":"151","nome":"COTÓ","lote":"LOTE 1","nascimento":"","parto":"2025-11-24","peso":"","media":17.53,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v672","numero":"672","nome":"FEITICEIRA","lote":"LOTE 1","nascimento":"","parto":"2025-05-25","peso":"","media":21.17,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v441","numero":"441","nome":"FUMAÇA","lote":"LOTE 1","nascimento":"","parto":"2026-01-27","peso":"","media":21.9,"situacao":"Em lactação","ultimaMedicao":"2025-07-21","status":"Ativo"},{"id":"v175","numero":"175","nome":"FUSQUINHA","lote":"LOTE 1","nascimento":"","parto":"2025-01-25","peso":"","media":20.49,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v563","numero":"563","nome":"GOLINHA","lote":"LOTE 1","nascimento":"","parto":"2026-02-16","peso":"","media":21.47,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v601","numero":"601","nome":"JOINHA","lote":"LOTE 1","nascimento":"","parto":"2025-08-03","peso":"","media":17.57,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v432","numero":"432","nome":"KAROLINA","lote":"LOTE 2","nascimento":"","parto":"2025-11-18","peso":"","media":21.62,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v560","numero":"560","nome":"LAVAREDA","lote":"LOTE 2","nascimento":"","parto":"2026-02-10","peso":"","media":19.15,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v663","numero":"663","nome":"MAÇA","lote":"LOTE 3","nascimento":"","parto":"2025-07-07","peso":"","media":30.67,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v23","numero":"23","nome":"MADONA","lote":"LOTE 2","nascimento":"","parto":"2025-08-31","peso":"","media":22.08,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v40","numero":"40","nome":"MANHOSA","lote":"LOTE 1","nascimento":"","parto":"2025-05-08","peso":"","media":21.89,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v125","numero":"125","nome":"MARINGÁ","lote":"LOTE 1","nascimento":"","parto":"2025-06-15","peso":"","media":19.72,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v573","numero":"573","nome":"MAYARA","lote":"LOTE 3","nascimento":"","parto":"2026-02-18","peso":"","media":13.98,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v598","numero":"598","nome":"OURO FINO","lote":"LOTE 2","nascimento":"","parto":"2025-09-26","peso":"","media":20.08,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v442","numero":"442","nome":"OVELHINHA","lote":"LOTE 1","nascimento":"","parto":"2025-10-08","peso":"","media":20.41,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v417","numero":"417","nome":"PANDORA","lote":"LOTE 1","nascimento":"","parto":"2025-07-21","peso":"","media":20.09,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v530","numero":"530","nome":"PASSO PRETO","lote":"LOTE 1","nascimento":"","parto":"2025-09-29","peso":"","media":17.19,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v497","numero":"497","nome":"PONTA CURTA","lote":"LOTE 3","nascimento":"","parto":"2025-08-16","peso":"","media":22.15,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v548","numero":"548","nome":"PRINCESA","lote":"LOTE 1","nascimento":"","parto":"2025-03-10","peso":"","media":20.71,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v406","numero":"406","nome":"QUARTINHA","lote":"LOTE 2","nascimento":"","parto":"2025-07-27","peso":"","media":23.59,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v205","numero":"205","nome":"REVISTA","lote":"LOTE 1","nascimento":"","parto":"2025-08-02","peso":"","media":21.65,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v338","numero":"338","nome":"ROSEIRA","lote":"LOTE 1","nascimento":"","parto":"2026-02-14","peso":"","media":16.25,"situacao":"Em lactação","ultimaMedicao":"2025-10-06","status":"Ativo"},{"id":"v447","numero":"447","nome":"SARIEMA","lote":"LOTE 3","nascimento":"","parto":"2026-02-21","peso":"","media":16.87,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v226","numero":"226","nome":"TRISTEZA 2","lote":"LOTE 1","nascimento":"","parto":"2025-10-17","peso":"","media":24.83,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v003 AMARELO","numero":"003 AMARELO","nome":"UBERÁBA","lote":"LOTE 1","nascimento":"","parto":"2025-10-23","peso":"","media":15.42,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v555","numero":"555","nome":"UBERLÂNDIA","lote":"LOTE 2","nascimento":"","parto":"2025-08-28","peso":"","media":27.66,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v487","numero":"487","nome":"VERMELHINHA","lote":"LOTE 3","nascimento":"","parto":"2025-10-04","peso":"","media":17.09,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v419","numero":"419","nome":"VIAJANTE","lote":"LOTE 3","nascimento":"","parto":"2025-09-18","peso":"","media":22.53,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v544","numero":"544","nome":"XENA","lote":"LOTE 2","nascimento":"","parto":"2026-02-23","peso":"","media":30.13,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v511","numero":"511","nome":"XEXEU","lote":"LOTE 1","nascimento":"","parto":"2025-09-09","peso":"","media":24.83,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v1","numero":"1","nome":"XUXA","lote":"LOTE 3","nascimento":"","parto":"2025-07-14","peso":"","media":20.15,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v694","numero":"694","nome":"ANDORINHA","lote":"LOTE 3","nascimento":"","parto":"2025-10-25","peso":"","media":17.37,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v652","numero":"652","nome":"ASA BRANCA","lote":"LOTE 2","nascimento":"","parto":"2025-12-23","peso":"","media":14.96,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v512","numero":"512","nome":"AZA NEGRA","lote":"LOTE 2","nascimento":"","parto":"2025-05-31","peso":"","media":20.83,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v677","numero":"677","nome":"BAIANINHA","lote":"LOTE 2","nascimento":"","parto":"2024-11-25","peso":"","media":19.59,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v654","numero":"654","nome":"BELINHA","lote":"LOTE 2","nascimento":"","parto":"2026-01-14","peso":"","media":27.25,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v16","numero":"16","nome":"BELMONTE","lote":"LOTE 3","nascimento":"","parto":"2025-09-22","peso":"","media":21.17,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v620","numero":"620","nome":"BONECA","lote":"LOTE 2","nascimento":"","parto":"2025-05-22","peso":"","media":25.86,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v689","numero":"689","nome":"BRASILEIRA","lote":"LOTE 2","nascimento":"","parto":"2025-06-10","peso":"","media":23.38,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v662","numero":"662","nome":"BURGUESA","lote":"LOTE 1","nascimento":"","parto":"2025-06-25","peso":"","media":18.62,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v679","numero":"679","nome":"CACHOEIRA","lote":"LOTE 2","nascimento":"","parto":"2026-01-19","peso":"","media":15.67,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v604","numero":"604","nome":"CARINHOSA","lote":"LOTE 2","nascimento":"","parto":"2025-06-05","peso":"","media":15.28,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v727","numero":"727","nome":"CHUVINHA","lote":"LOTE 2","nascimento":"","parto":"2025-10-25","peso":"","media":25.17,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v157","numero":"157","nome":"CIGANA","lote":"LOTE 2","nascimento":"","parto":"2026-01-22","peso":"","media":14.37,"situacao":"Em lactação","ultimaMedicao":"2025-01-07","status":"Ativo"},{"id":"v673","numero":"673","nome":"COTOZINHA","lote":"LOTE 2","nascimento":"","parto":"2024-11-30","peso":"","media":23.62,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v660","numero":"660","nome":"DIAMANTE","lote":"LOTE 2","nascimento":"","parto":"2026-01-11","peso":"","media":17.3,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v11","numero":"11","nome":"DOMINÓ","lote":"LOTE 3","nascimento":"","parto":"2025-11-02","peso":"","media":19.1,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v361","numero":"361","nome":"ESTRELINHA","lote":"LOTE 2","nascimento":"","parto":"2025-05-25","peso":"","media":21.79,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v724","numero":"724","nome":"FILÓ","lote":"LOTE 2","nascimento":"","parto":"2025-08-01","peso":"","media":18.4,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v575","numero":"575","nome":"GABRIELA","lote":"LOTE 2","nascimento":"","parto":"2026-02-21","peso":"","media":21.21,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v633","numero":"633","nome":"GIGANTE","lote":"LOTE 3","nascimento":"","parto":"2025-11-04","peso":"","media":26.29,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v42","numero":"42","nome":"JUDITE","lote":"LOTE 2","nascimento":"","parto":"2026-02-22","peso":"","media":18.26,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v696","numero":"696","nome":"MANAÍRA","lote":"LOTE 2","nascimento":"","parto":"2025-11-02","peso":"","media":19.25,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v854","numero":"854","nome":"MARAVILHA","lote":"LOTE 2","nascimento":"","parto":"2025-08-30","peso":"","media":25.8,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v657","numero":"657","nome":"MAROCA","lote":"LOTE 3","nascimento":"","parto":"2025-11-04","peso":"","media":22.27,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v683","numero":"683","nome":"MARRECA","lote":"LOTE 2","nascimento":"","parto":"2025-07-28","peso":"","media":20,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v678","numero":"678","nome":"MEIA LUA","lote":"LOTE 2","nascimento":"","parto":"2025-06-28","peso":"","media":16.73,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v15","numero":"15","nome":"MOÇA BRANCA","lote":"LOTE 1","nascimento":"","parto":"2025-04-25","peso":"","media":28.21,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v661","numero":"661","nome":"MOCINHA","lote":"LOTE 2","nascimento":"","parto":"2025-11-15","peso":"","media":18.46,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v842","numero":"842","nome":"MORENA","lote":"LOTE 2","nascimento":"","parto":"2025-10-23","peso":"","media":23.75,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v767","numero":"767","nome":"NEBLINA","lote":"LOTE 1","nascimento":"","parto":"2025-05-21","peso":"","media":22.64,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v647","numero":"647","nome":"NEGUINHA","lote":"LOTE 2","nascimento":"","parto":"2025-06-15","peso":"","media":32.57,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v558","numero":"558","nome":"NÚBIA","lote":"LOTE 2","nascimento":"","parto":"2025-07-15","peso":"","media":20.95,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v565","numero":"565","nome":"PANTERA","lote":"LOTE 2","nascimento":"","parto":"2025-04-08","peso":"","media":17.56,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v701","numero":"701","nome":"PIQUENA","lote":"LOTE 3","nascimento":"","parto":"2026-02-21","peso":"","media":17.45,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v859","numero":"859","nome":"PREGUIÇA","lote":"LOTE 2","nascimento":"","parto":"2025-09-11","peso":"","media":18,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v853","numero":"853","nome":"PRETINHA","lote":"LOTE 3","nascimento":"","parto":"2025-10-18","peso":"","media":15,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v547","numero":"547","nome":"REBECA","lote":"LOTE 3","nascimento":"","parto":"2025-07-05","peso":"","media":18.3,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v649","numero":"649","nome":"REDONDA","lote":"LOTE 3","nascimento":"","parto":"2025-10-22","peso":"","media":19.42,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v695","numero":"695","nome":"RIO NEGRO","lote":"LOTE 2","nascimento":"","parto":"2025-08-22","peso":"","media":18.05,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v861","numero":"861","nome":"SAIA BRANCA","lote":"LOTE 2","nascimento":"","parto":"2026-01-26","peso":"","media":12.42,"situacao":"Em lactação","ultimaMedicao":"2024-01-27","status":"Ativo"},{"id":"v671","numero":"671","nome":"SERTANEJA","lote":"LOTE 3","nascimento":"","parto":"2025-09-29","peso":"","media":23.69,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v474","numero":"474","nome":"SURUBIM","lote":"LOTE 2","nascimento":"","parto":"2025-10-23","peso":"","media":22,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v567","numero":"567","nome":"SUZANA","lote":"LOTE 3","nascimento":"","parto":"2025-11-30","peso":"","media":14.4,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v516","numero":"516","nome":"ALAGOANA","lote":"","nascimento":"","parto":"2024-12-22","peso":"","media":27.5,"situacao":"Em lactação","ultimaMedicao":"2025-10-06","status":"Ativo"},{"id":"v35","numero":"35","nome":"ALIANÇA","lote":"","nascimento":"","parto":"2023-05-08","peso":"","media":10.83,"situacao":"Seca","ultimaMedicao":"2023-12-22","status":"Ativo"},{"id":"v595","numero":"595","nome":"ALVORADA","lote":"","nascimento":"","parto":"2023-09-16","peso":"","media":11.64,"situacao":"Seca","ultimaMedicao":"2023-12-22","status":"Ativo"},{"id":"v26","numero":"26","nome":"AMANDA","lote":"LOTE 1","nascimento":"","parto":"2024-10-22","peso":"","media":24.29,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v010 VERDE","numero":"010 VERDE","nome":"AMAZONA","lote":"","nascimento":"","parto":"2024-05-11","peso":"","media":15.58,"situacao":"Seca","ultimaMedicao":"2024-07-19","status":"Ativo"},{"id":"v550","numero":"550","nome":"AMÉLIA","lote":"LOTE 1","nascimento":"","parto":"2025-02-28","peso":"","media":20.17,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v124","numero":"124","nome":"AMERICANA","lote":"","nascimento":"","parto":"2023-03-02","peso":"","media":32.42,"situacao":"Seca","ultimaMedicao":"2024-05-17","status":"Ativo"},{"id":"v506","numero":"506","nome":"AMOROSA","lote":"","nascimento":"","parto":"2024-11-06","peso":"","media":15.94,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v154","numero":"154","nome":"APARECIDA","lote":"","nascimento":"","parto":"2023-05-14","peso":"","media":17.95,"situacao":"Seca","ultimaMedicao":"2024-04-19","status":"Ativo"},{"id":"v407","numero":"407","nome":"APARECIDA DO ABREU","lote":"","nascimento":"","parto":"2024-05-27","peso":"","media":22.12,"situacao":"Seca","ultimaMedicao":"2024-07-19","status":"Ativo"},{"id":"v440","numero":"440","nome":"ARIZONA","lote":"","nascimento":"","parto":"2025-01-29","peso":"","media":17.23,"situacao":"Em lactação","ultimaMedicao":"2025-11-04","status":"Ativo"},{"id":"v685","numero":"685","nome":"ASSANHADA","lote":"","nascimento":"","parto":"2024-07-05","peso":"","media":16.75,"situacao":"Em lactação","ultimaMedicao":"2025-10-06","status":"Ativo"},{"id":"v196","numero":"196","nome":"ASSUCENA","lote":"","nascimento":"","parto":"2024-03-15","peso":"","media":19.72,"situacao":"Seca","ultimaMedicao":"2024-11-08","status":"Ativo"},{"id":"v380","numero":"380","nome":"BAÉ","lote":"LOTE 2","nascimento":"","parto":"2025-07-13","peso":"","media":16.71,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v591","numero":"591","nome":"BAHIA","lote":"LOTE 1","nascimento":"","parto":"2025-07-04","peso":"","media":18.27,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v390","numero":"390","nome":"BAIANA","lote":"","nascimento":"","parto":"2024-06-06","peso":"","media":29.5,"situacao":"Em lactação","ultimaMedicao":"2025-03-06","status":"Ativo"},{"id":"v577","numero":"577","nome":"BALIZA","lote":"","nascimento":"","parto":"2025-02-28","peso":"","media":17.02,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v219","numero":"219","nome":"BANANEIRA","lote":"","nascimento":"","parto":"2024-03-01","peso":"","media":21,"situacao":"Em lactação","ultimaMedicao":"2025-01-07","status":"Ativo"},{"id":"v691","numero":"691","nome":"BARBIE","lote":"LOTE 2","nascimento":"","parto":"2025-05-15","peso":"","media":11.2,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v162","numero":"162","nome":"BEIJA FLOR","lote":"","nascimento":"","parto":"2025-04-23","peso":"","media":13.79,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v621","numero":"621","nome":"BELEZA","lote":"","nascimento":"","parto":"2023-12-09","peso":"","media":18.09,"situacao":"Seca","ultimaMedicao":"2024-11-08","status":"Ativo"},{"id":"v132","numero":"132","nome":"BETANIA","lote":"","nascimento":"","parto":"2023-09-12","peso":"","media":19.43,"situacao":"Seca","ultimaMedicao":"2024-11-08","status":"Ativo"},{"id":"v597","numero":"597","nome":"BIANCA","lote":"LOTE 1","nascimento":"","parto":"2025-06-07","peso":"","media":17.07,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v461","numero":"461","nome":"BOA VISTA","lote":"","nascimento":"","parto":"2024-04-08","peso":"","media":18.98,"situacao":"Em lactação","ultimaMedicao":"2025-03-06","status":"Ativo"},{"id":"v228","numero":"228","nome":"BOLACHA","lote":"","nascimento":"","parto":"2021-09-26","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v19","numero":"19","nome":"BOLINHA","lote":"","nascimento":"","parto":"2022-09-02","peso":"","media":10.06,"situacao":"Seca","ultimaMedicao":"2023-04-17","status":"Ativo"},{"id":"v626","numero":"626","nome":"BOLINHA","lote":"","nascimento":"","parto":"2023-10-24","peso":"","media":13.83,"situacao":"Seca","ultimaMedicao":"2024-03-05","status":"Ativo"},{"id":"v016 VERDE","numero":"016 VERDE","nome":"BORBOLETA 3","lote":"LOTE 1","nascimento":"","parto":"2025-03-15","peso":"","media":20.84,"situacao":"Em lactação","ultimaMedicao":"2025-11-04","status":"Ativo"},{"id":"v27","numero":"27","nome":"BORBOREMA","lote":"LOTE 3","nascimento":"","parto":"2024-12-21","peso":"","media":20.22,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v005 VERDE","numero":"005 VERDE","nome":"BORDADA","lote":"","nascimento":"","parto":"2024-12-06","peso":"","media":18.61,"situacao":"Em lactação","ultimaMedicao":"2025-01-07","status":"Ativo"},{"id":"v244","numero":"244","nome":"BRANQUINHA 2","lote":"","nascimento":"","parto":"2021-12-21","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v137","numero":"137","nome":"BRILHANTE","lote":"","nascimento":"","parto":"2024-05-15","peso":"","media":15.58,"situacao":"Em lactação","ultimaMedicao":"2025-01-07","status":"Ativo"},{"id":"v143","numero":"143","nome":"BURGUESA","lote":"","nascimento":"","parto":"2024-06-21","peso":"","media":18,"situacao":"Seca","ultimaMedicao":"2024-09-26","status":"Ativo"},{"id":"v108","numero":"108","nome":"CABOQUINHA","lote":"","nascimento":"","parto":"2024-09-03","peso":"","media":14.65,"situacao":"Em lactação","ultimaMedicao":"2025-01-07","status":"Ativo"},{"id":"v363","numero":"363","nome":"CACHORRINHA","lote":"","nascimento":"","parto":"2020-07-04","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v176","numero":"176","nome":"CAFOFINHA","lote":"","nascimento":"","parto":"2024-10-28","peso":"","media":16.39,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v36","numero":"36","nome":"CAMBRAIA","lote":"","nascimento":"","parto":"2025-07-21","peso":"","media":21.06,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v570","numero":"570","nome":"CAMBRAIA","lote":"","nascimento":"","parto":"2025-07-21","peso":"","media":0,"situacao":"Em lactação","ultimaMedicao":"","status":"Ativo"},{"id":"v656","numero":"656","nome":"CANOA","lote":"","nascimento":"","parto":"2025-01-05","peso":"","media":22.56,"situacao":"Em lactação","ultimaMedicao":"2025-11-04","status":"Ativo"},{"id":"v642","numero":"642","nome":"CARA BRANCA","lote":"LOTE 1","nascimento":"","parto":"2025-05-19","peso":"","media":20.85,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v501","numero":"501","nome":"CARETINHA","lote":"","nascimento":"","parto":"2024-07-23","peso":"","media":16.4,"situacao":"Em lactação","ultimaMedicao":"2025-03-06","status":"Ativo"},{"id":"v155","numero":"155","nome":"CARINA","lote":"","nascimento":"","parto":"","peso":"","media":14.91,"situacao":"Em lactação","ultimaMedicao":"2025-07-21","status":"Ativo"},{"id":"v147","numero":"147","nome":"CARRAPETA","lote":"","nascimento":"","parto":"2024-07-05","peso":"","media":17.8,"situacao":"Seca","ultimaMedicao":"2024-09-26","status":"Ativo"},{"id":"v664","numero":"664","nome":"CARRAPETA","lote":"LOTE 2","nascimento":"","parto":"2025-05-26","peso":"","media":20.17,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v258","numero":"258","nome":"CASA GRANDE","lote":"","nascimento":"","parto":"2025-01-01","peso":"","media":19.63,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v294","numero":"294","nome":"CAVEIRA","lote":"LOTE 1","nascimento":"","parto":"2025-03-01","peso":"","media":22.13,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v499","numero":"499","nome":"CHARMOZA","lote":"","nascimento":"","parto":"2023-12-05","peso":"","media":7,"situacao":"Seca","ultimaMedicao":"2024-01-27","status":"Ativo"},{"id":"v637","numero":"637","nome":"CHITADA","lote":"LOTE 3","nascimento":"","parto":"2025-05-17","peso":"","media":17.4,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v610","numero":"610","nome":"CHOCOLATE","lote":"LOTE 1","nascimento":"","parto":"2025-04-15","peso":"","media":19.07,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v238","numero":"238","nome":"CHUVINHA DO ABREU","lote":"","nascimento":"","parto":"2022-03-27","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v77","numero":"77","nome":"CHUVISCADA","lote":"","nascimento":"","parto":"2024-08-29","peso":"","media":19.12,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v628","numero":"628","nome":"CODORNA","lote":"","nascimento":"","parto":"2023-12-07","peso":"","media":10.5,"situacao":"Seca","ultimaMedicao":"2024-01-27","status":"Ativo"},{"id":"v509","numero":"509","nome":"CONDEÇA","lote":"","nascimento":"","parto":"2023-11-09","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v435","numero":"435","nome":"CONFIANÇA","lote":"","nascimento":"","parto":"2025-03-19","peso":"","media":25.33,"situacao":"Em lactação","ultimaMedicao":"2025-11-04","status":"Ativo"},{"id":"v84","numero":"84","nome":"CORAÇÃO","lote":"","nascimento":"","parto":"2024-04-06","peso":"","media":20.67,"situacao":"Seca","ultimaMedicao":"2024-11-08","status":"Ativo"},{"id":"v221","numero":"221","nome":"CORAÇÃO DO ABREU","lote":"","nascimento":"","parto":"2023-04-24","peso":"","media":14.97,"situacao":"Seca","ultimaMedicao":"2024-07-19","status":"Ativo"},{"id":"v397","numero":"397","nome":"CORUJA","lote":"","nascimento":"","parto":"2024-05-29","peso":"","media":15.89,"situacao":"Em lactação","ultimaMedicao":"2025-04-16","status":"Ativo"},{"id":"v618","numero":"618","nome":"CRAUNA","lote":"","nascimento":"","parto":"2024-12-02","peso":"","media":15.16,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v166","numero":"166","nome":"CRAUNINHA","lote":"","nascimento":"","parto":"2024-11-13","peso":"","media":23.65,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v061 VERDE","numero":"061 VERDE","nome":"CRIOLA","lote":"","nascimento":"","parto":"2022-05-18","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v13","numero":"13","nome":"CURIÓ","lote":"","nascimento":"","parto":"2024-05-11","peso":"","media":15.2,"situacao":"Em lactação","ultimaMedicao":"2025-01-07","status":"Ativo"},{"id":"v543","numero":"543","nome":"DOLORES","lote":"","nascimento":"","parto":"2024-10-04","peso":"","media":28.5,"situacao":"Seca","ultimaMedicao":"2025-04-16","status":"Ativo"},{"id":"v46","numero":"46","nome":"ESMERALDA","lote":"","nascimento":"","parto":"2025-06-05","peso":"","media":11.84,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v78","numero":"78","nome":"ESPERANÇA","lote":"","nascimento":"","parto":"2023-02-01","peso":"","media":24.44,"situacao":"Seca","ultimaMedicao":"2024-08-22","status":"Ativo"},{"id":"v263 ABREU","numero":"263 ABREU","nome":"ESPERANÇA","lote":"LOTE 1","nascimento":"","parto":"2025-03-27","peso":"","media":18.98,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v490","numero":"490","nome":"ESPERANÇA 3","lote":"","nascimento":"","parto":"2022-10-21","peso":"","media":8.27,"situacao":"Seca","ultimaMedicao":"2023-05-22","status":"Ativo"},{"id":"v009 VERMELHO","numero":"009 VERMELHO","nome":"FAÍSCA","lote":"","nascimento":"","parto":"2024-08-24","peso":"","media":14.31,"situacao":"Em lactação","ultimaMedicao":"2025-01-07","status":"Ativo"},{"id":"v434","numero":"434","nome":"FAÍSCA","lote":"LOTE 2","nascimento":"","parto":"2025-03-12","peso":"","media":18.43,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v387","numero":"387","nome":"FANTASMA","lote":"","nascimento":"","parto":"2024-08-22","peso":"","media":19.6,"situacao":"Em lactação","ultimaMedicao":"2025-10-06","status":"Ativo"},{"id":"v129","numero":"129","nome":"FANTAZIA","lote":"","nascimento":"","parto":"2022-07-29","peso":"","media":15.36,"situacao":"Seca","ultimaMedicao":"2023-06-10","status":"Ativo"},{"id":"v392","numero":"392","nome":"FILEPA","lote":"","nascimento":"","parto":"2024-05-24","peso":"","media":20.39,"situacao":"Em lactação","ultimaMedicao":"2025-01-07","status":"Ativo"},{"id":"v237","numero":"237","nome":"FORTALEZA","lote":"","nascimento":"","parto":"2024-09-17","peso":"","media":24.54,"situacao":"Em lactação","ultimaMedicao":"2025-06-18","status":"Ativo"},{"id":"v427","numero":"427","nome":"FUMAÇA ABREU","lote":"","nascimento":"","parto":"2021-01-04","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v186","numero":"186","nome":"GAIVOTA","lote":"","nascimento":"","parto":"2021-07-22","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v242","numero":"242","nome":"GALEGA","lote":"","nascimento":"","parto":"2024-07-31","peso":"","media":18.73,"situacao":"Em lactação","ultimaMedicao":"2025-10-06","status":"Ativo"},{"id":"v586","numero":"586","nome":"GAÚCHA","lote":"LOTE 1","nascimento":"","parto":"2025-05-31","peso":"","media":26.21,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v779","numero":"779","nome":"GÉSSIKA","lote":"LOTE 1","nascimento":"","parto":"2025-06-16","peso":"","media":21.5,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v184","numero":"184","nome":"GIRAFA","lote":"","nascimento":"","parto":"2023-05-22","peso":"","media":16.2,"situacao":"Seca","ultimaMedicao":"2024-07-19","status":"Ativo"},{"id":"v009 VERDE","numero":"009 VERDE","nome":"GIRAFA 2","lote":"","nascimento":"","parto":"2022-06-07","peso":"","media":16.93,"situacao":"Seca","ultimaMedicao":"2023-03-27","status":"Ativo"},{"id":"v2","numero":"2","nome":"GIRASSOL","lote":"","nascimento":"","parto":"2024-06-27","peso":"","media":17.89,"situacao":"Em lactação","ultimaMedicao":"2025-04-16","status":"Ativo"},{"id":"v507 AMARELO","numero":"507 AMARELO","nome":"GUINÉ","lote":"","nascimento":"","parto":"2025-01-14","peso":"","media":15.78,"situacao":"Em lactação","ultimaMedicao":"2025-10-06","status":"Ativo"},{"id":"v438","numero":"438","nome":"INJEITADA","lote":"","nascimento":"","parto":"2023-04-08","peso":"","media":17.62,"situacao":"Seca","ultimaMedicao":"2024-03-05","status":"Ativo"},{"id":"v391","numero":"391","nome":"JADI","lote":"","nascimento":"","parto":"2022-07-08","peso":"","media":13.32,"situacao":"Seca","ultimaMedicao":"2023-06-10","status":"Ativo"},{"id":"v534","numero":"534","nome":"JANDAÍRA","lote":"","nascimento":"","parto":"2024-05-01","peso":"","media":13.21,"situacao":"Seca","ultimaMedicao":"2024-11-08","status":"Ativo"},{"id":"v675","numero":"675","nome":"JANGADA","lote":"","nascimento":"","parto":"2024-08-13","peso":"","media":19.17,"situacao":"Em lactação","ultimaMedicao":"2025-04-16","status":"Ativo"},{"id":"v220","numero":"220","nome":"JARDINEIRA","lote":"","nascimento":"","parto":"2022-07-30","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v556","numero":"556","nome":"JURITI","lote":"","nascimento":"","parto":"2024-07-10","peso":"","media":16.09,"situacao":"Em lactação","ultimaMedicao":"2025-03-06","status":"Ativo"},{"id":"v249 (BV1)","numero":"249 (BV1)","nome":"LAVANDEIRA","lote":"","nascimento":"","parto":"","peso":"","media":16.81,"situacao":"Em lactação","ultimaMedicao":"2025-06-18","status":"Ativo"},{"id":"v18","numero":"18","nome":"LULÚ","lote":"LOTE 1","nascimento":"","parto":"2022-02-19","peso":"","media":26,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v395","numero":"395","nome":"LULUZINHA","lote":"LOTE 1","nascimento":"","parto":"2025-05-30","peso":"","media":21.72,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v702","numero":"702","nome":"MAÇA","lote":"","nascimento":"","parto":"2024-07-12","peso":"","media":17.66,"situacao":"Seca","ultimaMedicao":"2024-07-19","status":"Ativo"},{"id":"v386","numero":"386","nome":"MADALENA","lote":"","nascimento":"","parto":"2026-01-08","peso":"","media":19.71,"situacao":"Em lactação","ultimaMedicao":"2025-10-06","status":"Ativo"},{"id":"v411","numero":"411","nome":"MADRUGADA","lote":"","nascimento":"","parto":"2024-08-01","peso":"","media":22.52,"situacao":"Em lactação","ultimaMedicao":"2025-10-06","status":"Ativo"},{"id":"v579","numero":"579","nome":"MAGRELA","lote":"","nascimento":"","parto":"2023-11-01","peso":"","media":11.5,"situacao":"Seca","ultimaMedicao":"2024-08-22","status":"Ativo"},{"id":"v568","numero":"568","nome":"MALHADA","lote":"","nascimento":"","parto":"2023-09-02","peso":"","media":13.68,"situacao":"Seca","ultimaMedicao":"2023-06-10","status":"Ativo"},{"id":"v","numero":"","nome":"MALHADINHA","lote":"","nascimento":"","parto":"2022-07-14","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v114","numero":"114","nome":"MANCINHA","lote":"","nascimento":"","parto":"2024-08-02","peso":"","media":20.05,"situacao":"Em lactação","ultimaMedicao":"2025-06-18","status":"Ativo"},{"id":"v120","numero":"120","nome":"MARIA BRAGA","lote":"","nascimento":"","parto":"2023-09-18","peso":"","media":16.04,"situacao":"Seca","ultimaMedicao":"2024-07-19","status":"Ativo"},{"id":"v619","numero":"619","nome":"MARIPOZA","lote":"LOTE 1","nascimento":"","parto":"2025-01-04","peso":"","media":15.11,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v265","numero":"265","nome":"MAROMBA","lote":"","nascimento":"","parto":"2025-04-07","peso":"","media":18.15,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v686","numero":"686","nome":"MEDALHA","lote":"","nascimento":"","parto":"2025-05-19","peso":"","media":9,"situacao":"Seca","ultimaMedicao":"2025-06-18","status":"Ativo"},{"id":"v448","numero":"448","nome":"MEIAS BRANCA","lote":"","nascimento":"","parto":"2025-02-27","peso":"","media":17.15,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v229","numero":"229","nome":"MEIOTA","lote":"","nascimento":"","parto":"2024-09-17","peso":"","media":19.98,"situacao":"Em lactação","ultimaMedicao":"2025-06-18","status":"Ativo"},{"id":"v245","numero":"245","nome":"MERCEDES","lote":"","nascimento":"","parto":"2025-03-30","peso":"","media":21.46,"situacao":"Em lactação","ultimaMedicao":"2025-11-04","status":"Ativo"},{"id":"v570","numero":"570","nome":"MIMOSA","lote":"","nascimento":"","parto":"2025-07-21","peso":"","media":17.94,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v582","numero":"582","nome":"MINEIRA","lote":"LOTE 1","nascimento":"","parto":"2025-06-15","peso":"","media":18.96,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v019 AZUL","numero":"019 AZUL","nome":"MIUDA","lote":"","nascimento":"","parto":"2023-06-14","peso":"","media":17.34,"situacao":"Seca","ultimaMedicao":"2024-06-03","status":"Ativo"},{"id":"v181","numero":"181","nome":"MIUDINHA","lote":"","nascimento":"","parto":"2022-10-22","peso":"","media":18.08,"situacao":"Seca","ultimaMedicao":"2023-10-28","status":"Ativo"},{"id":"v62","numero":"62","nome":"MOEDA","lote":"","nascimento":"","parto":"2021-08-14","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v17","numero":"17","nome":"MOEDA ABREU","lote":"","nascimento":"","parto":"2023-04-28","peso":"","media":14.55,"situacao":"Seca","ultimaMedicao":"2024-03-05","status":"Ativo"},{"id":"v571","numero":"571","nome":"MORGANA","lote":"","nascimento":"","parto":"2025-11-08","peso":"","media":12.05,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v372","numero":"372","nome":"MULATA","lote":"","nascimento":"","parto":"2022-05-30","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v635","numero":"635","nome":"NEBLINA","lote":"","nascimento":"","parto":"2024-01-22","peso":"","media":9.44,"situacao":"Seca","ultimaMedicao":"2024-09-26","status":"Ativo"},{"id":"v259","numero":"259","nome":"NEGONA","lote":"","nascimento":"","parto":"2023-04-03","peso":"","media":17.67,"situacao":"Seca","ultimaMedicao":"2023-10-28","status":"Ativo"},{"id":"v63","numero":"63","nome":"NOBREZA","lote":"","nascimento":"","parto":"2021-03-31","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v529","numero":"529","nome":"NOCA","lote":"","nascimento":"","parto":"2024-12-22","peso":"","media":15.25,"situacao":"Em lactação","ultimaMedicao":"2025-01-07","status":"Ativo"},{"id":"v001 VERM.","numero":"001 VERM.","nome":"NOVENTA E NOVE","lote":"","nascimento":"","parto":"2023-05-13","peso":"","media":12.4,"situacao":"Seca","ultimaMedicao":"2023-12-22","status":"Ativo"},{"id":"v732","numero":"732","nome":"PACIÊNCIA","lote":"LOTE 2","nascimento":"","parto":"2024-11-10","peso":"","media":12.75,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v539","numero":"539","nome":"PALMEIRA","lote":"LOTE 1","nascimento":"","parto":"2025-02-19","peso":"","media":21.61,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v96","numero":"96","nome":"PALOMA","lote":"","nascimento":"","parto":"2023-05-02","peso":"","media":11.64,"situacao":"Seca","ultimaMedicao":"2023-05-22","status":"Ativo"},{"id":"v584","numero":"584","nome":"PALOMA","lote":"LOTE 2","nascimento":"","parto":"2025-05-08","peso":"","media":13.62,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v064 VERDE","numero":"064 VERDE","nome":"PASSO PRETO","lote":"","nascimento":"","parto":"2023-06-25","peso":"","media":11,"situacao":"Seca","ultimaMedicao":"2023-07-19","status":"Ativo"},{"id":"v88","numero":"88","nome":"PASSO PRETO","lote":"","nascimento":"","parto":"2022-01-17","peso":"","media":9,"situacao":"Seca","ultimaMedicao":"2023-03-01","status":"Ativo"},{"id":"v30","numero":"30","nome":"PATURY","lote":"","nascimento":"","parto":"2024-05-27","peso":"","media":15.67,"situacao":"Em lactação","ultimaMedicao":"2025-01-07","status":"Ativo"},{"id":"v514","numero":"514","nome":"PAULA","lote":"LOTE 1","nascimento":"","parto":"2025-02-03","peso":"","media":19.56,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v56","numero":"56","nome":"PEBINHA","lote":"","nascimento":"","parto":"2023-04-26","peso":"","media":15.51,"situacao":"Seca","ultimaMedicao":"2024-05-17","status":"Ativo"},{"id":"v599","numero":"599","nome":"PEITUDA","lote":"LOTE 1","nascimento":"","parto":"2025-03-04","peso":"","media":17.04,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v418","numero":"418","nome":"PENSAMENTO","lote":"","nascimento":"","parto":"2021-10-15","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v313","numero":"313","nome":"PÉROLA","lote":"LOTE 1","nascimento":"","parto":"2025-03-29","peso":"","media":19.39,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v104","numero":"104","nome":"PIEDADE","lote":"","nascimento":"","parto":"2021-09-23","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v561","numero":"561","nome":"PINGO DE OURO","lote":"","nascimento":"","parto":"2024-10-05","peso":"","media":12.86,"situacao":"Em lactação","ultimaMedicao":"2025-10-06","status":"Ativo"},{"id":"v79","numero":"79","nome":"PINTADINHA","lote":"","nascimento":"","parto":"2024-02-14","peso":"","media":19.8,"situacao":"Seca","ultimaMedicao":"2024-09-26","status":"Ativo"},{"id":"v521","numero":"521","nome":"POLIANA","lote":"LOTE 2","nascimento":"","parto":"2025-06-19","peso":"","media":17.29,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v346","numero":"346","nome":"PONTA FINA","lote":"","nascimento":"","parto":"2024-02-20","peso":"","media":0,"situacao":"Em lactação","ultimaMedicao":"","status":"Ativo"},{"id":"v346","numero":"346","nome":"PONTA FINA DO ABREU","lote":"","nascimento":"","parto":"2024-02-20","peso":"","media":19.7,"situacao":"Seca","ultimaMedicao":"2024-11-08","status":"Ativo"},{"id":"v680","numero":"680","nome":"RAINHA","lote":"","nascimento":"","parto":"2025-05-18","peso":"","media":27.08,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v526","numero":"526","nome":"RENATINHA","lote":"","nascimento":"","parto":"2024-08-06","peso":"","media":16.9,"situacao":"Em lactação","ultimaMedicao":"2025-04-16","status":"Ativo"},{"id":"v48","numero":"48","nome":"ROXINÓ","lote":"","nascimento":"","parto":"2024-09-13","peso":"","media":19.29,"situacao":"Em lactação","ultimaMedicao":"2025-01-07","status":"Ativo"},{"id":"v462","numero":"462","nome":"SABIÁ","lote":"LOTE 1","nascimento":"","parto":"2025-05-14","peso":"","media":23.86,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v542","numero":"542","nome":"SAFIRA","lote":"","nascimento":"","parto":"2025-04-12","peso":"","media":22.71,"situacao":"Em lactação","ultimaMedicao":"2025-06-18","status":"Ativo"},{"id":"v257","numero":"257","nome":"SALOMÉ","lote":"","nascimento":"","parto":"2023-04-18","peso":"","media":15.57,"situacao":"Seca","ultimaMedicao":"2023-07-19","status":"Ativo"},{"id":"v594","numero":"594","nome":"SAMANTA","lote":"","nascimento":"","parto":"2024-08-10","peso":"","media":22.36,"situacao":"Em lactação","ultimaMedicao":"2025-01-07","status":"Ativo"},{"id":"v415","numero":"415","nome":"SARDINHA","lote":"","nascimento":"","parto":"2020-11-26","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v128","numero":"128","nome":"SEREIA","lote":"","nascimento":"","parto":"2024-12-08","peso":"","media":24.55,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v","numero":"","nome":"SERRANA","lote":"","nascimento":"","parto":"2025-06-02","peso":"","media":25.5,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v034 VERDE","numero":"034 VERDE","nome":"SIRI","lote":"","nascimento":"","parto":"2021-06-09","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v436","numero":"436","nome":"SUCESSO","lote":"","nascimento":"","parto":"2025-04-12","peso":"","media":23.4,"situacao":"Em lactação","ultimaMedicao":"2025-04-16","status":"Ativo"},{"id":"v503","numero":"503","nome":"TAPERA","lote":"","nascimento":"","parto":"2025-01-05","peso":"","media":19.15,"situacao":"Em lactação","ultimaMedicao":"2024-09-26","status":"Ativo"},{"id":"v319","numero":"319","nome":"TETEU","lote":"","nascimento":"","parto":"2024-05-24","peso":"","media":19.47,"situacao":"Em lactação","ultimaMedicao":"2025-01-07","status":"Ativo"},{"id":"v10","numero":"10","nome":"TIETA","lote":"","nascimento":"","parto":"2025-09-13","peso":"","media":20.5,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v174","numero":"174","nome":"TRISTEZA","lote":"","nascimento":"","parto":"2024-08-23","peso":"","media":18.97,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v43","numero":"43","nome":"VIANA","lote":"","nascimento":"","parto":"2024-01-22","peso":"","media":18.78,"situacao":"Em lactação","ultimaMedicao":"2025-04-16","status":"Ativo"},{"id":"v409","numero":"409","nome":"VIOLA","lote":"","nascimento":"","parto":"2025-05-29","peso":"","media":16.59,"situacao":"Em lactação","ultimaMedicao":"2025-12-02","status":"Ativo"},{"id":"v404","numero":"404","nome":"VITÓRIA","lote":"","nascimento":"","parto":"2024-06-17","peso":"","media":23.67,"situacao":"Em lactação","ultimaMedicao":"2025-03-06","status":"Ativo"},{"id":"v123","numero":"123","nome":"XAXÁ","lote":"","nascimento":"","parto":"2022-07-19","peso":"","media":0,"situacao":"Seca","ultimaMedicao":"","status":"Ativo"},{"id":"v687","numero":"687","nome":"Maringa","lote":"LOTE 1","nascimento":"","parto":"","peso":"","media":26,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v498","numero":"498","nome":"Meias Branca","lote":"LOTE 1","nascimento":"","parto":"","peso":"","media":22.5,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v682","numero":"682","nome":"Rainha","lote":"LOTE 1","nascimento":"","parto":"","peso":"","media":0,"situacao":"Em lactação","ultimaMedicao":"","status":"Ativo"},{"id":"v8","numero":"8","nome":"Cabelo De Fogo","lote":"LOTE 1","nascimento":"","parto":"","peso":"","media":0,"situacao":"Em lactação","ultimaMedicao":"","status":"Ativo"},{"id":"v141","numero":"141","nome":"Fumaca","lote":"LOTE 3","nascimento":"","parto":"","peso":"","media":0,"situacao":"Em lactação","ultimaMedicao":"","status":"Ativo"},{"id":"v519","numero":"519","nome":"Branquinha","lote":"LOTE 2","nascimento":"","parto":"","peso":"","media":19.5,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v133","numero":"133","nome":"Bruna","lote":"LOTE 2","nascimento":"","parto":"","peso":"","media":0,"situacao":"Em lactação","ultimaMedicao":"","status":"Ativo"},{"id":"v832","numero":"832","nome":"Carinhosa","lote":"LOTE 2","nascimento":"","parto":"","peso":"","media":21,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v1015","numero":"1015","nome":"Jardineira","lote":"LOTE 2","nascimento":"","parto":"","peso":"","media":21,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v821","numero":"821","nome":"Cigana","lote":"LOTE 2","nascimento":"","parto":"","peso":"","media":15,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v956","numero":"956","nome":"Bolinha","lote":"LOTE 2","nascimento":"","parto":"","peso":"","media":12,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v964","numero":"964","nome":"Tieta","lote":"LOTE 2","nascimento":"","parto":"","peso":"","media":0,"situacao":"Em lactação","ultimaMedicao":"","status":"Ativo"},{"id":"v862","numero":"862","nome":"Saia Branca","lote":"LOTE 2","nascimento":"","parto":"","peso":"","media":17,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v812","numero":"812","nome":"Esmeralda","lote":"LOTE 1","nascimento":"","parto":"","peso":"","media":20.5,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v508","numero":"508","nome":"Princesa","lote":"LOTE 1","nascimento":"","parto":"","peso":"","media":0,"situacao":"Em lactação","ultimaMedicao":"","status":"Ativo"},{"id":"v1013","numero":"1013","nome":"Boemia","lote":"LOTE 2","nascimento":"","parto":"","peso":"","media":18.5,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v981","numero":"981","nome":"Condessa","lote":"LOTE 2","nascimento":"","parto":"","peso":"","media":16.5,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v827","numero":"827","nome":"Revista","lote":"LOTE 2","nascimento":"","parto":"","peso":"","media":0,"situacao":"Em lactação","ultimaMedicao":"","status":"Ativo"},{"id":"v1001","numero":"1001","nome":"Arizona","lote":"LOTE 2","nascimento":"","parto":"","peso":"","media":19.5,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v967","numero":"967","nome":"Machada","lote":"","nascimento":"","parto":"","peso":"","media":2,"situacao":"Seca","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v846","numero":"846","nome":"Surubim","lote":"LOTE 2","nascimento":"","parto":"","peso":"","media":16.5,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v733","numero":"733","nome":"Pauna","lote":"LOTE 2","nascimento":"","parto":"","peso":"","media":12,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v879","numero":"879","nome":"Medalha","lote":"LOTE 3","nascimento":"","parto":"","peso":"","media":10.5,"situacao":"Em lactação","ultimaMedicao":"2026-07-22","status":"Ativo"},{"id":"v666","numero":"666","nome":"Schuma","lote":"LOTE 1","nascimento":"","parto":"","peso":"","media":0,"situacao":"Em lactação","ultimaMedicao":"","status":"Ativo"}],"insumos":[{"id":"i1","nome":"Concentrado","precoKg":2.12125,"historico":[{"data":"2026-08-20","preco":2.12125}],"dieta":{"LOTE 1":480,"LOTE 2":400,"LOTE 3":80}},{"id":"i2","nome":"Caroço","precoKg":1.61,"historico":[{"data":"2026-08-20","preco":1.61}],"dieta":{"LOTE 1":60,"LOTE 2":60,"LOTE 3":0}},{"id":"i3","nome":"Silagem","precoKg":0.35,"historico":[{"data":"2026-08-20","preco":0.35}],"dieta":{"LOTE 1":1800,"LOTE 2":1800,"LOTE 3":600}},{"id":"i4","nome":"Casca de Mandioca","precoKg":0.55,"historico":[{"data":"2026-08-20","preco":0.55}],"dieta":{"LOTE 1":400,"LOTE 2":400,"LOTE 3":100}}],"usuarios":[{"id":"u1","nome":"Mario Bezerra","email":"mbezerrajr@gmail.com","senha":"belovale2026","perfil":"admin"},{"id":"u2","nome":"Leonardo","email":"leonardo@saborisis.com.br","senha":"belovale2026","perfil":"editor"}],"precoLeite":2.59}</script>
+<script>
+(function () {
+  "use strict";
+
+  // ================= STATE =================
+  let state;
+  try { state = JSON.parse(document.getElementById("state-data").textContent); }
+  catch (e) { state = { vacas: [], insumos: [], usuarios: [], precoLeite: 2.59 }; }
+
+  let session = null;
+  let aba = "dashboard";
+  let dashF = { lote: "all", sit: "all", search: "" };
+  let vacasF = { busca: "", lote: "Todos", status: "Todos", situacao: "Todas" };
+  let selecionadas = new Set();
+  let modal = null; // { tipo: "completo"|"formulario" }
+
+  const LOTES = ["LOTE 1", "LOTE 2", "LOTE 3"];
+  const SITUACOES = ["Em lactação", "Seca", "Gestante", "Descarte"];
+  const STATUS = ["Ativo", "Inativo", "Vendida"];
+  const FEED_CATS = ["Concentrado", "Caroço", "Silagem", "Casca de Mandioca"];
+
+  // ================= PERSISTENCE =================
+  let artifactNS = null;
+  let dbOk = false;
+  (async function initArtifact() {
+    try {
+      if (window.claude && typeof window.claude.use === "function") {
+        artifactNS = await window.claude.use("artifact");
+        dbOk = !!artifactNS;
+      }
+    } catch (e) { dbOk = false; }
+    updateSaveChip(dbOk ? "saved" : "local");
+  })();
+
+  function showToast(msg, kind) {
+    const t = document.getElementById("bv2Toast");
+    if (!t) return;
+    t.textContent = msg;
+    t.className = kind ? `show ${kind}` : "show";
+    clearTimeout(t.__hideT);
+    t.__hideT = setTimeout(() => { t.className = ""; }, 8000);
+  }
+
+  function updateSaveChip(kind) {
+    const el = document.getElementById("saveChip");
+    if (!el) return;
+    if (kind === "saving") { el.className = "savechip saving"; el.textContent = "Salvando…"; }
+    else if (kind === "saved") { el.className = "savechip saved"; el.textContent = "Salvo"; }
+    else { el.className = "savechip local"; el.textContent = "Somente neste navegador"; }
+  }
+
+  let saveTimer = null;
+  function scheduleSave() {
+    updateSaveChip(dbOk ? "saving" : "local");
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(doSave, 1200);
+  }
+  async function doSave() {
+    if (!artifactNS) { updateSaveChip("local"); return; }
+    try {
+      const resp = await fetch(location.href, { cache: "no-store" });
+      let html = await resp.text();
+      const newJson = JSON.stringify(state);
+      html = html.replace(
+        /<script id="state-data" type="application\/json">[\s\S]*?<\/script>/,
+        `<script id="state-data" type="application/json">${newJson}<\/script>`
+      );
+      await artifactNS.publish(html);
+      updateSaveChip("saved");
+    } catch (e) {
+      if (e && e.code === "conflict") return; // view is reloading to the winner
+      console.error("save failed", e);
+      updateSaveChip("local");
+    }
+  }
+
+  // ================= HELPERS =================
+  const stripAccents = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const fmtL = (v) => (v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " L";
+  const fmtR = (v) => "R$ " + (v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtPct = (v) => ((v || 0) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
+  function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+  function loteClass(l) { return l === "LOTE 1" ? "c-lote-1" : l === "LOTE 2" ? "c-lote-2" : l === "LOTE 3" ? "c-lote-3" : "c-lote-none"; }
+  function loteLabel(l) { return l ? l.replace("LOTE ", "Lote ") : "Sem lote"; }
+  function sitClass(s) { return s === "Em lactação" ? "c-sit-lactacao" : s === "Seca" ? "c-sit-seca" : s === "Gestante" ? "c-sit-gestante" : "c-sit-descarte"; }
+  function statusClass(s) { return s === "Ativo" ? "c-status-ativo" : s === "Inativo" ? "c-status-inativo" : "c-status-vendida"; }
+  function loteColorVar(l) { return l === "LOTE 1" ? "var(--series-1)" : l === "LOTE 2" ? "var(--series-2)" : l === "LOTE 3" ? "var(--series-3)" : "var(--text-muted)"; }
+  function isAdmin() { return session && session.perfil === "admin"; }
+
+  function custoPorLote() {
+    const out = {};
+    LOTES.forEach((l) => {
+      out[l] = state.insumos.reduce((acc, ins) => acc + (ins.dieta && ins.dieta[l] ? ins.dieta[l] : 0) * ins.precoKg, 0);
+    });
+    return out;
+  }
+  function vacasCountPorLote() {
+    const out = { "LOTE 1": 0, "LOTE 2": 0, "LOTE 3": 0 };
+    state.vacas.forEach((v) => { if (out[v.lote] !== undefined) out[v.lote]++; });
+    return out;
+  }
+  function custoDiaVaca(v) {
+    if (!v.lote) return 0;
+    const custos = custoPorLote(), counts = vacasCountPorLote();
+    return counts[v.lote] ? custos[v.lote] / counts[v.lote] : 0;
+  }
+
+  // ================= LOGIN =================
+  function tryLogin(email, pass) {
+    const u = state.usuarios.find((x) => stripAccents(x.email) === stripAccents(email) && x.senha === pass);
+    return u || null;
+  }
+  document.getElementById("loginForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const email = document.getElementById("loginEmail").value;
+    const pass = document.getElementById("loginPass").value;
+    const u = tryLogin(email, pass);
+    if (u) {
+      session = { id: u.id, nome: u.nome, perfil: u.perfil, email: u.email };
+      try { sessionStorage.setItem("bv2_session", JSON.stringify(session)); } catch (e) {}
+      showApp();
+    } else {
+      document.getElementById("loginError").textContent = "E-mail ou senha incorretos.";
+    }
+  });
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    session = null;
+    try { sessionStorage.removeItem("bv2_session"); } catch (e) {}
+    document.getElementById("app").classList.remove("visible");
+    document.getElementById("loginScreen").style.display = "flex";
+    document.getElementById("loginPass").value = "";
+  });
+  function showApp() {
+    document.getElementById("loginScreen").style.display = "none";
+    document.getElementById("app").classList.add("visible");
+    document.getElementById("whoLabel").textContent = session.nome + " · " + session.email;
+    renderApp();
+  }
+  (function initSession() {
+    try {
+      const raw = sessionStorage.getItem("bv2_session");
+      if (raw) {
+        const s = JSON.parse(raw);
+        const stillValid = state.usuarios.some((u) => stripAccents(u.email) === stripAccents(s.email));
+        if (stillValid) { session = s; showApp(); }
+      }
+    } catch (e) {}
+  })();
+
+  // ================= NAV =================
+  function renderNav() {
+    const tabs = [["dashboard", "Dashboard"], ["vacas", "Vacas"], ["insumos", "Insumos"], ["usuarios", "Usuários"]];
+    document.getElementById("tabNav").innerHTML = tabs.map(([id, label]) =>
+      `<button type="button" data-tab="${id}" class="${aba === id ? "active" : ""}">${label}</button>`
+    ).join("");
+    document.querySelectorAll("#tabNav button").forEach((b) => b.addEventListener("click", () => { aba = b.dataset.tab; selecionadas = new Set(); renderApp(); }));
+  }
+
+  // ================= APP RENDER =================
+  function renderApp() {
+    renderNav();
+    const el = document.getElementById("tabContent");
+    if (aba === "dashboard") el.innerHTML = dashboardHtml();
+    else if (aba === "vacas") el.innerHTML = vacasHtml();
+    else if (aba === "insumos") el.innerHTML = insumosHtml();
+    else if (aba === "usuarios") el.innerHTML = usuariosHtml();
+    wireTabEvents();
+    if (aba === "dashboard") renderDashboardCharts();
+    renderModal();
+  }
+
+  // ================= DASHBOARD =================
+  function matchesSitSearch(v) {
+    if (dashF.sit !== "all" && v.situacao !== dashF.sit) return false;
+    if (dashF.search) {
+      const q = stripAccents(dashF.search);
+      if (!stripAccents(v.nome).includes(q) && !String(v.numero).includes(q)) return false;
+    }
+    return true;
+  }
+  function matchesDashAll(v) {
+    if (dashF.lote !== "all") { const lv = v.lote || "null"; if (lv !== dashF.lote) return false; }
+    return matchesSitSearch(v);
+  }
+
+  function dashboardHtml() {
+    return `
+      <header class="top">
+        <h1>Painel do rebanho</h1>
+        <div class="sub">Lê ao vivo das abas <b>Vacas</b> e <b>Insumos</b>.</div>
+      </header>
+      <div class="filterbar">
+        <div class="fgroup"><span class="flabel">Lote</span>
+          <div class="seg" id="segLote">
+            <button data-value="all" class="${dashF.lote === "all" ? "active" : ""}">Todos</button>
+            <button data-value="LOTE 1" class="${dashF.lote === "LOTE 1" ? "active" : ""}">Lote 1</button>
+            <button data-value="LOTE 2" class="${dashF.lote === "LOTE 2" ? "active" : ""}">Lote 2</button>
+            <button data-value="LOTE 3" class="${dashF.lote === "LOTE 3" ? "active" : ""}">Lote 3</button>
+            <button data-value="null" class="${dashF.lote === "null" ? "active" : ""}">Sem lote</button>
+          </div>
+        </div>
+        <div class="fgroup"><span class="flabel">Situação</span>
+          <div class="seg" id="segSit">
+            <button data-value="all" class="${dashF.sit === "all" ? "active" : ""}">Todas</button>
+            <button data-value="Em lactação" class="${dashF.sit === "Em lactação" ? "active" : ""}">Lactação</button>
+            <button data-value="Seca" class="${dashF.sit === "Seca" ? "active" : ""}">Seca</button>
+            <button data-value="Gestante" class="${dashF.sit === "Gestante" ? "active" : ""}">Gestante</button>
+            <button data-value="Descarte" class="${dashF.sit === "Descarte" ? "active" : ""}">Descarte</button>
+          </div>
+        </div>
+        <div class="fgroup searchwrap">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9.5 9.5L13 13M11 6a5 5 0 1 1-10 0 5 5 0 0 1 10 0Z" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <input type="text" id="dashSearch" placeholder="Buscar por nome ou nº..." value="${esc(dashF.search)}">
+        </div>
+        <button class="clearbtn" id="dashClear">Limpar filtros</button>
+        <div class="fsummary" id="dashSummary"></div>
+      </div>
+      <div class="kpi-grid" id="kpiRow"></div>
+      <p class="desc" style="margin-top:8px;">"Vacas na seleção" e "Produção/dia" seguem todos os filtros. Os KPIs financeiros mostram sempre o total do(s) lote(s) selecionado(s) — a dieta é por lote, não por vaca.</p>
+      <div class="section"><h2>Composição do rebanho</h2>
+        <p class="desc" id="herdDesc"></p>
+        <div class="grid2">
+          <div class="card"><div class="legend" id="herdLegend"></div><div class="chart-wrap"><svg id="herdBar" width="100%" height="140"></svg></div></div>
+          <div class="card"><div class="legend" id="activeLegend"></div><div class="chart-wrap"><svg id="activeBar" width="100%" height="140"></svg></div></div>
+        </div>
+      </div>
+      <div class="section"><h2>Comparativo por lote</h2>
+        <p class="desc">Total fixo de cada lote — só reage ao filtro de Lote.</p>
+        <div class="grid2">
+          <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:10px;">Produção diária de leite (L)</div><div class="chart-wrap"><svg id="prodLoteBar" width="100%" height="150"></svg></div></div>
+          <div class="card"><div class="legend" id="finLegend"></div><div class="chart-wrap"><svg id="finLoteBar" width="100%" height="150"></svg></div></div>
+        </div>
+        <div class="stat-row" id="loteStats"></div>
+        <details class="tbl"><summary>Ver tabela — comparativo por lote</summary><table class="datatable" id="loteTable"></table></details>
+      </div>
+      <div class="section"><h2>Composição do custo de alimentação</h2>
+        <p class="desc">Preço/kg atual da aba Insumos × dieta por lote.</p>
+        <div class="card"><div class="legend" id="feedLegend"></div><div class="chart-wrap"><svg id="feedBar" width="100%" height="130"></svg></div>
+          <details class="tbl"><summary>Ver tabela</summary><table class="datatable" id="feedTable"></table></details>
+        </div>
+      </div>
+      <div class="section"><h2>Estágio de lactação</h2>
+        <p class="desc" id="delDesc"></p>
+        <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:10px;" id="delTitle"></div><div class="chart-wrap"><svg id="delBar" width="100%" height="140"></svg></div></div>
+      </div>
+      <div class="section"><h2>Vacas de maior e menor produção</h2>
+        <p class="desc" id="topBottomDesc"></p>
+        <div class="legend" id="topBottomLegend"></div>
+        <div class="grid2">
+          <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:10px;">Top 10 (L)</div><div class="chart-wrap"><svg id="topBar" width="100%" height="240"></svg></div></div>
+          <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:10px;">Bottom 10 (L)</div><div class="chart-wrap"><svg id="bottomBar" width="100%" height="240"></svg></div></div>
+        </div>
+      </div>
+      <footer class="foot" id="footerNote"></footer>`;
+  }
+
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function clearSvg(svg) { while (svg.firstChild) svg.removeChild(svg.firstChild); }
+  function svgSize(svg) { const r = svg.getBoundingClientRect(); return { w: Math.max(r.width, 280), h: parseFloat(svg.getAttribute("height")) }; }
+  const cssv = (name) => getComputedStyle(document.querySelector(".viz-root")).getPropertyValue(name).trim();
+  const resolveColor = (c) => c.startsWith("var(") ? cssv(c.slice(4, -1)) : c;
+
+  function horizontalBar(svgId, items, opts) {
+    opts = opts || {};
+    const svg = document.getElementById(svgId);
+    if (!svg) return;
+    clearSvg(svg);
+    if (!items.length) {
+      const { w, h } = svgSize(svg); svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      el("text", { x: w / 2, y: h / 2, "text-anchor": "middle", class: "axis-label" }, svg).textContent = "Sem dados para este filtro";
+      return;
+    }
+    const { w, h } = svgSize(svg);
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    const labelW = opts.labelW || 150, valueW = opts.valueW || 70;
+    const padTop = 8, padBottom = 8;
+    const rowH = (h - padTop - padBottom) / items.length;
+    const barH = Math.min(20, rowH - 10);
+    const maxV = opts.max || Math.max(...items.map((i) => i.value), 1) * 1.12;
+    const plotX0 = labelW, plotX1 = w - valueW;
+    const maxChars = Math.max(6, Math.floor((labelW - 14) / 6.4));
+    items.forEach((it, i) => {
+      const cy = padTop + rowH * i + rowH / 2;
+      const truncated = it.label.length > maxChars ? it.label.slice(0, maxChars - 1) + "…" : it.label;
+      const txt = el("text", { x: labelW - 10, y: cy + 4, "text-anchor": "end", class: "cat-label" }, svg);
+      txt.textContent = truncated;
+      if (truncated !== it.label) el("title", {}, txt).textContent = it.label;
+      const bw = Math.max(2, (it.value / maxV) * (plotX1 - plotX0));
+      el("rect", { x: plotX0, y: cy - barH / 2, width: bw, height: barH, rx: 4, ry: 4, fill: resolveColor(it.color || "var(--series-1)"), opacity: it.dimmed ? 0.28 : 1 }, svg);
+      el("text", { x: plotX0 + bw + 8, y: cy + 4, class: "value-label" }, svg).textContent = opts.fmt ? opts.fmt(it.value) : it.value;
+    });
+  }
+  function groupedBar(svgId, categories, series, opts) {
+    opts = opts || {};
+    const svg = document.getElementById(svgId);
+    clearSvg(svg);
+    const { w, h } = svgSize(svg);
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    const padL = 10, padR = 10, padT = 22, padB = 28;
+    const plotW = w - padL - padR, plotH = h - padT - padB;
+    const maxV = opts.max || Math.max(...series.flatMap((s) => s.values), 1) * 1.15;
+    const groupW = plotW / categories.length;
+    const barGap = 4;
+    const barW = Math.min(24, (groupW - 20) / series.length - barGap);
+    el("line", { x1: padL, x2: padL + plotW, y1: h - padB, y2: h - padB, class: "baseline" }, svg);
+    categories.forEach((cat, ci) => {
+      const gx0 = padL + groupW * ci + (groupW - (barW + barGap) * series.length + barGap) / 2;
+      const dimmed = opts.dimFn ? opts.dimFn(cat) : false;
+      series.forEach((s, si) => {
+        const v = s.values[ci];
+        const bh = Math.max(2, (v / maxV) * plotH);
+        const bx = gx0 + si * (barW + barGap);
+        const by = h - padB - bh;
+        el("rect", { x: bx, y: by, width: barW, height: bh, rx: 4, ry: 4, fill: resolveColor(s.color), opacity: dimmed ? 0.28 : 1 }, svg);
+      });
+      el("text", { x: padL + groupW * ci + groupW / 2, y: h - padB + 18, "text-anchor": "middle", class: "cat-label" }, svg).textContent = cat;
+    });
+  }
+  function stackedBarH(svgId, rows, categories, colors, opts) {
+    opts = opts || {};
+    const svg = document.getElementById(svgId);
+    clearSvg(svg);
+    const { w, h } = svgSize(svg);
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    const labelW = 70, padR = 16, padTop = 10;
+    const rowH = (h - padTop * 2) / rows.length;
+    const barH = Math.min(30, rowH - 14);
+    const plotX0 = labelW, plotX1 = w - padR;
+    const maxTotal = Math.max(...rows.map((r) => r.values.reduce((a, b) => a + b, 0)), 1) * 1.05;
+    const gap = 2;
+    rows.forEach((row, ri) => {
+      const cy = padTop + rowH * ri + rowH / 2;
+      const dimmed = opts.dimFn ? opts.dimFn(row.lote) : false;
+      el("text", { x: labelW - 10, y: cy + 4, "text-anchor": "end", class: "cat-label", opacity: dimmed ? 0.4 : 1 }, svg).textContent = row.lote;
+      let x = plotX0;
+      row.values.forEach((v, vi) => {
+        const segW = Math.max(0, (v / maxTotal) * (plotX1 - plotX0) - gap);
+        if (segW > 0) {
+          el("rect", { x, y: cy - barH / 2, width: segW, height: barH, rx: 3, ry: 3, fill: resolveColor(colors[vi]), opacity: dimmed ? 0.28 : 1 }, svg);
+          if (segW > 46) { const t = el("text", { x: x + segW / 2, y: cy + 4, "text-anchor": "middle", style: "font-size:10.5px;font-weight:600;fill:#fff", opacity: dimmed ? 0.6 : 1 }, svg); t.textContent = "R$" + Math.round(v); }
+        }
+        x += segW + gap;
+      });
+    });
+  }
+  function renderLegend(id, items) {
+    const c = document.getElementById(id); if (!c) return;
+    c.innerHTML = items.map((it) => `<div class="item"><span class="swatch" style="background:${resolveColor(it.color)}"></span><span>${esc(it.label)}</span></div>`).join("");
+  }
+
+  function renderDashboardCharts() {
+    const cows = state.vacas;
+    const custos = custoPorLote();
+    function cowsInLote(l, opts) { opts = opts || {}; return cows.filter((c) => (c.lote || "null") === l && (opts.ignoreCowFilters || matchesSitSearch(c))); }
+    function loteIsDimmed(l) { return dashF.lote !== "all" && dashF.lote !== l; }
+    function loteStats(l, opts) {
+      const inLote = cowsInLote(l, opts);
+      const n = inLote.length;
+      const prod = inLote.reduce((s, c) => s + (c.media || 0), 0);
+      const custo = custos[l] || 0;
+      const receita = prod * state.precoLeite;
+      return { lote: l, vacas: n, producao: prod, custo, receita, lucro: receita - custo, custoVaca: n ? custo / n : 0, vendaVaca: n ? receita / n : 0, mediaVaca: n ? prod / n : 0, pctCusto: receita ? custo / receita : 0 };
+    }
+    const inFilter = cows.filter(matchesDashAll);
+    const n = inFilter.length;
+    const parts = [];
+    if (dashF.lote !== "all") parts.push(dashF.lote === "null" ? "sem lote" : loteLabel(dashF.lote).toLowerCase());
+    if (dashF.sit !== "all") parts.push(dashF.sit.toLowerCase());
+    if (dashF.search) parts.push(`"${dashF.search}"`);
+    document.getElementById("dashSummary").innerHTML = `<b>${n}</b> de ${cows.length} vacas${parts.length ? " — " + esc(parts.join(", ")) : ""}`;
+
+    const vl = inFilter.filter((c) => c.situacao === "Em lactação").length;
+    const outras = inFilter.length - vl;
+    const comLote = inFilter.filter((c) => c.lote).length;
+    const semLote = inFilter.length - comLote;
+    document.getElementById("herdDesc").textContent = `${inFilter.length} vaca(s) na seleção. ${comLote} com lote ativo — ${semLote} sem lote.`;
+    renderLegend("herdLegend", [{ label: "Em lactação", value: vl, color: "var(--series-1)" }, { label: "Outras situações", value: outras, color: "var(--series-2)" }]);
+    horizontalBar("herdBar", [{ label: "Em lactação", value: vl, color: "var(--series-1)" }, { label: "Outras situações", value: outras, color: "var(--series-2)" }], { fmt: (v) => v + " vacas" });
+    renderLegend("activeLegend", [{ label: "Com lote ativo", value: comLote, color: "var(--series-1)" }, { label: "Sem lote ativo", value: semLote, color: "var(--text-muted)" }]);
+    horizontalBar("activeBar", [{ label: "Com lote ativo", value: comLote, color: "var(--series-1)" }, { label: "Sem lote ativo", value: semLote, color: "var(--text-muted)" }], { fmt: (v) => v + " vacas" });
+
+    const kpiRow = document.getElementById("kpiRow");
+    const lotesAtivos = dashF.lote === "all" ? LOTES : (dashF.lote === "null" ? [] : [dashF.lote]);
+    const stats2 = lotesAtivos.map((l) => loteStats(l, { ignoreCowFilters: true }));
+    const custoTot = stats2.reduce((s, l) => s + l.custo, 0);
+    const receitaTot = stats2.reduce((s, l) => s + l.receita, 0);
+    const lucroTot = receitaTot - custoTot;
+    const semDieta = dashF.lote === "null";
+    kpiRow.innerHTML = [
+      { label: "Vacas na seleção", value: n.toLocaleString("pt-BR") },
+      { label: "Produção / dia (seleção)", value: fmtL(inFilter.reduce((s, c) => s + (c.media || 0), 0)) },
+      { label: "Receita / dia (lote)", value: semDieta ? "—" : fmtR(receitaTot) },
+      { label: "Custo / dia (lote)", value: semDieta ? "—" : fmtR(custoTot) },
+      { label: "Lucro / dia (lote)", value: semDieta ? "—" : fmtR(lucroTot), good: !semDieta && lucroTot >= 0, bad: !semDieta && lucroTot < 0 },
+      { label: "% custo de produção", value: semDieta ? "—" : fmtPct(receitaTot ? custoTot / receitaTot : 0) }
+    ].map((it) => `<div class="kpi"><div class="label">${it.label}</div><div class="value">${it.value}</div>${it.good ? `<div class="delta good">margem positiva</div>` : it.bad ? `<div class="delta bad">margem negativa</div>` : ""}</div>`).join("");
+
+    const stats = LOTES.map((l) => loteStats(l, { ignoreCowFilters: true }));
+    horizontalBar("prodLoteBar", stats.map((l) => ({ label: loteLabel(l.lote), value: l.producao, color: loteColorVar(l.lote), dimmed: loteIsDimmed(l.lote) })), { fmt: fmtL });
+    renderLegend("finLegend", [{ label: "Custo/dia", color: "var(--series-1)" }, { label: "Receita/dia", color: "var(--series-2)" }, { label: "Lucro/dia", color: "var(--series-3)" }]);
+    groupedBar("finLoteBar", LOTES.map(loteLabel), [{ color: "var(--series-1)", values: stats.map((l) => l.custo) }, { color: "var(--series-2)", values: stats.map((l) => l.receita) }, { color: "var(--series-3)", values: stats.map((l) => l.lucro) }], { dimFn: (cat) => loteIsDimmed("LOTE " + cat.replace("Lote ", "")) });
+
+    document.getElementById("loteStats").innerHTML = stats.map((l) => {
+      const dimmed = loteIsDimmed(l.lote) ? "style=\"opacity:.4\"" : "";
+      return [
+        [`${loteLabel(l.lote)} · custo/vaca`, fmtR(l.custoVaca)], [`${loteLabel(l.lote)} · venda/vaca`, fmtR(l.vendaVaca)],
+        [`${loteLabel(l.lote)} · média/vaca`, l.mediaVaca.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + " L"], [`${loteLabel(l.lote)} · % custo`, fmtPct(l.pctCusto)]
+      ].map(([lab, val]) => `<div class="mini" ${dimmed}><div class="l">${lab}</div><div class="v">${val}</div></div>`).join("");
+    }).join("");
+    document.getElementById("loteTable").innerHTML = `<thead><tr><th>Lote</th><th class="num">Vacas</th><th class="num">Produção (L)</th><th class="num">Custo (R$)</th><th class="num">Receita (R$)</th><th class="num">Lucro (R$)</th><th class="num">% Custo</th></tr></thead><tbody>` +
+      stats.map((l) => `<tr><td>${loteLabel(l.lote)}</td><td class="num">${l.vacas}</td><td class="num">${l.producao.toFixed(1)}</td><td class="num">${l.custo.toFixed(2)}</td><td class="num">${l.receita.toFixed(2)}</td><td class="num">${l.lucro.toFixed(2)}</td><td class="num">${(l.pctCusto * 100).toFixed(1)}%</td></tr>`).join("") + `</tbody>`;
+
+    const feedColors = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];
+    renderLegend("feedLegend", FEED_CATS.map((c, i) => ({ label: c, color: feedColors[i] })));
+    const feedRows = LOTES.map((l) => ({ lote: l, values: FEED_CATS.map((cat) => { const ins = state.insumos.find((i) => i.nome === cat); return ins ? (ins.dieta[l] || 0) * ins.precoKg : 0; }) }));
+    stackedBarH("feedBar", feedRows, FEED_CATS, feedColors, { dimFn: loteIsDimmed });
+    document.getElementById("feedTable").innerHTML = `<thead><tr><th>Lote</th>${FEED_CATS.map((c) => `<th class="num">${c}</th>`).join("")}<th class="num">Total</th></tr></thead><tbody>` +
+      feedRows.map((r) => `<tr><td>${loteLabel(r.lote)}</td>${r.values.map((v) => `<td class="num">R$ ${v.toFixed(2)}</td>`).join("")}<td class="num">R$ ${r.values.reduce((a, b) => a + b, 0).toFixed(2)}</td></tr>`).join("") + `</tbody>`;
+
+    const delPool = inFilter.filter((c) => c.situacao === "Em lactação" && c.lote);
+    document.getElementById("delTitle").textContent = `Fase DEL — ${delPool.length} vaca(s) na seleção`;
+    document.getElementById("delDesc").textContent = "Estimativa a partir da data de parto (vacas em lactação, com lote ativo, dentro do filtro atual).";
+    const TODAY = new Date();
+    const delCounts = { ">200 dias": 0, "85-200 dias": 0, "40-85 dias": 0, "<40 dias": 0, "Sem data de parto": 0 };
+    delPool.forEach((c) => {
+      if (!c.parto) { delCounts["Sem data de parto"]++; return; }
+      const d = (TODAY - new Date(c.parto)) / 86400000;
+      if (d > 200) delCounts[">200 dias"]++; else if (d > 85) delCounts["85-200 dias"]++; else if (d > 40) delCounts["40-85 dias"]++; else delCounts["<40 dias"]++;
+    });
+    horizontalBar("delBar", Object.entries(delCounts).filter(([, v]) => v > 0).map(([label, value]) => ({ label, value, color: "var(--series-1)" })), { fmt: (v) => v + " vacas" });
+
+    const withMedia = inFilter.filter((c) => c.media).sort((a, b) => b.media - a.media);
+    document.getElementById("topBottomDesc").textContent = `Top 10 e bottom 10 entre as ${withMedia.length} vaca(s) com média cadastrada, no filtro atual.`;
+    renderLegend("topBottomLegend", [{ label: "Lote 1", color: "var(--series-1)" }, { label: "Lote 2", color: "var(--series-2)" }, { label: "Lote 3", color: "var(--series-3)" }, { label: "Sem lote", color: "var(--text-muted)" }]);
+    horizontalBar("topBar", withMedia.slice(0, 10).map((c) => ({ label: `${c.nome} - ${c.numero}`, value: c.media, color: loteColorVar(c.lote) })), { fmt: fmtL, labelW: 168, valueW: 50 });
+    horizontalBar("bottomBar", withMedia.slice(-10).reverse().map((c) => ({ label: `${c.nome} - ${c.numero}`, value: c.media, color: loteColorVar(c.lote) })), { fmt: fmtL, labelW: 168, valueW: 50 });
+
+    document.getElementById("footerNote").innerHTML = `Dados: aba Vacas (${cows.length} cadastradas, ${cows.filter((c) => c.lote).length} com lote ativo) e aba Insumos. Preço do leite: R$ ${state.precoLeite.toFixed(2)}/L.`;
+  }
+
+  // ================= VACAS TAB =================
+  function vacasFiltradas() {
+    return state.vacas.filter((v) =>
+      (vacasF.lote === "Todos" || v.lote === vacasF.lote) &&
+      (vacasF.status === "Todos" || v.status === vacasF.status) &&
+      (vacasF.situacao === "Todas" || v.situacao === vacasF.situacao) &&
+      (vacasF.busca === "" || stripAccents(v.nome).includes(stripAccents(vacasF.busca)) || String(v.numero).includes(vacasF.busca))
+    ).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  }
+
+  function vacasHtml() {
+    const filtradas = vacasFiltradas();
+    const todasSel = filtradas.length > 0 && filtradas.every((v) => selecionadas.has(v.id));
+    return `
+      <header class="top"><h1>Cadastro de vacas</h1>
+        <div class="sub">Clique duplo num nome/média/peso para editar. Clique num selo (Lote, Situação, Status) para alternar. Toda edição é salva e aparece para quem mais tiver acesso a este link.</div>
+      </header>
+      <div class="toolbar">
+        <input type="text" id="vBusca" class="searchwrap" placeholder="Buscar por nome ou nº..." value="${esc(vacasF.busca)}" style="font-size:12.5px;padding:7px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);width:200px;">
+        <select class="selfilter" id="vLote"><option ${vacasF.lote === "Todos" ? "selected" : ""}>Todos</option>${LOTES.map((l) => `<option ${vacasF.lote === l ? "selected" : ""}>${l}</option>`).join("")}</select>
+        <select class="selfilter" id="vStatus"><option ${vacasF.status === "Todos" ? "selected" : ""}>Todos</option>${STATUS.map((s) => `<option ${vacasF.status === s ? "selected" : ""}>${s}</option>`).join("")}</select>
+        <select class="selfilter" id="vSituacao"><option ${vacasF.situacao === "Todas" ? "selected" : ""}>Todas</option>${SITUACOES.map((s) => `<option ${vacasF.situacao === s ? "selected" : ""}>${s}</option>`).join("")}</select>
+        <span class="fsummary">${filtradas.length} vacas${selecionadas.size ? ` · ${selecionadas.size} selecionada(s)` : ""}</span>
+        <div style="flex:1"></div>
+        <button type="button" class="btn" id="btnImprimirLista">🖨 Imprimir lista</button>
+        <button type="button" class="btn" id="btnFormBranco">📋 Formulário em branco</button>
+        ${isAdmin() ? `<button type="button" class="btn primary" id="btnAddVaca">+ Adicionar vaca</button>` : ""}
+      </div>
+      <div class="card tablecard"><div class="table-scroll">
+        <table class="cadtable"><thead><tr>
+          <th><input type="checkbox" id="vSelAll" ${todasSel ? "checked" : ""}></th>
+          <th>Nº</th><th>Nome</th><th>Lote</th><th>Nascimento</th><th>Parto</th><th>Peso (kg)</th><th>Média (L/dia)</th><th>Situação</th><th>Custo/dia</th><th>Últ. medição</th><th>Status</th><th></th>
+        </tr></thead><tbody id="vacasBody">
+          ${filtradas.length ? filtradas.map(vacaRowHtml).join("") : `<tr><td colspan="13"><div class="empty-state">Nenhuma vaca corresponde a esse filtro.</div></td></tr>`}
+        </tbody></table>
+      </div></div>`;
+  }
+
+  function vacaRowHtml(v) {
+    return `<tr data-id="${v.id}" class="${selecionadas.has(v.id) ? "sel" : ""}">
+      <td><input type="checkbox" class="vSelRow" data-id="${v.id}" ${selecionadas.has(v.id) ? "checked" : ""}></td>
+      <td style="color:var(--text-muted)">${esc(v.numero)}</td>
+      <td><span class="ed-text" data-field="nome" data-id="${v.id}" data-type="text" ondblclick="window.__bv2edit(this)">${esc(v.nome)}</span></td>
+      <td><button type="button" class="pill ${loteClass(v.lote)}" data-id="${v.id}" data-field="lote" data-cycle="lote">${loteLabel(v.lote)}</button></td>
+      <td><input type="date" data-id="${v.id}" data-field="nascimento" value="${esc(v.nascimento)}"></td>
+      <td><input type="date" data-id="${v.id}" data-field="parto" value="${esc(v.parto)}"></td>
+      <td><span class="ed-text" data-field="peso" data-id="${v.id}" data-type="number" ondblclick="window.__bv2edit(this)">${v.peso || "—"}</span></td>
+      <td><span class="ed-text" data-field="media" data-id="${v.id}" data-type="number" ondblclick="window.__bv2edit(this)">${v.media ? v.media.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"}</span></td>
+      <td><button type="button" class="pill ${sitClass(v.situacao)}" data-id="${v.id}" data-field="situacao" data-cycle="situacao">${v.situacao}</button></td>
+      <td style="color:var(--text-secondary);font-weight:600;">R$ ${custoDiaVaca(v).toFixed(2)}</td>
+      <td><input type="date" data-id="${v.id}" data-field="ultimaMedicao" value="${esc(v.ultimaMedicao)}"></td>
+      <td><button type="button" class="pill ${statusClass(v.status)}" data-id="${v.id}" data-field="status" data-cycle="status">${v.status}</button></td>
+      <td>${isAdmin() ? `<button type="button" class="row-del" data-id="${v.id}" data-action="del-vaca" title="Remover">✕</button>` : ""}</td>
+    </tr>`;
+  }
+
+  // ================= INSUMOS TAB =================
+  function insumosHtml() {
+    return `
+      <header class="top"><h1>Insumos e dieta</h1>
+        <div class="sub">Preço/kg atual de cada item, dieta por lote (kg/dia) e histórico de preços.</div>
+      </header>
+      <div class="toolbar">
+        <span class="flabel" style="font-size:12px;">Preço do leite (R$/L)</span>
+        <input type="number" id="precoLeiteInput" step="0.01" value="${state.precoLeite}" style="font-size:14px;font-weight:700;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);width:100px;">
+      </div>
+      ${state.insumos.map(insumoCardHtml).join("")}`;
+  }
+
+  function insumoCardHtml(ins) {
+    const hist = ins.historico.slice().reverse().slice(0, 10);
+    const media = ins.historico.length ? ins.historico.reduce((a, h) => a + h.preco, 0) / ins.historico.length : ins.precoKg;
+    return `<div class="card ins-card" data-ins="${ins.id}">
+      <div class="ins-head"><h3>${esc(ins.nome)}</h3><span class="price-now">R$ ${ins.precoKg.toFixed(2)}/kg <span style="color:var(--text-muted);font-weight:400;font-size:11.5px;">· média R$ ${media.toFixed(2)}</span></span></div>
+      <div class="ins-form">
+        <div class="f"><label>Novo preço (R$/kg)</label><input type="number" step="0.00001" id="np-${ins.id}" placeholder="0,00"></div>
+        <div class="f"><label>Data</label><input type="date" id="nd-${ins.id}" value="${new Date().toISOString().slice(0, 10)}"></div>
+        <button type="button" class="btn primary" data-action="reg-preco" data-id="${ins.id}">Registrar</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Dieta por lote (kg/dia)</div>
+      <div class="dieta-row">
+        ${LOTES.map((l) => `<div class="d"><span style="font-size:12px;font-weight:600;">${loteLabel(l)}</span><input type="number" step="0.5" data-ins="${ins.id}" data-lote="${l}" value="${ins.dieta[l] || 0}"></div>`).join("")}
+      </div>
+      ${hist.length > 1 ? `<details style="margin-top:10px;"><summary style="font-size:11px;color:var(--text-muted);cursor:pointer;">Histórico de preços (${ins.historico.length})</summary>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">${hist.map((h) => `<span class="hist-chip">${h.data.split("-").reverse().join("/")} — R$ ${h.preco.toFixed(2)}</span>`).join("")}</div>
+      </details>` : ""}
+    </div>`;
+  }
+
+  // ================= USUARIOS TAB =================
+  function usuariosHtml() {
+    return `
+      <header class="top"><h1>Usuários</h1>
+        <div class="sub">Quem pode entrar na plataforma. Lembre-se: as senhas ficam visíveis a quem tiver acesso a esta aba.</div>
+      </header>
+      <div class="card tablecard"><div class="table-scroll">
+        <table class="cadtable"><thead><tr><th>Nome</th><th>E-mail</th><th>Senha</th><th>Perfil</th><th></th></tr></thead><tbody>
+          ${state.usuarios.map((u) => `<tr data-id="${u.id}">
+            <td>${isAdmin() ? `<span class="ed-text" data-field="nome" data-id="${u.id}" data-type="text" ondblclick="window.__bv2edituser(this)">${esc(u.nome)}</span>` : esc(u.nome)}${u.id === session.id ? ` <span style="color:var(--text-muted);font-size:11px;">(você)</span>` : ""}</td>
+            <td>${isAdmin() ? `<span class="ed-text" data-field="email" data-id="${u.id}" data-type="text" ondblclick="window.__bv2edituser(this)">${esc(u.email)}</span>` : esc(u.email)}</td>
+            <td>${isAdmin() ? `<span class="ed-text" data-field="senha" data-id="${u.id}" data-type="text" ondblclick="window.__bv2edituser(this)">${esc(u.senha)}</span>` : "••••••••"}</td>
+            <td>${isAdmin() ? `<button type="button" class="pill role-pill ${u.perfil === "admin" ? "admin" : ""}" data-id="${u.id}" data-cycle="perfil">${u.perfil === "admin" ? "Administrador" : "Editor"}</button>` : `<span class="role-pill ${u.perfil === "admin" ? "admin" : ""}">${u.perfil === "admin" ? "Administrador" : "Editor"}</span>`}</td>
+            <td>${isAdmin() && u.id !== session.id ? `<button type="button" class="row-del" data-id="${u.id}" data-action="del-user">Remover</button>` : ""}</td>
+          </tr>`).join("")}
+        </tbody></table>
+      </div></div>
+      ${isAdmin() ? `<div class="section"><h2>Adicionar usuário</h2>
+        <div class="card" style="max-width:520px;">
+          <div id="userAddError" style="color:var(--status-critical);font-size:12.5px;margin-bottom:10px;"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+            <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Nome</label><input type="text" id="nu-nome" placeholder="Nome completo" style="width:100%;font-size:13px;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--page-plane);color:var(--text-primary);"></div>
+            <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">E-mail</label><input type="email" id="nu-email" placeholder="email@exemplo.com" style="width:100%;font-size:13px;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--page-plane);color:var(--text-primary);"></div>
+            <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Senha</label><input type="text" id="nu-senha" placeholder="senha" style="width:100%;font-size:13px;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--page-plane);color:var(--text-primary);"></div>
+            <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Perfil</label><select id="nu-perfil" style="width:100%;font-size:13px;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--page-plane);color:var(--text-primary);"><option value="editor">Editor</option><option value="admin">Administrador</option></select></div>
+          </div>
+          <button type="button" class="btn primary" id="btnAddUser">Adicionar usuário</button>
+        </div>
+      </div>` : ""}`;
+  }
+
+  // ================= CYCLES =================
+  const CYCLES = { lote: [...LOTES, ""], situacao: SITUACOES, status: STATUS, perfil: ["editor", "admin"] };
+  function cycleValue(kind, cur) {
+    const opts = CYCLES[kind];
+    const idx = opts.indexOf(cur);
+    return opts[(idx + 1) % opts.length];
+  }
+
+  // ================= EDIT HELPERS (double-click text fields) =================
+  window.__bv2edit = function (span) {
+    const id = span.dataset.id, field = span.dataset.field, type = span.dataset.type;
+    const v = state.vacas.find((x) => x.id === id);
+    const cur = v[field] || "";
+    const input = document.createElement("input");
+    input.type = type === "number" ? "number" : "text";
+    input.value = cur;
+    input.style.cssText = "font-size:12.5px;width:100px;padding:3px 5px;border-radius:6px;border:1px solid var(--series-1);background:var(--page-plane);color:var(--text-primary);";
+    span.replaceWith(input);
+    input.focus(); input.select();
+    function commit() {
+      let val = input.value;
+      if (type === "number") val = parseFloat(val) || 0;
+      v[field] = val;
+      renderApp();
+      scheduleSave();
+    }
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); if (e.key === "Escape") { renderApp(); } });
+  };
+  window.__bv2edituser = function (span) {
+    const id = span.dataset.id, field = span.dataset.field;
+    const u = state.usuarios.find((x) => x.id === id);
+    const input = document.createElement("input");
+    input.type = "text"; input.value = u[field] || "";
+    input.style.cssText = "font-size:12.5px;width:130px;padding:3px 5px;border-radius:6px;border:1px solid var(--series-1);background:var(--page-plane);color:var(--text-primary);";
+    span.replaceWith(input);
+    input.focus(); input.select();
+    function commit() {
+      const val = input.value.trim();
+      if (field === "email") {
+        if (!val) { renderApp(); return; }
+        if (state.usuarios.some((x) => x.id !== u.id && stripAccents(x.email) === stripAccents(val))) {
+          alert("Já existe um usuário com esse e-mail.");
+          renderApp();
+          return;
+        }
+      }
+      if ((field === "nome" || field === "senha") && !val) { renderApp(); return; }
+      u[field] = val;
+      renderApp(); scheduleSave();
+    }
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); if (e.key === "Escape") { input.onblur = null; renderApp(); } });
+  };
+
+  // ================= PRINT / PDF =================
+  function abrirModalImpressao(tipo) { modal = { tipo, lote: vacasF.lote, status: vacasF.status }; renderModal(); }
+  function fecharModal() { modal = null; renderModal(); }
+  function renderModal() {
+    const root = document.getElementById("modalRoot");
+    if (!modal) { root.innerHTML = ""; return; }
+    const base = selecionadas.size > 0 ? state.vacas.filter((v) => selecionadas.has(v.id)) : vacasFiltradas();
+    const filtradas = base.filter((v) => (modal.lote === "Todos" || v.lote === modal.lote) && (modal.status === "Todos" || v.status === modal.status)).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    root.innerHTML = `<div class="modal-overlay" id="modalOverlay"><div class="modal">
+      <h3>${modal.tipo === "completo" ? "🖨 Imprimir lista de vacas" : "📋 Formulário em branco"}</h3>
+      <p class="desc2">${modal.tipo === "completo" ? "Gera PDF com Nº, Nome, Lote, Parto, Situação, Média, Custo/dia e Status — em ordem alfabética." : "Gera formulário com Nº, Nome, Lote, Parto e Média (L/dia) em branco para preenchimento manual."}</p>
+      <div class="grid2f">
+        <div><label>Lote</label><select id="mLote"><option ${modal.lote === "Todos" ? "selected" : ""}>Todos</option>${LOTES.map((l) => `<option ${modal.lote === l ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div><label>Status</label><select id="mStatus"><option ${modal.status === "Todos" ? "selected" : ""}>Todos</option>${STATUS.map((s) => `<option ${modal.status === s ? "selected" : ""}>${s}</option>`).join("")}</select></div>
+      </div>
+      <div class="infobar">${filtradas.length} vacas serão incluídas, em ordem alfabética${selecionadas.size ? " (a partir da seleção da tabela)" : ""}.</div>
+      <div class="modal-actions"><button type="button" class="btn" id="mCancel">Cancelar</button><button type="button" class="btn primary" id="mGo" ${filtradas.length === 0 ? "disabled" : ""}>Gerar PDF / Imprimir</button></div>
+    </div></div>`;
+    document.getElementById("modalOverlay").addEventListener("click", (e) => { if (e.target.id === "modalOverlay") fecharModal(); });
+    document.getElementById("mCancel").addEventListener("click", fecharModal);
+    document.getElementById("mLote").addEventListener("change", (e) => { modal.lote = e.target.value; renderModal(); });
+    document.getElementById("mStatus").addEventListener("change", (e) => { modal.status = e.target.value; renderModal(); });
+    document.getElementById("mGo").addEventListener("click", () => { imprimir(modal.tipo, filtradas); fecharModal(); });
+  }
+  function imprimir(tipo, vacasFiltradas) {
+    const titulo = tipo === "completo" ? "Lista de Vacas — Belo Vale II" : "Formulário de Produção — Belo Vale II";
+    const filtrosDesc = `Data: ${new Date().toLocaleDateString("pt-BR")} | ${vacasFiltradas.length} vacas`;
+    let linhas;
+    if (tipo === "completo") {
+      linhas = `<table><thead><tr><th>Nº</th><th>Nome</th><th>Lote</th><th>Parto</th><th>Situação</th><th>Média (L/dia)</th><th>Custo/dia</th><th>Status</th></tr></thead><tbody>` +
+        vacasFiltradas.map((v) => `<tr><td>${esc(v.numero)}</td><td>${esc(v.nome)}</td><td>${esc(loteLabel(v.lote))}</td><td>${v.parto ? new Date(v.parto + "T00:00").toLocaleDateString("pt-BR") : "—"}</td><td>${esc(v.situacao)}</td><td>${(v.media || 0).toFixed(1)}</td><td>R$ ${custoDiaVaca(v).toFixed(2)}</td><td>${esc(v.status)}</td></tr>`).join("") + `</tbody></table>`;
+    } else {
+      linhas = `<table><thead><tr><th>Nº</th><th>Nome</th><th>Lote</th><th>Parto</th><th>Média (L/dia)</th></tr></thead><tbody>` +
+        vacasFiltradas.map((v) => `<tr><td>${esc(v.numero)}</td><td>${esc(v.nome)}</td><td>${esc(loteLabel(v.lote))}</td><td>${v.parto ? new Date(v.parto + "T00:00").toLocaleDateString("pt-BR") : "—"}</td><td style="min-width:80px"></td></tr>`).join("") + `</tbody></table>`;
+    }
+    const area = document.getElementById("printArea");
+    area.innerHTML = `<h1>${esc(titulo)}</h1><div class="sub">${esc(filtrosDesc)}</div>${linhas}`;
+    // Best-effort: works in some viewers. The artifact sandbox blocks window.print()
+    // in most, so we never rely on this alone — the toast below is the real instruction.
+    try { window.print(); } catch (e) {}
+    showToast("Pronto para imprimir — pressione Ctrl+P (ou Cmd+P no Mac) para abrir a caixa de impressão / salvar como PDF.");
+  }
+
+  // ================= EVENT WIRING =================
+  function wireTabEvents() {
+    if (aba === "dashboard") {
+      document.getElementById("segLote").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { dashF.lote = b.dataset.value; renderApp(); }));
+      document.getElementById("segSit").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { dashF.sit = b.dataset.value; renderApp(); }));
+      document.getElementById("dashSearch").addEventListener("input", (e) => { dashF.search = e.target.value; renderDashboardCharts(); });
+      document.getElementById("dashClear").addEventListener("click", () => { dashF = { lote: "all", sit: "all", search: "" }; renderApp(); });
+    } else if (aba === "vacas") {
+      document.getElementById("vBusca").addEventListener("input", (e) => { vacasF.busca = e.target.value; renderVacasBodyOnly(); });
+      document.getElementById("vLote").addEventListener("change", (e) => { vacasF.lote = e.target.value; renderApp(); });
+      document.getElementById("vStatus").addEventListener("change", (e) => { vacasF.status = e.target.value; renderApp(); });
+      document.getElementById("vSituacao").addEventListener("change", (e) => { vacasF.situacao = e.target.value; renderApp(); });
+      document.getElementById("vSelAll").addEventListener("change", (e) => {
+        const filtradas = vacasFiltradas();
+        if (e.target.checked) filtradas.forEach((v) => selecionadas.add(v.id)); else filtradas.forEach((v) => selecionadas.delete(v.id));
+        renderApp();
+      });
+      document.querySelectorAll(".vSelRow").forEach((cb) => cb.addEventListener("change", (e) => {
+        const id = e.target.dataset.id;
+        if (e.target.checked) selecionadas.add(id); else selecionadas.delete(id);
+        renderApp();
+      }));
+      document.getElementById("btnImprimirLista").addEventListener("click", () => abrirModalImpressao("completo"));
+      document.getElementById("btnFormBranco").addEventListener("click", () => abrirModalImpressao("formulario"));
+      const addBtn = document.getElementById("btnAddVaca");
+      if (addBtn) addBtn.addEventListener("click", () => {
+        const nums = state.vacas.map((v) => parseInt(v.numero, 10)).filter((n) => !isNaN(n));
+        const novoNum = (nums.length ? Math.max(...nums) : 0) + 1;
+        state.vacas.push({ id: "v" + novoNum + "_" + Date.now(), numero: String(novoNum), nome: "Nova vaca", lote: "", nascimento: "", parto: "", peso: "", media: 0, situacao: "Em lactação", ultimaMedicao: "", status: "Ativo" });
+        renderApp(); scheduleSave();
+      });
+      document.querySelectorAll("[data-cycle]").forEach((btn) => btn.addEventListener("click", () => {
+        const id = btn.dataset.id, field = btn.dataset.field, kind = btn.dataset.cycle;
+        const v = state.vacas.find((x) => x.id === id);
+        v[field] = cycleValue(kind, v[field]);
+        renderApp(); scheduleSave();
+      }));
+      document.querySelectorAll('input[type="date"][data-id]').forEach((inp) => inp.addEventListener("change", (e) => {
+        const v = state.vacas.find((x) => x.id === e.target.dataset.id);
+        v[e.target.dataset.field] = e.target.value;
+        scheduleSave();
+      }));
+      document.querySelectorAll('[data-action="del-vaca"]').forEach((btn) => btn.addEventListener("click", () => {
+        if (!confirm("Excluir esta vaca?")) return;
+        state.vacas = state.vacas.filter((v) => v.id !== btn.dataset.id);
+        selecionadas.delete(btn.dataset.id);
+        renderApp(); scheduleSave();
+      }));
+    } else if (aba === "insumos") {
+      document.getElementById("precoLeiteInput").addEventListener("change", (e) => { state.precoLeite = parseFloat(e.target.value) || 0; scheduleSave(); });
+      document.querySelectorAll('[data-action="reg-preco"]').forEach((btn) => btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        const precoInput = document.getElementById("np-" + id), dataInput = document.getElementById("nd-" + id);
+        const preco = parseFloat(precoInput.value);
+        if (!preco || preco <= 0) return;
+        const data = dataInput.value || new Date().toISOString().slice(0, 10);
+        const ins = state.insumos.find((x) => x.id === id);
+        ins.precoKg = preco;
+        ins.historico.push({ data, preco });
+        renderApp(); scheduleSave();
+      }));
+      document.querySelectorAll('input[data-ins][data-lote]').forEach((inp) => inp.addEventListener("change", (e) => {
+        const ins = state.insumos.find((x) => x.id === e.target.dataset.ins);
+        ins.dieta[e.target.dataset.lote] = parseFloat(e.target.value) || 0;
+        renderApp(); scheduleSave();
+      }));
+    } else if (aba === "usuarios") {
+      document.querySelectorAll("[data-cycle='perfil']").forEach((btn) => btn.addEventListener("click", () => {
+        const u = state.usuarios.find((x) => x.id === btn.dataset.id);
+        u.perfil = cycleValue("perfil", u.perfil);
+        renderApp(); scheduleSave();
+      }));
+      document.querySelectorAll('[data-action="del-user"]').forEach((btn) => btn.addEventListener("click", () => {
+        if (!confirm("Remover este usuário?")) return;
+        state.usuarios = state.usuarios.filter((u) => u.id !== btn.dataset.id);
+        renderApp(); scheduleSave();
+      }));
+      const addUserBtn = document.getElementById("btnAddUser");
+      if (addUserBtn) addUserBtn.addEventListener("click", () => {
+        const nome = document.getElementById("nu-nome").value.trim();
+        const email = document.getElementById("nu-email").value.trim();
+        const senha = document.getElementById("nu-senha").value.trim();
+        const perfil = document.getElementById("nu-perfil").value;
+        const errEl = document.getElementById("userAddError");
+        if (!nome || !email || !senha) { errEl.textContent = "Preencha todos os campos."; return; }
+        if (state.usuarios.some((u) => stripAccents(u.email) === stripAccents(email))) { errEl.textContent = "E-mail já cadastrado."; return; }
+        state.usuarios.push({ id: "u" + Date.now(), nome, email, senha, perfil });
+        renderApp(); scheduleSave();
+      });
+    }
+  }
+
+  function renderVacasBodyOnly() {
+    const filtradas = vacasFiltradas();
+    document.getElementById("vacasBody").innerHTML = filtradas.length ? filtradas.map(vacaRowHtml).join("") : `<tr><td colspan="13"><div class="empty-state">Nenhuma vaca corresponde a esse filtro.</div></td></tr>`;
+    document.querySelectorAll(".vSelRow").forEach((cb) => cb.addEventListener("change", (e) => { const id = e.target.dataset.id; if (e.target.checked) selecionadas.add(id); else selecionadas.delete(id); renderApp(); }));
+    document.querySelectorAll("[data-cycle]").forEach((btn) => btn.addEventListener("click", () => { const id = btn.dataset.id, field = btn.dataset.field, kind = btn.dataset.cycle; const v = state.vacas.find((x) => x.id === id); v[field] = cycleValue(kind, v[field]); renderApp(); scheduleSave(); }));
+    document.querySelectorAll('input[type="date"][data-id]').forEach((inp) => inp.addEventListener("change", (e) => { const v = state.vacas.find((x) => x.id === e.target.dataset.id); v[e.target.dataset.field] = e.target.value; scheduleSave(); }));
+    document.querySelectorAll('[data-action="del-vaca"]').forEach((btn) => btn.addEventListener("click", () => { if (!confirm("Excluir esta vaca?")) return; state.vacas = state.vacas.filter((v) => v.id !== btn.dataset.id); renderApp(); scheduleSave(); }));
+  }
+
+  let resizeT;
+  window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (aba === "dashboard" && session) renderDashboardCharts(); }, 150); });
+})();
+</script>
