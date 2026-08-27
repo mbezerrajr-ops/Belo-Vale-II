@@ -27,7 +27,7 @@ services:
     build:
       context: ..
       dockerfile: infra/Dockerfile.api
-    command: ["celery", "-A", "app.workers.tasks", "worker", "--loglevel=info"]
+    command: ["uv", "run", "--no-sync", "celery", "-A", "app.workers.tasks", "worker", "--loglevel=info"]
     healthcheck:
       disable: true
     environment:
