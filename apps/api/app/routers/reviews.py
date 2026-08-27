@@ -44,6 +44,15 @@ def _review_response(review: ImportReview) -> dict[str, Any]:
                     }
                     for alert in line.alerts
                 ],
+                "existing_measurement": (
+                    {
+                        "id": str(line.existing_measurement.id),
+                        "measured_on": line.existing_measurement.measured_on,
+                        "values": line.existing_measurement.values,
+                    }
+                    if line.existing_measurement
+                    else None
+                ),
             }
             for line in review.lines
         ],

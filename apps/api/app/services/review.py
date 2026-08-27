@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import ExtractedLine, ExtractionRun, ImageAsset, Import, ValidationAlert
+from app.db.models import (
+    ExtractedLine,
+    ExtractionRun,
+    ImageAsset,
+    Import,
+    OfficialMeasurement,
+    ValidationAlert,
+)
 from app.services.ingestion import ImportNotFoundError
 from app.services.storage import ObjectStorage
 
@@ -23,6 +31,13 @@ class ReviewAlert:
 
 
 @dataclass(frozen=True)
+class ExistingMeasurement:
+    id: UUID
+    measured_on: str
+    values: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class ReviewLine:
     id: UUID
     line_number: int
@@ -33,6 +48,7 @@ class ReviewLine:
     candidate_animal_id: UUID | None
     crop_url: str | None
     alerts: list[ReviewAlert] = field(default_factory=list)
+    existing_measurement: ExistingMeasurement | None = None
 
 
 @dataclass(frozen=True)
@@ -79,6 +95,24 @@ async def get_import_review(
                         ValidationAlert.extracted_line_id == line.id
                     )
                 )
+
+                existing_measurement: ExistingMeasurement | None = None
+                measured_on_raw = (line.normalized_values or {}).get("measured_on")
+                if line.candidate_animal_id is not None and measured_on_raw:
+                    active = await session.scalar(
+                        select(OfficialMeasurement).where(
+                            OfficialMeasurement.animal_id == line.candidate_animal_id,
+                            OfficialMeasurement.measured_on == date.fromisoformat(measured_on_raw),
+                            OfficialMeasurement.status == "active",
+                        )
+                    )
+                    if active is not None:
+                        existing_measurement = ExistingMeasurement(
+                            id=active.id,
+                            measured_on=active.measured_on.isoformat(),
+                            values=active.values,
+                        )
+
                 lines.append(
                     ReviewLine(
                         id=line.id,
@@ -98,6 +132,7 @@ async def get_import_review(
                             )
                             for alert in alerts
                         ],
+                        existing_measurement=existing_measurement,
                     )
                 )
 
