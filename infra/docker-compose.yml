@@ -21,7 +21,7 @@ services:
         condition: service_healthy
     ports:
       - "8000:8000"
-    networks: [ingestion_private]
+    networks: [ingestion_private, ingestion_edge]
 
   worker:
     build:
@@ -87,12 +87,24 @@ services:
     networks: [ingestion_private]
 
   web:
-    image: nginx:1.27-alpine
-    networks: [ingestion_private]
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.web
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+    networks: [ingestion_edge]
 
 networks:
+  # No host-published port ever reaches a container on this network — it has
+  # no gateway to the outside. db/redis/minio/worker only ever need to talk
+  # to each other and to the api container, never to the host or internet.
   ingestion_private:
     internal: true
+  # api and web sit here too so the host (and Playwright/browsers) can reach
+  # them via their published ports; this network is deliberately NOT internal.
+  ingestion_edge: {}
 
 volumes:
   postgres_data:

@@ -279,3 +279,78 @@ def test_corrected_values_override_normalized_values_in_the_stored_measurement()
         assert measurement.values["total"] == "19"
 
     _run(scenario)
+
+
+def test_two_reviewers_racing_on_the_same_animal_and_date_cannot_both_win_silently() -> None:
+    """Operator A opens the review and sees existing_measurement = None.
+    Before A submits, operator B approves a different extracted line for the
+    same animal + date. A's stale view must not let their approval silently
+    win or silently lose — the backend must force an explicit replacement
+    decision, never a silent overwrite."""
+
+    async def scenario(session: AsyncSession) -> None:
+        animal = await _make_animal(session)
+        animal_id = animal.id
+        line_seen_by_a = await _make_line(session, animal_id=animal_id)
+        line_seen_by_a_id = line_seen_by_a.id
+        line_approved_by_b = await _make_line(session, animal_id=animal_id)
+
+        # A's view of the world at review time: no active measurement yet.
+        existing_before_b = await session.scalar(
+            select(OfficialMeasurement).where(OfficialMeasurement.animal_id == animal_id)
+        )
+        assert existing_before_b is None
+
+        # B approves first.
+        b_result = await decide_line(
+            session,
+            line_id=line_approved_by_b.id,
+            reviewer_email="operator-b@example.com",
+            action="approve",
+            corrected_values=None,
+            reason=None,
+            expected_version=1,
+        )
+        assert b_result.measurement_status == "active"
+
+        # A now tries to approve, still holding the version they originally
+        # saw. The backend must reject a silent overwrite...
+        with pytest.raises(ReplacementReasonRequiredError):
+            await decide_line(
+                session,
+                line_id=line_seen_by_a_id,
+                reviewer_email="operator-a@example.com",
+                action="approve",
+                corrected_values=None,
+                reason=None,
+                expected_version=1,
+            )
+        # A real request gets its own session; reusing this one across calls
+        # needs the rollback AsyncSession.close() would otherwise do, so the
+        # rejected attempt's uncommitted version bump doesn't leak forward.
+        await session.rollback()
+
+        # ...but an explicit, reasoned replacement is allowed and auditable.
+        a_result = await decide_line(
+            session,
+            line_id=line_seen_by_a_id,
+            reviewer_email="operator-a@example.com",
+            action="approve",
+            corrected_values=None,
+            reason="B aprovou primeiro; confirmando valor de A após conferência",
+            expected_version=1,
+        )
+        assert a_result.measurement_status == "active"
+
+        b_measurement = await session.get(OfficialMeasurement, b_result.measurement_id)
+        assert b_measurement.status == "superseded"
+
+        active_count = await session.scalars(
+            select(OfficialMeasurement).where(
+                OfficialMeasurement.animal_id == animal_id,
+                OfficialMeasurement.status == "active",
+            )
+        )
+        assert len(list(active_count)) == 1
+
+    _run(scenario)

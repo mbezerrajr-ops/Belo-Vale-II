@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import get_settings
 from app.routers.auth import router as auth_router
 from app.routers.imports import router as imports_router
+from app.routers.measurements import router as measurements_router
 from app.routers.reviews import router as reviews_router
 from app.services.approval import (
     ConcurrentReviewError,
@@ -27,6 +28,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(imports_router)
     app.include_router(reviews_router)
+    app.include_router(measurements_router)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
