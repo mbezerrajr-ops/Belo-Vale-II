@@ -68,6 +68,7 @@ async def get_import_review(
         raise ImportNotFoundError(str(import_id))
 
     lines: list[ReviewLine] = []
+    status = import_row.status
     image = await session.scalar(
         select(ImageAsset).where(ImageAsset.import_id == import_id)
     )
@@ -79,6 +80,11 @@ async def get_import_review(
             .limit(1)
         )
         if latest_run is not None:
+            # ExtractionRun tracks the real processing lifecycle
+            # (pending/processing/extracted/failed); Import.status only ever
+            # moves between pending and queued, so once a run exists its
+            # status is what the review UI actually needs to show.
+            status = latest_run.status
             extracted_lines = await session.scalars(
                 select(ExtractedLine)
                 .where(ExtractedLine.extraction_run_id == latest_run.id)
@@ -138,7 +144,7 @@ async def get_import_review(
 
     return ImportReview(
         import_id=import_row.id,
-        status=import_row.status,
+        status=status,
         declared_lot=import_row.declared_lot,
         declared_measured_on=(
             import_row.declared_measured_on.isoformat()

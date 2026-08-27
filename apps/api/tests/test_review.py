@@ -17,9 +17,11 @@ from app.db.models import (
     ReviewDecision,
     ValidationAlert,
 )
-from app.services.ingestion import ImportNotFoundError
+from app.services.ingestion import ImportNotFoundError, create_import
 from app.services.review import get_import_review
 from app.services.storage import InMemoryObjectStorage
+from app.vision.provider import FakeVisionProvider
+from app.workers.tasks import run_extraction
 
 
 def _database_url() -> str:
@@ -90,7 +92,10 @@ def test_get_import_review_assembles_lines_and_alerts() -> None:
             session, InMemoryObjectStorage(), import_id=ingestion.id
         )
 
-        assert review.status == "pending"
+        # The run (status="extracted") is the authoritative processing state
+        # once it exists — Import.status ("pending" here) never advances past
+        # queued on its own.
+        assert review.status == "extracted"
         assert review.declared_lot == "1"
         assert review.declared_measured_on == "2026-07-22"
         assert len(review.lines) == 1
@@ -174,6 +179,42 @@ def test_get_import_review_surfaces_an_existing_active_measurement() -> None:
         assert existing is not None
         assert existing.measured_on == "2026-07-22"
         assert existing.values["total"] == "18"
+
+    _run(scenario)
+
+
+def test_get_import_review_status_tracks_the_extraction_run_not_the_stale_import_status() -> None:
+    """Regression test: found via a manual smoke test — Import.status only
+    ever moves pending -> queued and never advances further, so a real
+    upload that finished processing kept reporting "queued" forever unless
+    the review reads the ExtractionRun's own status instead."""
+
+    async def scenario(session: AsyncSession) -> None:
+        farm = Farm(name="Fazenda Modelo")
+        session.add(farm)
+        await session.commit()
+
+        import io
+
+        from PIL import Image
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (20, 10), color=(120, 80, 40)).save(buffer, format="JPEG")
+
+        storage = InMemoryObjectStorage()
+        created = await create_import(
+            session, storage, farm_id=farm.id, content=buffer.getvalue(), max_bytes=1_000_000
+        )
+
+        review_before = await get_import_review(session, storage, import_id=created.id)
+        assert review_before.status == "pending"
+
+        await run_extraction(
+            session, storage, FakeVisionProvider(), extraction_run_id=created.extraction_run_id
+        )
+
+        review_after = await get_import_review(session, storage, import_id=created.id)
+        assert review_after.status == "extracted"
 
     _run(scenario)
 
