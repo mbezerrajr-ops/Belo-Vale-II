@@ -1,8 +1,11 @@
 import {
   ApiError,
+  type CurrentUser,
   type DecisionRequest,
   type DecisionResult,
   type ImportReview,
+  type LoginResult,
+  type MeasurementRecord,
   type UploadResult,
 } from "./types";
 
@@ -18,6 +21,25 @@ async function parseJsonOrThrow<T>(response: Response): Promise<T> {
 
 function authHeaders(token: string): HeadersInit {
   return { Authorization: `Bearer ${token}` };
+}
+
+export async function login(
+  email: string,
+  password: string,
+): Promise<LoginResult> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  return parseJsonOrThrow<LoginResult>(response);
+}
+
+export async function getCurrentUser(token: string): Promise<CurrentUser> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow<CurrentUser>(response);
 }
 
 export interface UploadImportInput {
@@ -69,6 +91,30 @@ export async function getImportReview(
     { headers: authHeaders(token) },
   );
   return parseJsonOrThrow<ImportReview>(response);
+}
+
+export interface MeasurementFilter {
+  farmId: string;
+  from?: string;
+  to?: string;
+}
+
+export async function getMeasurements(
+  filter: MeasurementFilter,
+  token: string,
+): Promise<MeasurementRecord[]> {
+  const params = new URLSearchParams({ farm_id: filter.farmId });
+  if (filter.from) {
+    params.set("from", filter.from);
+  }
+  if (filter.to) {
+    params.set("to", filter.to);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/measurements?${params.toString()}`, {
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow<MeasurementRecord[]>(response);
 }
 
 export async function decideLine(

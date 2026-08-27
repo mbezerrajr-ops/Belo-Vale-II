@@ -55,6 +55,29 @@ export interface DecisionResult {
   measurement_status: string | null;
 }
 
+export interface LoginResult {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+export interface CurrentUser {
+  id: string;
+  email: string;
+  role: string;
+}
+
+export interface MeasurementRecord {
+  id: string;
+  animal_id: string;
+  animal_identifier: string;
+  animal_name: string | null;
+  measured_on: string;
+  values: Record<string, unknown>;
+  reviewed_by: string | null;
+  created_at: string;
+}
+
 export interface ApiErrorBody {
   code: string;
   [key: string]: unknown;
