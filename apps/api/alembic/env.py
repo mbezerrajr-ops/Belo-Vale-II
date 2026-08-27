@@ -9,10 +9,10 @@ from app.db.models import Base
 
 
 config = context.config
-config.set_main_option(
-    "sqlalchemy.url",
-    os.getenv("POSTGRES_URL", config.get_main_option("sqlalchemy.url")),
-)
+database_url = os.getenv("POSTGRES_URL")
+if not database_url:
+    raise RuntimeError("POSTGRES_URL is required to run database migrations")
+config.set_main_option("sqlalchemy.url", database_url)
 target_metadata = Base.metadata
 
 

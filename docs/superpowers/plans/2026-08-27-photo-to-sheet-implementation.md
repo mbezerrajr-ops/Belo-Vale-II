@@ -167,6 +167,35 @@ git add apps/api
 git commit -m "feat: add auditable ingestion domain"
 ```
 
+### Task 2A: Autenticação e autorização no servidor
+
+**Files:**
+- Create: `apps/api/app/core/security.py`
+- Create: `apps/api/app/routers/auth.py`
+- Create: `apps/api/app/schemas/auth.py`
+- Modify: `apps/api/app/main.py`
+- Modify: `apps/api/app/db/models.py`
+- Create: `apps/api/tests/test_auth.py`
+
+**Interfaces:**
+- Produces authenticated server sessions/tokens and server-enforced `operator`, `reviewer` and `admin` roles.
+- Produces dependencies consumed by every mutable route; frontend profile data is never treated as authorization.
+- Consumes the database session and audit entities from Tasks 1–2.
+
+- [ ] **Step 1: Write failing authorization tests**
+
+Cover unauthenticated denial, role denial and permitted access for an authenticated reviewer/admin.
+
+- [ ] **Step 2: Implement server-side identity and role enforcement**
+
+Store only password hashes, validate credentials on the server, issue an expiring authenticated session/token, and centralize role dependencies. Do not hard-code or publish credentials.
+
+- [ ] **Step 3: Verify**
+
+Run: `cd apps/api && python -m pytest tests/test_auth.py -v`
+
+Expected: PASS.
+
 ### Task 3: Ingestão segura, deduplicação e armazenamento de objetos
 
 **Files:**
@@ -177,7 +206,9 @@ git commit -m "feat: add auditable ingestion domain"
 
 **Interfaces:**
 - Produces: `POST /api/imports` multipart with `file`, `farm_id`, `declared_lot`, `declared_period`.
-- Produces: `{id, status: "queued", duplicate_of: null | UUID}`.
+- Produces: `202 {id, status: "queued"}` on a new image.
+- Produces: `409 {code: "duplicate_image", existing_import_id: UUID}` when the hash already exists for the farm — upload never silently reprocesses.
+- Produces: `POST /api/imports/{existing_import_id}/reprocess` — the explicit, separate confirmation the spec requires before reprocessing a duplicate. Requires `require_minimum_role("reviewer")`. Returns `202 {id: existing_import_id, status: "queued"}` and enqueues a new `ExtractionRun` for the existing `Import`/`ImageAsset` (no re-upload). Returns `409 {code: "import_already_processing"}` if a run for that import is already queued or in progress.
 - Consumes: `ImageAsset` and `Import` from Task 2.
 
 - [ ] **Step 1: Write failing ingest tests**
@@ -188,11 +219,26 @@ def test_upload_creates_queued_import(client, farm_id, valid_jpeg) -> None:
     assert response.status_code == 202
     assert response.json()["status"] == "queued"
 
-def test_duplicate_upload_returns_existing_import(client, farm_id, valid_jpeg) -> None:
-    client.post("/api/imports", data={"farm_id": farm_id}, files={"file": ("sheet.jpg", valid_jpeg, "image/jpeg")})
+def test_duplicate_upload_is_rejected_with_the_existing_import_id(client, farm_id, valid_jpeg) -> None:
+    first = client.post("/api/imports", data={"farm_id": farm_id}, files={"file": ("sheet.jpg", valid_jpeg, "image/jpeg")})
     response = client.post("/api/imports", data={"farm_id": farm_id}, files={"file": ("sheet.jpg", valid_jpeg, "image/jpeg")})
     assert response.status_code == 409
     assert response.json()["code"] == "duplicate_image"
+    assert response.json()["existing_import_id"] == first.json()["id"]
+
+def test_reprocess_enqueues_a_new_run_for_the_existing_import(client, reviewer_token, farm_id, valid_jpeg) -> None:
+    first = client.post("/api/imports", data={"farm_id": farm_id}, files={"file": ("sheet.jpg", valid_jpeg, "image/jpeg")})
+    response = client.post(
+        f"/api/imports/{first.json()['id']}/reprocess",
+        headers={"Authorization": f"Bearer {reviewer_token}"},
+    )
+    assert response.status_code == 202
+    assert response.json() == {"id": first.json()["id"], "status": "queued"}
+
+def test_reprocess_requires_authentication(client, farm_id, valid_jpeg) -> None:
+    first = client.post("/api/imports", data={"farm_id": farm_id}, files={"file": ("sheet.jpg", valid_jpeg, "image/jpeg")})
+    response = client.post(f"/api/imports/{first.json()['id']}/reprocess")
+    assert response.status_code == 401
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -203,7 +249,7 @@ Expected: FAIL because the import router is absent.
 
 - [ ] **Step 3: Implement validation and object storage**
 
-Accept JPEG, PNG and HEIC only after content sniffing; enforce a configured maximum size and reject malformed images. Stream upload while calculating SHA-256, store original under an opaque object key, create rows transactionally and enqueue only after commit. Never expose MinIO credentials or permanent object paths to the browser.
+Accept JPEG, PNG and HEIC only after content sniffing; enforce a configured maximum size and reject malformed images. Stream upload while calculating SHA-256, store original under an opaque object key, create rows transactionally and enqueue only after commit. Never expose MinIO credentials or permanent object paths to the browser. Upload never reprocesses a duplicate on its own; only the dedicated, authenticated reprocess endpoint does, per the explicit-confirmation requirement in design.md's acceptance criteria.
 
 - [ ] **Step 4: Run tests**
 
