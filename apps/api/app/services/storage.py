@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+from datetime import timedelta
 from functools import lru_cache
 from typing import Protocol
 from urllib.parse import urlsplit
@@ -12,6 +13,8 @@ class ObjectStorage(Protocol):
     def save(self, object_key: str, data: bytes, content_type: str) -> None: ...
 
     def load(self, object_key: str) -> bytes: ...
+
+    def presigned_url(self, object_key: str, *, expires_seconds: int) -> str: ...
 
 
 class InMemoryObjectStorage:
@@ -25,6 +28,9 @@ class InMemoryObjectStorage:
 
     def load(self, object_key: str) -> bytes:
         return self.objects[object_key]
+
+    def presigned_url(self, object_key: str, *, expires_seconds: int) -> str:
+        return f"memory://{object_key}?expires_in={expires_seconds}"
 
 
 class MinioObjectStorage:
@@ -60,6 +66,11 @@ class MinioObjectStorage:
         finally:
             response.close()
             response.release_conn()
+
+    def presigned_url(self, object_key: str, *, expires_seconds: int) -> str:
+        return self._client.presigned_get_object(
+            self._bucket, object_key, expires=timedelta(seconds=expires_seconds)
+        )
 
 
 @lru_cache

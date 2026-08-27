@@ -11,8 +11,9 @@ from celery import Celery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.db.models import ExtractionRun, ImageAsset
+from app.db.models import ExtractionRun, Import, ImageAsset
 from app.db.session import get_session_factory
+from app.services.extraction_processing import persist_extracted_lines
 from app.services.image_preprocessing import preprocess_image
 from app.services.storage import ObjectStorage, get_object_storage
 from app.vision.contracts import VisionProvider
@@ -71,6 +72,8 @@ async def run_extraction(
         await session.commit()
         raise
 
+    # Raw provider output is committed on its own so it survives even if the
+    # normalization/validation step below fails partway through.
     run.raw_response = {
         "header_text": extraction.header_text,
         "lot": extraction.lot,
@@ -81,6 +84,29 @@ async def run_extraction(
         "lines": [dataclasses.asdict(line) for line in extraction.lines],
     }
     run.model_name = extraction.model_name
+    await session.commit()
+
+    try:
+        import_row = (
+            await session.get(Import, image.import_id) if image.import_id else None
+        )
+        await persist_extracted_lines(
+            session,
+            farm_id=image.farm_id,
+            extraction_run_id=run.id,
+            extraction=extraction,
+            declared_lot=import_row.declared_lot if import_row else None,
+            declared_measured_on=import_row.declared_measured_on if import_row else None,
+        )
+    except Exception:
+        # Discard any partially-inserted lines/alerts; raw_response above was
+        # already committed and is untouched by this rollback.
+        await session.rollback()
+        run.status = "failed"
+        run.completed_at = datetime.now(timezone.utc)
+        await session.commit()
+        raise
+
     run.status = "extracted"
     run.completed_at = datetime.now(timezone.utc)
     await session.commit()

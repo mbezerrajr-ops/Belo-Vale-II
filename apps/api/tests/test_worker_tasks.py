@@ -7,7 +7,9 @@ import pytest
 from PIL import Image
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.db.models import ExtractionRun, Farm
+from sqlalchemy import select
+
+from app.db.models import ExtractedLine, ExtractionRun, Farm, ValidationAlert
 from app.services.ingestion import create_import
 from app.services.storage import InMemoryObjectStorage
 from app.vision.contracts import VisionExtraction
@@ -60,6 +62,27 @@ def test_run_extraction_persists_the_raw_provider_response() -> None:
                 assert completed_run.raw_response["lines"][0]["morning"] == "10"
                 assert completed_run.started_at is not None
                 assert completed_run.completed_at is not None
+
+                extracted = list(
+                    await session.scalars(
+                        select(ExtractedLine).where(
+                            ExtractedLine.extraction_run_id == completed_run.id
+                        )
+                    )
+                )
+                assert len(extracted) == 1
+                assert extracted[0].normalized_values["animal_number"] == "497"
+                # No animal 497 is registered on this farm, so the line must be
+                # flagged unknown_animal rather than silently matched.
+                assert extracted[0].candidate_animal_id is None
+                alerts = list(
+                    await session.scalars(
+                        select(ValidationAlert).where(
+                            ValidationAlert.extracted_line_id == extracted[0].id
+                        )
+                    )
+                )
+                assert any(alert.code == "unknown_animal" for alert in alerts)
         finally:
             await engine.dispose()
 

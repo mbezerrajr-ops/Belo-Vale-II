@@ -101,6 +101,8 @@ class Import(TimestampedModel, Base):
     status: Mapped[str] = mapped_column(String(32), default="pending", server_default=text("'pending'"), nullable=False)
     source: Mapped[str | None] = mapped_column(String(255))
     initiated_by: Mapped[str | None] = mapped_column(String(255))
+    declared_lot: Mapped[str | None] = mapped_column(String(64))
+    declared_measured_on: Mapped[date | None] = mapped_column(Date)
 
 
 class ImageAsset(TimestampedModel, Base):
@@ -144,6 +146,10 @@ class ExtractedLine(TimestampedModel, Base):
     normalized_values: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     confidence: Mapped[float | None] = mapped_column(Float)
     crop_coordinates: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default=text("1"), nullable=False)
+    candidate_animal_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("animals.id", ondelete="SET NULL")
+    )
 
 
 class ValidationAlert(TimestampedModel, Base):

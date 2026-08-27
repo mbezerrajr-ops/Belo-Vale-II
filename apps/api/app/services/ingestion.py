@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy import select
@@ -54,6 +55,8 @@ async def create_import(
     farm_id: UUID,
     content: bytes,
     max_bytes: int,
+    declared_lot: str | None = None,
+    declared_measured_on: date | None = None,
 ) -> ImportStatus:
     media_type = sniff_image_media_type(content)
     if media_type is None:
@@ -71,7 +74,12 @@ async def create_import(
     if existing is not None:
         raise DuplicateImageError(existing_import_id=existing.import_id)
 
-    import_row = Import(farm_id=farm_id, status="pending")
+    import_row = Import(
+        farm_id=farm_id,
+        status="pending",
+        declared_lot=declared_lot,
+        declared_measured_on=declared_measured_on,
+    )
     session.add(import_row)
     await session.flush()
 

@@ -11,6 +11,7 @@ from app.core.security import require_minimum_role
 from app.db.models import User
 from app.db.session import get_db_session
 from app.services.ingestion import ImportStatus, create_import, reprocess_import
+from app.services.normalization import normalize_date
 from app.services.storage import ObjectStorage, get_object_storage
 from app.workers.tasks import ExtractionDispatcher, get_extraction_dispatcher
 
@@ -30,6 +31,8 @@ async def upload_import(
     _: Annotated[User, Depends(require_minimum_role("operator"))],
     farm_id: Annotated[UUID, Form()],
     file: Annotated[UploadFile, File()],
+    declared_lot: Annotated[str | None, Form()] = None,
+    declared_period: Annotated[str | None, Form()] = None,
 ) -> dict[str, str]:
     content = await file.read()
     created = await create_import(
@@ -38,6 +41,8 @@ async def upload_import(
         farm_id=farm_id,
         content=content,
         max_bytes=settings.max_upload_bytes,
+        declared_lot=declared_lot,
+        declared_measured_on=normalize_date(declared_period),
     )
     dispatcher.dispatch(created.extraction_run_id)
     return _response(created)
