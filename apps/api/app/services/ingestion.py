@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from dataclasses import dataclass
 from datetime import date
 from uuid import UUID
@@ -11,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import ExtractionRun, ImageAsset, Import
 from app.services.image_sniffing import sniff_image_media_type
 from app.services.storage import ObjectStorage
+
+logger = logging.getLogger(__name__)
 
 _ACTIVE_RUN_STATUSES = ("pending", "processing")
 
@@ -72,6 +75,10 @@ async def create_import(
         )
     )
     if existing is not None:
+        logger.info(
+            "duplicate image rejected farm_id=%s existing_import_id=%s",
+            farm_id, existing.import_id,
+        )
         raise DuplicateImageError(existing_import_id=existing.import_id)
 
     import_row = Import(
@@ -103,6 +110,10 @@ async def create_import(
     import_row.status = "queued"
     await session.commit()
 
+    logger.info(
+        "import queued import_id=%s farm_id=%s extraction_run_id=%s",
+        import_row.id, farm_id, run.id,
+    )
     return ImportStatus(id=import_row.id, status=import_row.status, extraction_run_id=run.id)
 
 
@@ -132,4 +143,7 @@ async def reprocess_import(session: AsyncSession, *, import_id: UUID) -> ImportS
     import_row.status = "queued"
     await session.commit()
 
+    logger.info(
+        "reprocess queued import_id=%s extraction_run_id=%s", import_row.id, run.id
+    )
     return ImportStatus(id=import_row.id, status=import_row.status, extraction_run_id=run.id)

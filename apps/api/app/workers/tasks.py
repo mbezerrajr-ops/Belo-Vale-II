@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import logging
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Protocol
@@ -17,6 +18,8 @@ from app.services.image_preprocessing import preprocess_image
 from app.services.storage import ObjectStorage, get_object_storage
 from app.vision.contracts import VisionProvider
 from app.vision.provider import get_vision_provider
+
+logger = logging.getLogger(__name__)
 
 
 def _build_celery_app() -> Celery:
@@ -60,6 +63,7 @@ async def run_extraction(
     run.status = "processing"
     run.started_at = datetime.now(timezone.utc)
     await session.commit()
+    logger.info("extraction processing extraction_run_id=%s", run.id)
 
     try:
         original_bytes = storage.load(image.object_key)
@@ -69,6 +73,7 @@ async def run_extraction(
         run.status = "failed"
         run.completed_at = datetime.now(timezone.utc)
         await session.commit()
+        logger.exception("extraction failed extraction_run_id=%s", run.id)
         raise
 
     # Raw provider output is committed on its own so it survives even if the
@@ -104,11 +109,13 @@ async def run_extraction(
         run.status = "failed"
         run.completed_at = datetime.now(timezone.utc)
         await session.commit()
+        logger.exception("validation failed extraction_run_id=%s", run.id)
         raise
 
     run.status = "extracted"
     run.completed_at = datetime.now(timezone.utc)
     await session.commit()
+    logger.info("extraction extracted extraction_run_id=%s", run.id)
     return run
 
 

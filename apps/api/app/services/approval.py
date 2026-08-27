@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Literal
@@ -16,6 +17,8 @@ from app.db.models import (
     OfficialMeasurement,
     ReviewDecision,
 )
+
+logger = logging.getLogger(__name__)
 
 Decision = Literal["approve", "reject"]
 
@@ -134,6 +137,10 @@ async def decide_line(
             if not reason or not reason.strip():
                 raise ReplacementReasonRequiredError(str(line_id))
             existing_active.status = "superseded"
+            logger.info(
+                "measurement superseded line_id=%s previous_measurement_id=%s",
+                line_id, existing_active.id,
+            )
 
         measurement = OfficialMeasurement(
             animal_id=line.candidate_animal_id,
@@ -166,6 +173,10 @@ async def decide_line(
 
     await session.commit()
 
+    logger.info(
+        "line decided line_id=%s action=%s actor=%s measurement_id=%s",
+        line.id, action, reviewer_email, measurement.id if measurement else None,
+    )
     return DecisionResult(
         line_id=line.id,
         version=line.version,
