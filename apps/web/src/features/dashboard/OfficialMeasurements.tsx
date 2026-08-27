@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { getMeasurements } from "../../api/client";
 import type { MeasurementRecord } from "../../api/types";
@@ -54,25 +54,20 @@ export function OfficialMeasurements({
   const [records, setRecords] = useState<MeasurementRecord[]>([]);
   const [state, setState] = useState<LoadState>("loading");
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = useCallback(async (): Promise<void> => {
     setState("loading");
-    getMeasurements({ farmId }, token)
-      .then((result) => {
-        if (!cancelled) {
-          setRecords(result);
-          setState("ready");
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setState("error");
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
+    try {
+      const result = await getMeasurements({ farmId }, token);
+      setRecords(result);
+      setState("ready");
+    } catch {
+      setState("error");
+    }
   }, [farmId, token]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   if (state === "loading") {
     return <p>Carregando medições…</p>;
@@ -86,6 +81,9 @@ export function OfficialMeasurements({
   return (
     <section aria-label="Medições oficiais">
       <h2>Medições oficiais</h2>
+      <button type="button" onClick={load}>
+        Atualizar
+      </button>
       <dl>
         <div>
           <dt>Medições ativas</dt>

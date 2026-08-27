@@ -8,11 +8,10 @@ from typing import Protocol
 from uuid import UUID
 
 from celery import Celery
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import get_settings
 from app.db.models import ExtractionRun, Import, ImageAsset
-from app.db.session import get_session_factory
 from app.services.extraction_processing import persist_extracted_lines
 from app.services.image_preprocessing import preprocess_image
 from app.services.storage import ObjectStorage, get_object_storage
@@ -116,13 +115,28 @@ async def run_extraction(
 @celery_app.task(name="ingestion.process_extraction_run")
 def process_extraction_run(extraction_run_id: str) -> None:
     async def scenario() -> None:
-        async with get_session_factory()() as session:
-            await run_extraction(
-                session,
-                get_object_storage(),
-                get_vision_provider(),
-                extraction_run_id=UUID(extraction_run_id),
-            )
+        # Deliberately not the API's cached get_session_factory(): that
+        # engine's asyncpg connections are tied to whatever event loop
+        # first created them, but asyncio.run() gives every task a brand
+        # new loop. Reusing a cached, cross-process engine here made every
+        # task after the very first one fail with
+        # "Future attached to a different loop" — a bug that stayed hidden
+        # until the worker actually processed more than one task in its
+        # lifetime. A fresh engine per task, disposed afterward, avoids the
+        # cross-loop reuse entirely.
+        settings = get_settings()
+        engine = create_async_engine(settings.postgres_url)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        try:
+            async with session_factory() as session:
+                await run_extraction(
+                    session,
+                    get_object_storage(),
+                    get_vision_provider(),
+                    extraction_run_id=UUID(extraction_run_id),
+                )
+        finally:
+            await engine.dispose()
 
     asyncio.run(scenario())
 

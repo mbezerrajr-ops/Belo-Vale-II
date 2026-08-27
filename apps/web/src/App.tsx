@@ -76,11 +76,27 @@ function AuthenticatedApp({
   onLogout,
 }: AuthenticatedAppProps): JSX.Element {
   const [farmId, setFarmId] = useState("");
+  const [importId, setImportId] = useState<string | null>(null);
   const [review, setReview] = useState<ImportReview | null>(null);
 
-  const handleUploaded = async (result: UploadResult): Promise<void> => {
-    const nextReview = await getImportReview(result.id, token);
+  const refreshReview = async (id: string): Promise<void> => {
+    const nextReview = await getImportReview(id, token);
     setReview(nextReview);
+  };
+
+  const handleUploaded = async (result: UploadResult): Promise<void> => {
+    setImportId(result.id);
+    await refreshReview(result.id);
+  };
+
+  const handleDecided = async (): Promise<void> => {
+    // Approving/rejecting doesn't optimistically patch local state — this
+    // just re-fetches the same source of truth GET /review already reads,
+    // so an approval's supersession side effects, updated line version, and
+    // any new alerts show up exactly as the backend now sees them.
+    if (importId !== null) {
+      await refreshReview(importId);
+    }
   };
 
   return (
@@ -101,7 +117,14 @@ function AuthenticatedApp({
       </label>
 
       <UploadForm token={token} onUploaded={handleUploaded} />
-      {review === null ? null : <ReviewWorkspace review={review} token={token} />}
+      {review === null ? null : (
+        <div>
+          <button type="button" onClick={() => refreshReview(review.import_id)}>
+            Atualizar revisão
+          </button>
+          <ReviewWorkspace review={review} token={token} onDecided={handleDecided} />
+        </div>
+      )}
       {farmId === "" ? null : <OfficialMeasurements farmId={farmId} token={token} />}
     </main>
   );
