@@ -26,6 +26,8 @@ services:
       context: ..
       dockerfile: infra/Dockerfile.api
     command: ["python", "-c", "import time; time.sleep(3600)"]
+    healthcheck:
+      disable: true
     environment:
       ENVIRONMENT: development
       POSTGRES_URL: postgresql+asyncpg://ingestion:ingestion@db:5432/ingestion
