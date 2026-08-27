@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Belo Vale photo ingestion API"
 requires-python = ">=3.13"
 dependencies = [
+    "alembic>=1.14,<2.0",
     "fastapi>=0.115,<1.0",
     "pydantic-settings>=2.7,<3.0",
     "sqlalchemy[asyncio]>=2.0,<3.0",
@@ -11,5 +12,11 @@ dependencies = [
     "uvicorn[standard]>=0.34,<1.0",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0,<9.0",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
