@@ -12,6 +12,7 @@ from app.db.models import User
 from app.db.session import get_db_session
 from app.services.ingestion import ImportStatus, create_import, reprocess_import
 from app.services.storage import ObjectStorage, get_object_storage
+from app.workers.tasks import ExtractionDispatcher, get_extraction_dispatcher
 
 router = APIRouter(prefix="/api/imports", tags=["imports"])
 
@@ -25,6 +26,7 @@ async def upload_import(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     storage: Annotated[ObjectStorage, Depends(get_object_storage)],
     settings: Annotated[Settings, Depends(get_settings)],
+    dispatcher: Annotated[ExtractionDispatcher, Depends(get_extraction_dispatcher)],
     _: Annotated[User, Depends(require_minimum_role("operator"))],
     farm_id: Annotated[UUID, Form()],
     file: Annotated[UploadFile, File()],
@@ -37,6 +39,7 @@ async def upload_import(
         content=content,
         max_bytes=settings.max_upload_bytes,
     )
+    dispatcher.dispatch(created.extraction_run_id)
     return _response(created)
 
 
@@ -44,7 +47,9 @@ async def upload_import(
 async def reprocess(
     import_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    dispatcher: Annotated[ExtractionDispatcher, Depends(get_extraction_dispatcher)],
     _: Annotated[User, Depends(require_minimum_role("reviewer"))],
 ) -> dict[str, str]:
     created = await reprocess_import(session, import_id=import_id)
+    dispatcher.dispatch(created.extraction_run_id)
     return _response(created)

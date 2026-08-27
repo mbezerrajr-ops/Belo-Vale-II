@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 from datetime import datetime, timezone
+from functools import lru_cache
+from typing import Protocol
 from uuid import UUID
 
 from celery import Celery
@@ -18,8 +20,11 @@ from app.vision.provider import get_vision_provider
 
 
 def _build_celery_app() -> Celery:
+    # No result backend: these tasks are fire-and-forget, and "memory://" (the
+    # local-dev broker fallback) is a valid kombu *broker* transport but not a
+    # valid Celery *result backend* scheme.
     broker_url = get_settings().redis_url or "memory://"
-    return Celery("belo_vale_ingestion", broker=broker_url, backend=broker_url)
+    return Celery("belo_vale_ingestion", broker=broker_url)
 
 
 celery_app = _build_celery_app()
@@ -56,9 +61,15 @@ async def run_extraction(
     run.started_at = datetime.now(timezone.utc)
     await session.commit()
 
-    original_bytes = storage.load(image.object_key)
-    preprocessed = preprocess_image(original_bytes)
-    extraction = vision_provider.extract(preprocessed.content)
+    try:
+        original_bytes = storage.load(image.object_key)
+        preprocessed = preprocess_image(original_bytes)
+        extraction = vision_provider.extract(preprocessed.content)
+    except Exception:
+        run.status = "failed"
+        run.completed_at = datetime.now(timezone.utc)
+        await session.commit()
+        raise
 
     run.raw_response = {
         "header_text": extraction.header_text,
@@ -88,3 +99,19 @@ def process_extraction_run(extraction_run_id: str) -> None:
             )
 
     asyncio.run(scenario())
+
+
+class ExtractionDispatcher(Protocol):
+    def dispatch(self, extraction_run_id: UUID) -> None: ...
+
+
+class CeleryExtractionDispatcher:
+    """Production dispatcher; a real broker must be reachable via REDIS_URL."""
+
+    def dispatch(self, extraction_run_id: UUID) -> None:
+        process_extraction_run.delay(str(extraction_run_id))
+
+
+@lru_cache
+def get_extraction_dispatcher() -> ExtractionDispatcher:
+    return CeleryExtractionDispatcher()

@@ -25,6 +25,7 @@ from app.services.ingestion import (
     reprocess_import,
 )
 from app.services.storage import InMemoryObjectStorage, get_object_storage
+from app.workers.tasks import get_extraction_dispatcher
 
 _JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 32
 _PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
@@ -218,9 +219,20 @@ class _RecordingSession:
         return None
 
 
-def _build_client(*, user: User | None = None) -> TestClient:
+class _FakeExtractionDispatcher:
+    def __init__(self) -> None:
+        self.dispatched: list[Any] = []
+
+    def dispatch(self, extraction_run_id: Any) -> None:
+        self.dispatched.append(extraction_run_id)
+
+
+def _build_client(
+    *, user: User | None = None
+) -> tuple[TestClient, "_FakeExtractionDispatcher"]:
     session = _RecordingSession(user=user)
     settings = Settings(environment="test", auth_secret=_AUTH_SECRET, auth_token_ttl_seconds=900)
+    dispatcher = _FakeExtractionDispatcher()
 
     async def override_session() -> AsyncIterator[_RecordingSession]:
         yield session
@@ -229,7 +241,8 @@ def _build_client(*, user: User | None = None) -> TestClient:
     app.dependency_overrides[get_db_session] = override_session
     app.dependency_overrides[get_object_storage] = lambda: InMemoryObjectStorage()
     app.dependency_overrides[get_settings] = lambda: settings
-    return TestClient(app)
+    app.dependency_overrides[get_extraction_dispatcher] = lambda: dispatcher
+    return TestClient(app), dispatcher
 
 
 def _operator() -> User:
@@ -243,7 +256,7 @@ def _operator() -> User:
 
 
 def test_upload_requires_authentication() -> None:
-    client = _build_client()
+    client, dispatcher = _build_client()
 
     response = client.post(
         "/api/imports",
@@ -252,11 +265,12 @@ def test_upload_requires_authentication() -> None:
     )
 
     assert response.status_code == 401
+    assert dispatcher.dispatched == []
 
 
-def test_upload_creates_a_queued_import() -> None:
+def test_upload_creates_a_queued_import_and_dispatches_extraction() -> None:
     user = _operator()
-    client = _build_client(user=user)
+    client, dispatcher = _build_client(user=user)
     token = create_access_token(user.id, _AUTH_SECRET, 900)
 
     response = client.post(
@@ -268,14 +282,16 @@ def test_upload_creates_a_queued_import() -> None:
 
     assert response.status_code == 202
     assert response.json()["status"] == "queued"
+    assert len(dispatcher.dispatched) == 1
 
 
 def test_reprocess_requires_authentication() -> None:
-    client = _build_client()
+    client, dispatcher = _build_client()
 
     response = client.post(f"/api/imports/{uuid4()}/reprocess")
 
     assert response.status_code == 401
+    assert dispatcher.dispatched == []
 
 
 def test_authenticated_reviewer_receives_404_for_an_unknown_import() -> None:
@@ -286,7 +302,7 @@ def test_authenticated_reviewer_receives_404_for_an_unknown_import() -> None:
         role="reviewer",
         is_active=True,
     )
-    client = _build_client(user=user)
+    client, dispatcher = _build_client(user=user)
     token = create_access_token(user.id, _AUTH_SECRET, 900)
 
     response = client.post(
@@ -296,3 +312,4 @@ def test_authenticated_reviewer_receives_404_for_an_unknown_import() -> None:
 
     assert response.status_code == 404
     assert response.json()["code"] == "import_not_found"
+    assert dispatcher.dispatched == []

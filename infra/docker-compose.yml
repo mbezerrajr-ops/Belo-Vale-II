@@ -27,7 +27,7 @@ services:
     build:
       context: ..
       dockerfile: infra/Dockerfile.api
-    command: ["python", "-c", "import time; time.sleep(3600)"]
+    command: ["celery", "-A", "app.workers.tasks", "worker", "--loglevel=info"]
     healthcheck:
       disable: true
     environment:

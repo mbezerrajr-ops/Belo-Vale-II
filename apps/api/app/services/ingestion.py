@@ -44,6 +44,7 @@ class ImportAlreadyProcessingError(IngestionError):
 class ImportStatus:
     id: UUID
     status: str
+    extraction_run_id: UUID
 
 
 async def create_import(
@@ -88,11 +89,13 @@ async def create_import(
     session.add(image)
     await session.flush()
 
-    session.add(ExtractionRun(image_asset_id=image.id, status="pending"))
+    run = ExtractionRun(image_asset_id=image.id, status="pending")
+    session.add(run)
+    await session.flush()
     import_row.status = "queued"
     await session.commit()
 
-    return ImportStatus(id=import_row.id, status=import_row.status)
+    return ImportStatus(id=import_row.id, status=import_row.status, extraction_run_id=run.id)
 
 
 async def reprocess_import(session: AsyncSession, *, import_id: UUID) -> ImportStatus:
@@ -115,8 +118,10 @@ async def reprocess_import(session: AsyncSession, *, import_id: UUID) -> ImportS
     if active_run is not None:
         raise ImportAlreadyProcessingError(str(import_id))
 
-    session.add(ExtractionRun(image_asset_id=image.id, status="pending"))
+    run = ExtractionRun(image_asset_id=image.id, status="pending")
+    session.add(run)
+    await session.flush()
     import_row.status = "queued"
     await session.commit()
 
-    return ImportStatus(id=import_row.id, status=import_row.status)
+    return ImportStatus(id=import_row.id, status=import_row.status, extraction_run_id=run.id)
