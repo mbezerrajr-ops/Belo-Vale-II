@@ -327,7 +327,7 @@ git commit -m "feat: add image processing and vision contract"
 
 **Interfaces:**
 - Produces: `NormalizedLine` and `ValidationResult(final_confidence, alerts, candidate_animal_id)`.
-- Produces alert codes: `unknown_animal`, `ambiguous_animal`, `lot_mismatch`, `missing_header`, `total_mismatch`, `duplicate_measurement`, `implausible_value`, `missing_required_value`.
+- Produces alert codes: `unknown_animal`, `ambiguous_animal`, `lot_mismatch`, `date_mismatch`, `missing_header`, `total_mismatch`, `duplicate_measurement`, `implausible_value`, `missing_required_value`, `side_observation`. `date_mismatch` and `side_observation` were missing from the original list — design.md lines 99-107 require alerts for date divergence (not just lot) and for relevant side notes; without them a wrong-date sheet or a handwritten margin note would silently pass validation.
 
 - [ ] **Step 1: Write failing domain tests**
 
