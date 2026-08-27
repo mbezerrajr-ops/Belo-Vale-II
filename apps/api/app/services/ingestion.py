@@ -77,16 +77,18 @@ async def create_import(
     object_key = f"{farm_id}/{sha256}"
     storage.save(object_key, content, media_type)
 
-    session.add(
-        ImageAsset(
-            farm_id=farm_id,
-            import_id=import_row.id,
-            sha256=sha256,
-            object_key=object_key,
-            media_type=media_type,
-            byte_size=len(content),
-        )
+    image = ImageAsset(
+        farm_id=farm_id,
+        import_id=import_row.id,
+        sha256=sha256,
+        object_key=object_key,
+        media_type=media_type,
+        byte_size=len(content),
     )
+    session.add(image)
+    await session.flush()
+
+    session.add(ExtractionRun(image_asset_id=image.id, status="pending"))
     import_row.status = "queued"
     await session.commit()
 

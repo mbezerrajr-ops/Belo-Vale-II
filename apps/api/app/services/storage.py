@@ -11,6 +11,8 @@ from app.core.config import get_settings
 class ObjectStorage(Protocol):
     def save(self, object_key: str, data: bytes, content_type: str) -> None: ...
 
+    def load(self, object_key: str) -> bytes: ...
+
 
 class InMemoryObjectStorage:
     """Test double; never used against production configuration."""
@@ -20,6 +22,9 @@ class InMemoryObjectStorage:
 
     def save(self, object_key: str, data: bytes, content_type: str) -> None:
         self.objects[object_key] = data
+
+    def load(self, object_key: str) -> bytes:
+        return self.objects[object_key]
 
 
 class MinioObjectStorage:
@@ -47,6 +52,14 @@ class MinioObjectStorage:
             length=len(data),
             content_type=content_type,
         )
+
+    def load(self, object_key: str) -> bytes:
+        response = self._client.get_object(self._bucket, object_key)
+        try:
+            return response.read()
+        finally:
+            response.close()
+            response.release_conn()
 
 
 @lru_cache

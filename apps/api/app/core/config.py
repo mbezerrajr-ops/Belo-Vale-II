@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     minio_secret_key: str | None = None
     minio_bucket: str = "sheets"
     max_upload_bytes: int = Field(default=15_000_000, ge=1)
+    vision_provider: Literal["fake", "http"] = "fake"
+    vision_api_url: str | None = None
+    vision_api_key: SecretStr | None = None
+    vision_model_name: str = "unconfigured"
     auth_secret: SecretStr | None = None
     auth_token_ttl_seconds: int = Field(default=900, ge=60, le=86_400)
 
@@ -47,6 +51,8 @@ class Settings(BaseSettings):
         ]
         if self.runtime_role == "api":
             required.append("auth_secret")
+        if self.runtime_role == "worker" and self.vision_provider == "http":
+            required += ["vision_api_url", "vision_api_key"]
         missing = [name for name in required if not getattr(self, name)]
         if missing:
             raise ValueError(

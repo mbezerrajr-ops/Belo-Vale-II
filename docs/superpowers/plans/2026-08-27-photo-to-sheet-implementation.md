@@ -275,7 +275,7 @@ git commit -m "feat: add photo ingestion and deduplication"
 - Create: `apps/api/tests/test_vision_contract.py`
 
 **Interfaces:**
-- Produces: `VisionExtraction(header, lines, provider_name, model_name)`.
+- Produces: `VisionExtraction(header_text, lot, measured_on, header_confidence, lines, provider_name, model_name)`. `lot` and `measured_on` are explicit top-level fields (not left implicit inside `header_text`) because Task 5's lot/date validation needs them structured; `header_confidence` carries per-field confidence for `lot` and `measured_on`, mirroring the per-line confidence dict.
 - Each `VisionLine` contains `animal_number`, `animal_name`, `morning`, `afternoon`, `total`, `notes`, `confidence` and `bounding_boxes`.
 - Consumes: import ID from Task 3.
 

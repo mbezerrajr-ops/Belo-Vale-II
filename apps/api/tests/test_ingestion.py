@@ -7,11 +7,12 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.config import Settings, get_settings
 from app.core.security import create_access_token, hash_password
-from app.db.models import Farm, User
+from app.db.models import ExtractionRun, Farm, ImageAsset, User
 from app.db.session import get_db_session
 from app.main import create_app
 from app.services.image_sniffing import sniff_image_media_type
@@ -158,6 +159,19 @@ def test_reprocess_enqueues_a_new_run_for_an_existing_import() -> None:
                     content=_JPEG_BYTES,
                     max_bytes=1_000_000,
                 )
+
+                # Upload already queued a pending run; reprocessing while it is
+                # still in flight must not queue a second, competing run.
+                with pytest.raises(ImportAlreadyProcessingError):
+                    await reprocess_import(session, import_id=created.id)
+
+                pending_run = await session.scalar(
+                    select(ExtractionRun).where(ExtractionRun.image_asset_id.in_(
+                        select(ImageAsset.id).where(ImageAsset.import_id == created.id)
+                    ))
+                )
+                pending_run.status = "extracted"
+                await session.commit()
 
                 reprocessed = await reprocess_import(session, import_id=created.id)
                 assert reprocessed.id == created.id
