@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
@@ -22,7 +24,23 @@ from app.services.ingestion import (
 )
 
 
+def _configure_logging() -> None:
+    # uvicorn only configures its own `uvicorn`/`uvicorn.access` loggers, not
+    # the root logger — every `logging.getLogger(__name__).info(...)` call
+    # in app.services/app.workers was silently dropped without this, found
+    # by checking real container logs and seeing only uvicorn's HTTP access
+    # lines, none of the domain events.
+    app_logger = logging.getLogger("app")
+    if not app_logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+        app_logger.addHandler(handler)
+    app_logger.setLevel(logging.INFO)
+    app_logger.propagate = False
+
+
 def create_app() -> FastAPI:
+    _configure_logging()
     get_settings()
     app = FastAPI(title="Belo Vale Ingestion API")
     app.include_router(auth_router)
