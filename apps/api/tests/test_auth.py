@@ -233,7 +233,8 @@ def test_first_admin_creation_accepts_password_in_memory_and_stores_only_hash() 
     assert verify_password("correct horse battery staple", admin.password_hash)
 
 
-def test_production_configuration_requires_an_environment_auth_secret() -> None:
+def test_production_configuration_requires_an_environment_auth_secret(monkeypatch) -> None:
+    monkeypatch.delenv("AUTH_SECRET", raising=False)
     with pytest.raises(ValidationError, match="auth_secret"):
         Settings(
             environment="production",
@@ -250,7 +251,8 @@ def test_configuration_rejects_an_auth_secret_shorter_than_32_bytes() -> None:
         Settings(environment="test", auth_secret="too-short")
 
 
-def test_production_worker_configuration_does_not_require_auth_secret() -> None:
+def test_production_worker_configuration_does_not_require_auth_secret(monkeypatch) -> None:
+    monkeypatch.delenv("AUTH_SECRET", raising=False)
     settings = Settings(
         environment="production",
         runtime_role="worker",

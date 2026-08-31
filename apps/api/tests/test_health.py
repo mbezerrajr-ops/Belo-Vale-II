@@ -13,6 +13,16 @@ def test_healthz_returns_ok() -> None:
     assert response.json() == {"status": "ok"}
 
 
-def test_production_settings_require_infrastructure_urls_and_credentials() -> None:
+def test_production_settings_require_infrastructure_urls_and_credentials(monkeypatch) -> None:
+    for name in (
+        "POSTGRES_URL",
+        "REDIS_URL",
+        "MINIO_URL",
+        "MINIO_ACCESS_KEY",
+        "MINIO_SECRET_KEY",
+        "AUTH_SECRET",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
     with pytest.raises(ValidationError, match="Missing required production settings"):
         Settings(environment="production")
