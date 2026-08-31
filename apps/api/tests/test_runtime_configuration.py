@@ -1,62 +1,32 @@
-import json
-import os
 from pathlib import Path
-import subprocess
+import re
 
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+def _repository_root() -> Path:
+    for candidate in Path(__file__).resolve().parents:
+        if (candidate / ".gitignore").is_file() and (candidate / "infra" / "docker-compose.yml").is_file():
+            return candidate
+    raise RuntimeError("repository root not found")
 
 
-def test_materialized_compose_configuration_keeps_auth_secret_out_of_worker() -> None:
-    environment = os.environ.copy()
-    environment.update(
-        {
-            "POSTGRES_PASSWORD": "test-only-database-password",
-            "POSTGRES_URL": "postgresql+asyncpg://ingestion:test@db/ingestion",
-            "MINIO_ACCESS_KEY": "test-only-access-key",
-            "MINIO_SECRET_KEY": "test-only-object-password",
-            "AUTH_SECRET": "test-only-secret-with-at-least-32-bytes",
-        }
+def _service_block(compose_source: str, service: str) -> str:
+    match = re.search(
+        rf"^  {re.escape(service)}:\n(?P<body>.*?)(?=^  [a-z][\w-]*:|^networks:)",
+        compose_source,
+        flags=re.MULTILINE | re.DOTALL,
     )
-
-    result = subprocess.run(
-        [
-            "docker",
-            "compose",
-            "-f",
-            str(REPOSITORY_ROOT / "infra" / "docker-compose.yml"),
-            "config",
-            "--format",
-            "json",
-        ],
-        cwd=REPOSITORY_ROOT,
-        env=environment,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    configuration = json.loads(result.stdout)
-
-    assert "AUTH_SECRET" in configuration["services"]["api"]["environment"]
-    assert "AUTH_SECRET" not in configuration["services"]["worker"]["environment"]
+    assert match, f"service {service!r} was not found in docker-compose.yml"
+    return match.group("body")
 
 
-def test_local_environment_files_are_ignored_except_for_safe_examples() -> None:
-    ignored = subprocess.run(
-        ["git", "check-ignore", ".env", ".env.local", ".env.test"],
-        cwd=REPOSITORY_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    example = subprocess.run(
-        ["git", "check-ignore", ".env.example"],
-        cwd=REPOSITORY_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+def test_compose_declares_auth_secret_only_for_api() -> None:
+    compose_source = (_repository_root() / "infra" / "docker-compose.yml").read_text()
 
-    assert ignored.returncode == 0
-    assert set(ignored.stdout.splitlines()) == {".env", ".env.local", ".env.test"}
-    assert example.returncode == 1
+    assert "AUTH_SECRET" in _service_block(compose_source, "api")
+    assert "AUTH_SECRET" not in _service_block(compose_source, "worker")
+
+
+def test_gitignore_excludes_local_environment_files_except_safe_example() -> None:
+    rules = set((_repository_root() / ".gitignore").read_text().splitlines())
+
+    assert {".env", ".env.*", "!.env.example"}.issubset(rules)

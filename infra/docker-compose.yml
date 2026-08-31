@@ -3,6 +3,7 @@ services:
     build:
       context: ..
       dockerfile: infra/Dockerfile.api
+      target: runtime
     environment:
       ENVIRONMENT: development
       RUNTIME_ROLE: api
@@ -27,6 +28,7 @@ services:
     build:
       context: ..
       dockerfile: infra/Dockerfile.api
+      target: runtime
     command: ["uv", "run", "--no-sync", "celery", "-A", "app.workers.tasks", "worker", "--loglevel=info"]
     healthcheck:
       disable: true
@@ -38,6 +40,33 @@ services:
       MINIO_URL: http://minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY in the server environment}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY in the server environment}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks: [ingestion_private]
+
+  # Opt-in test target. `docker compose --profile test run --rm api-tests`
+  # starts the disposable local dependencies, migrates PostgreSQL and runs the
+  # backend suite without adding pytest or test sources to the runtime image.
+  api-tests:
+    profiles: ["test"]
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api
+      target: test
+    environment:
+      ENVIRONMENT: test
+      RUNTIME_ROLE: api
+      POSTGRES_URL: ${POSTGRES_URL:?Set POSTGRES_URL in the server environment}
+      REDIS_URL: redis://redis:6379/0
+      MINIO_URL: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY in the server environment}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY in the server environment}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in the server environment}
     depends_on:
       db:
         condition: service_healthy
