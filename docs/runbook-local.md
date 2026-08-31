@@ -4,6 +4,15 @@ Todos os comandos abaixo foram executados de verdade durante o desenvolvimento
 da Task 8, contra o `docker-compose.yml` deste repositório. Rode-os a partir
 da raiz do repositório, salvo indicação contrária.
 
+## Limite de integração com o legado
+
+A `main` histórica ainda é a POC baseada em HTML/JSON. Esta arquitetura nova
+fornece API, banco e frontend operacionais, mas **não migra os 272 animais nem
+seus dados históricos**. Portanto, integrar o código não é um cutover: os
+JSONs, planilhas e HTMLs legados permanecem necessários para uma futura
+migração e validação. PostgreSQL ainda não é a fonte definitiva dos dados
+históricos.
+
 ## 1. Configurar variáveis de ambiente
 
 Copie `infra/.env.example` para um arquivo de ambiente (por exemplo
@@ -80,23 +89,22 @@ Para chamadas diretas à API (sem passar pelo proxy do nginx):
 
 ## 7. Rodar os testes de backend
 
-Sem Postgres real (integrações são puladas):
+O alvo oficial usa PostgreSQL real, aplica migrations e roda pytest em uma
+imagem `test` separada. A imagem runtime continua sem pytest, dependências de
+desenvolvimento ou arquivos de teste.
+
+Use um nome de projeto distinto para manter banco e volumes descartáveis,
+independentes do ambiente de desenvolvimento:
 
 ```bash
-cd apps/api && uv run pytest -q
+docker compose -p belo-vale-test --env-file infra/.env.local -f infra/docker-compose.yml \
+  --profile test run --build --rm api-tests
 ```
 
-Contra Postgres real (recomendado antes de qualquer merge — é assim que
-todas as tasks deste projeto foram validadas):
-
-```bash
-export POSTGRES_URL="postgresql+asyncpg://ingestion:<senha>@localhost:<porta>/ingestion"
-cd apps/api && uv run alembic upgrade head && uv run pytest -q
-```
-
-(Suba um Postgres descartável com `docker run -d -e POSTGRES_DB=ingestion
--e POSTGRES_USER=ingestion -e POSTGRES_PASSWORD=ingestion -p 5433:5432
-postgres:17-alpine` se não quiser reaproveitar o `db` do compose.)
+O comando executa as **90 validações** contra PostgreSQL real, incluindo as
+verificações declarativas de isolamento de `AUTH_SECRET` entre API e worker e
+das regras de `.gitignore`. Nenhuma etapa copia arquivos ou instala
+dependências manualmente dentro de um container runtime.
 
 ## 8. Rodar os testes de frontend
 
@@ -115,7 +123,7 @@ idempotente via `docker compose exec`, então rodar mais de uma vez é seguro).
 
 ```bash
 cd apps/web
-npx playwright install chromium --with-deps   # só na primeira vez
+npx playwright install chromium               # só na primeira vez
 E2E_BASE_URL=http://localhost:8080 npx playwright test
 ```
 
