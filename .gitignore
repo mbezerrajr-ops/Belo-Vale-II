@@ -1,2 +1,17 @@
 .worktrees/
 .superpowers/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/

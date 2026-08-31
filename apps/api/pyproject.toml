@@ -1,0 +1,28 @@
+[project]
+name = "belo-vale-ingestion-api"
+version = "0.1.0"
+description = "Belo Vale photo ingestion API"
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.14,<2.0",
+    "fastapi>=0.115,<1.0",
+    "pydantic-settings>=2.7,<3.0",
+    "sqlalchemy[asyncio]>=2.0,<3.0",
+    "asyncpg>=0.30,<1.0",
+    "uvicorn[standard]>=0.34,<1.0",
+    "minio>=7.2.20",
+    "python-multipart>=0.0.32",
+    "pillow>=12.3.0",
+    "celery>=5.6.3",
+    "redis>=5.0,<6.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.12.0",
+    "pytest>=8.0,<9.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

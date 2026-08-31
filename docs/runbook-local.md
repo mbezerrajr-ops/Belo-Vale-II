@@ -1,0 +1,164 @@
+# Runbook local — ambiente de homologação (Docker)
+
+Todos os comandos abaixo foram executados de verdade durante o desenvolvimento
+da Task 8, contra o `docker-compose.yml` deste repositório. Rode-os a partir
+da raiz do repositório, salvo indicação contrária.
+
+## Limite de integração com o legado
+
+A `main` histórica ainda é a POC baseada em HTML/JSON. Esta arquitetura nova
+fornece API, banco e frontend operacionais, mas **não migra os 272 animais nem
+seus dados históricos**. Portanto, integrar o código não é um cutover: os
+JSONs, planilhas e HTMLs legados permanecem necessários para uma futura
+migração e validação. PostgreSQL ainda não é a fonte definitiva dos dados
+históricos.
+
+## 1. Configurar variáveis de ambiente
+
+Copie `infra/.env.example` para um arquivo de ambiente (por exemplo
+`infra/.env.local`) e preencha os valores. Nunca commite o arquivo
+preenchido — `.gitignore` já exclui `.env` e `.env.*` (exceto o próprio
+`.env.example`).
+
+```bash
+cp infra/.env.example infra/.env.local
+# edite infra/.env.local com valores reais
+```
+
+Em todos os comandos `docker compose` abaixo, use `--env-file infra/.env.local`
+(ou o nome que você escolher) para que o compose resolva as variáveis.
+
+## 2. Subir o ambiente
+
+```bash
+docker compose --env-file infra/.env.local -f infra/docker-compose.yml up --build -d
+```
+
+Sobe `db` (PostgreSQL 17), `redis`, `minio`, `api` (porta `8000`), `worker`
+(sem porta publicada) e `web` (porta `8080`, nginx servindo o React
+compilado e fazendo proxy reverso de `/api/*` e `/healthz` para `api`).
+
+Verifique a saúde dos serviços:
+
+```bash
+docker compose --env-file infra/.env.local -f infra/docker-compose.yml ps
+```
+
+Todos devem aparecer como `Up (healthy)` (exceto `worker`, que não tem
+healthcheck — veja a seção de diagnóstico).
+
+## 3. Migrações
+
+```bash
+docker compose --env-file infra/.env.local -f infra/docker-compose.yml exec api uv run --no-sync alembic upgrade head
+```
+
+## 4. Criar o primeiro administrador
+
+O comando é interativo (pede a senha duas vezes via stdin, nunca aceita a
+senha como argumento). Para rodar de forma não interativa (ex.: em scripts
+de CI/seed), envie a senha por stdin:
+
+```bash
+printf "SUA_SENHA_AQUI\nSUA_SENHA_AQUI\n" | docker compose --env-file infra/.env.local -f infra/docker-compose.yml exec -T api uv run --no-sync python -m app.core.bootstrap_admin --email admin@example.com
+```
+
+O bootstrap se recusa a rodar se já existir qualquer usuário no banco.
+
+## 5. Cadastrar fazenda e animal (cadastro mestre)
+
+Não há endpoint HTTP para isso na v1 — é inserido diretamente no banco:
+
+```bash
+docker compose --env-file infra/.env.local -f infra/docker-compose.yml exec -T db \
+  psql -U ingestion -d ingestion -c \
+  "INSERT INTO farms (id, name) VALUES (gen_random_uuid(), 'Minha Fazenda');"
+
+docker compose --env-file infra/.env.local -f infra/docker-compose.yml exec -T db \
+  psql -U ingestion -d ingestion -c \
+  "INSERT INTO animals (id, farm_id, identifier, name) VALUES (gen_random_uuid(), '<FARM_ID>', '497', 'PONTA CURTA');"
+```
+
+## 6. Acessar a aplicação
+
+Abra `http://localhost:8080` no navegador. Faça login com o e-mail/senha
+criados no passo 4.
+
+Para chamadas diretas à API (sem passar pelo proxy do nginx):
+`http://localhost:8000`.
+
+## 7. Rodar os testes de backend
+
+O alvo oficial usa PostgreSQL real, aplica migrations e roda pytest em uma
+imagem `test` separada. A imagem runtime continua sem pytest, dependências de
+desenvolvimento ou arquivos de teste.
+
+Use um nome de projeto distinto para manter banco e volumes descartáveis,
+independentes do ambiente de desenvolvimento:
+
+```bash
+docker compose -p belo-vale-test --env-file infra/.env.local -f infra/docker-compose.yml \
+  --profile test run --build --rm api-tests
+```
+
+O comando executa as **90 validações** contra PostgreSQL real, incluindo as
+verificações declarativas de isolamento de `AUTH_SECRET` entre API e worker e
+das regras de `.gitignore`. Nenhuma etapa copia arquivos ou instala
+dependências manualmente dentro de um container runtime.
+
+## 8. Rodar os testes de frontend
+
+```bash
+cd apps/web
+npm test              # Vitest — testes de unidade/componente
+npx tsc --noEmit       # typecheck
+npm run build          # build de produção real
+```
+
+## 9. Rodar o Playwright (E2E real)
+
+Pré-requisito: ambiente Docker no ar (passos 1–5 já feitos, incluindo
+usuário admin, fazenda e animal — o próprio teste garante isso de forma
+idempotente via `docker compose exec`, então rodar mais de uma vez é seguro).
+
+```bash
+cd apps/web
+npx playwright install chromium               # só na primeira vez
+E2E_BASE_URL=http://localhost:8080 npx playwright test
+```
+
+O Playwright usa o compose real (`infra/docker-compose.yml` +
+`infra/.env.e2e`, hardcoded em `e2e/seed.ts`) para popular usuário/fazenda/
+animal via `docker compose exec`. Se você usa um arquivo de env diferente de
+`infra/.env.e2e`, ajuste `ENV_FILE` em `apps/web/e2e/seed.ts`.
+
+## 10. Derrubar o ambiente
+
+```bash
+docker compose --env-file infra/.env.local -f infra/docker-compose.yml down
+```
+
+Adicione `-v` para também apagar os volumes (`postgres_data`, `minio_data`)
+— use com cautela, isso apaga todos os dados.
+
+## Diagnóstico básico
+
+| O que checar | Comando |
+| --- | --- |
+| API está de pé | `curl http://localhost:8000/healthz` (ou `http://localhost:8080/healthz` via proxy) |
+| Web está servindo o SPA | `curl -I http://localhost:8080/` (deve retornar `200`) |
+| Banco está aceitando conexões | `docker compose ... exec db pg_isready -U ingestion -d ingestion` |
+| Fila/worker está processando | `docker compose ... logs worker --tail=50` — procure `Task ingestion.process_extraction_run[...] succeeded` |
+| Логs da API | `docker compose ... logs api --tail=100` |
+| Estado de uma importação específica | `GET /api/imports/{id}/review` com um token válido — o campo `status` reflete o `ExtractionRun` mais recente (pending/processing/extracted/failed), não fica travado em "queued" |
+
+## Notas de rede (Docker)
+
+`ingestion_private` é uma rede Docker `internal: true` — containers nela
+(`db`, `redis`, `minio`, `worker`) não têm rota de saída para a internet nem
+podem ser alcançados via porta publicada do host. `api` e `web` também
+participam de uma segunda rede, `ingestion_edge` (não interna), que é o que
+permite `8000:8000` e `8080:80` funcionarem a partir do host. Isso foi
+confirmado empiricamente durante a Task 8 — antes dessa segunda rede
+existir, a porta publicada da API nunca era alcançável de fora de um
+container, apesar do `ports:` já estar declarado desde a Task 1.

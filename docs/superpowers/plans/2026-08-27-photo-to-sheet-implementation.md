@@ -167,6 +167,35 @@ git add apps/api
 git commit -m "feat: add auditable ingestion domain"
 ```
 
+### Task 2A: Autenticação e autorização no servidor
+
+**Files:**
+- Create: `apps/api/app/core/security.py`
+- Create: `apps/api/app/routers/auth.py`
+- Create: `apps/api/app/schemas/auth.py`
+- Modify: `apps/api/app/main.py`
+- Modify: `apps/api/app/db/models.py`
+- Create: `apps/api/tests/test_auth.py`
+
+**Interfaces:**
+- Produces authenticated server sessions/tokens and server-enforced `operator`, `reviewer` and `admin` roles.
+- Produces dependencies consumed by every mutable route; frontend profile data is never treated as authorization.
+- Consumes the database session and audit entities from Tasks 1–2.
+
+- [ ] **Step 1: Write failing authorization tests**
+
+Cover unauthenticated denial, role denial and permitted access for an authenticated reviewer/admin.
+
+- [ ] **Step 2: Implement server-side identity and role enforcement**
+
+Store only password hashes, validate credentials on the server, issue an expiring authenticated session/token, and centralize role dependencies. Do not hard-code or publish credentials.
+
+- [ ] **Step 3: Verify**
+
+Run: `cd apps/api && python -m pytest tests/test_auth.py -v`
+
+Expected: PASS.
+
 ### Task 3: Ingestão segura, deduplicação e armazenamento de objetos
 
 **Files:**
@@ -177,7 +206,9 @@ git commit -m "feat: add auditable ingestion domain"
 
 **Interfaces:**
 - Produces: `POST /api/imports` multipart with `file`, `farm_id`, `declared_lot`, `declared_period`.
-- Produces: `{id, status: "queued", duplicate_of: null | UUID}`.
+- Produces: `202 {id, status: "queued"}` on a new image.
+- Produces: `409 {code: "duplicate_image", existing_import_id: UUID}` when the hash already exists for the farm — upload never silently reprocesses.
+- Produces: `POST /api/imports/{existing_import_id}/reprocess` — the explicit, separate confirmation the spec requires before reprocessing a duplicate. Requires `require_minimum_role("reviewer")`. Returns `202 {id: existing_import_id, status: "queued"}` and enqueues a new `ExtractionRun` for the existing `Import`/`ImageAsset` (no re-upload). Returns `409 {code: "import_already_processing"}` if a run for that import is already queued or in progress.
 - Consumes: `ImageAsset` and `Import` from Task 2.
 
 - [ ] **Step 1: Write failing ingest tests**
@@ -188,11 +219,26 @@ def test_upload_creates_queued_import(client, farm_id, valid_jpeg) -> None:
     assert response.status_code == 202
     assert response.json()["status"] == "queued"
 
-def test_duplicate_upload_returns_existing_import(client, farm_id, valid_jpeg) -> None:
-    client.post("/api/imports", data={"farm_id": farm_id}, files={"file": ("sheet.jpg", valid_jpeg, "image/jpeg")})
+def test_duplicate_upload_is_rejected_with_the_existing_import_id(client, farm_id, valid_jpeg) -> None:
+    first = client.post("/api/imports", data={"farm_id": farm_id}, files={"file": ("sheet.jpg", valid_jpeg, "image/jpeg")})
     response = client.post("/api/imports", data={"farm_id": farm_id}, files={"file": ("sheet.jpg", valid_jpeg, "image/jpeg")})
     assert response.status_code == 409
     assert response.json()["code"] == "duplicate_image"
+    assert response.json()["existing_import_id"] == first.json()["id"]
+
+def test_reprocess_enqueues_a_new_run_for_the_existing_import(client, reviewer_token, farm_id, valid_jpeg) -> None:
+    first = client.post("/api/imports", data={"farm_id": farm_id}, files={"file": ("sheet.jpg", valid_jpeg, "image/jpeg")})
+    response = client.post(
+        f"/api/imports/{first.json()['id']}/reprocess",
+        headers={"Authorization": f"Bearer {reviewer_token}"},
+    )
+    assert response.status_code == 202
+    assert response.json() == {"id": first.json()["id"], "status": "queued"}
+
+def test_reprocess_requires_authentication(client, farm_id, valid_jpeg) -> None:
+    first = client.post("/api/imports", data={"farm_id": farm_id}, files={"file": ("sheet.jpg", valid_jpeg, "image/jpeg")})
+    response = client.post(f"/api/imports/{first.json()['id']}/reprocess")
+    assert response.status_code == 401
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -203,7 +249,7 @@ Expected: FAIL because the import router is absent.
 
 - [ ] **Step 3: Implement validation and object storage**
 
-Accept JPEG, PNG and HEIC only after content sniffing; enforce a configured maximum size and reject malformed images. Stream upload while calculating SHA-256, store original under an opaque object key, create rows transactionally and enqueue only after commit. Never expose MinIO credentials or permanent object paths to the browser.
+Accept JPEG, PNG and HEIC only after content sniffing; enforce a configured maximum size and reject malformed images. Stream upload while calculating SHA-256, store original under an opaque object key, create rows transactionally and enqueue only after commit. Never expose MinIO credentials or permanent object paths to the browser. Upload never reprocesses a duplicate on its own; only the dedicated, authenticated reprocess endpoint does, per the explicit-confirmation requirement in design.md's acceptance criteria.
 
 - [ ] **Step 4: Run tests**
 
@@ -229,7 +275,7 @@ git commit -m "feat: add photo ingestion and deduplication"
 - Create: `apps/api/tests/test_vision_contract.py`
 
 **Interfaces:**
-- Produces: `VisionExtraction(header, lines, provider_name, model_name)`.
+- Produces: `VisionExtraction(header_text, lot, measured_on, header_confidence, lines, provider_name, model_name)`. `lot` and `measured_on` are explicit top-level fields (not left implicit inside `header_text`) because Task 5's lot/date validation needs them structured; `header_confidence` carries per-field confidence for `lot` and `measured_on`, mirroring the per-line confidence dict.
 - Each `VisionLine` contains `animal_number`, `animal_name`, `morning`, `afternoon`, `total`, `notes`, `confidence` and `bounding_boxes`.
 - Consumes: import ID from Task 3.
 
@@ -281,7 +327,7 @@ git commit -m "feat: add image processing and vision contract"
 
 **Interfaces:**
 - Produces: `NormalizedLine` and `ValidationResult(final_confidence, alerts, candidate_animal_id)`.
-- Produces alert codes: `unknown_animal`, `ambiguous_animal`, `lot_mismatch`, `missing_header`, `total_mismatch`, `duplicate_measurement`, `implausible_value`, `missing_required_value`.
+- Produces alert codes: `unknown_animal`, `ambiguous_animal`, `lot_mismatch`, `date_mismatch`, `missing_header`, `total_mismatch`, `duplicate_measurement`, `implausible_value`, `missing_required_value`, `side_observation`. `date_mismatch` and `side_observation` were missing from the original list — design.md lines 99-107 require alerts for date divergence (not just lot) and for relevant side notes; without them a wrong-date sheet or a handwritten margin note would silently pass validation.
 
 - [ ] **Step 1: Write failing domain tests**
 
@@ -331,6 +377,10 @@ git commit -m "feat: validate normalized milk measurements"
 **Interfaces:**
 - Produces: `GET /api/imports/{id}/review` with raw values, normalized values, crop URLs, alerts and recent history.
 - Produces: `POST /api/extracted-lines/{id}/decision` with `{action, corrected_values, reason, expected_version}`.
+
+**Concurrency ruling (resolves the earlier optimistic-vs-pessimistic finding):** `expected_version` is the sole authoritative mechanism, implemented as a single atomic conditional `UPDATE extracted_lines SET version = version + 1 WHERE id = :id AND version = :expected_version RETURNING version`. Zero rows updated means either the line doesn't exist or the version was stale; the caller distinguishes those with a follow-up existence check. No separate row lock (`SELECT ... FOR UPDATE`) is needed — the conditional UPDATE's WHERE-clause equality check is itself atomic in PostgreSQL, so two concurrent requests can never both succeed against the same starting version. This also gives idempotent approval for free: a duplicate submission carries the same (now-stale) `expected_version` and is rejected with 409, so the same decision can never create two official measurements.
+
+**Bridging gap found before this task could do anything:** nothing between Task 4 (which only persists the vision adapter's raw JSON on `ExtractionRun.raw_response`) and this task (which reviews/approves `ExtractedLine` rows) ever created those `ExtractedLine`/`ValidationAlert` rows using Task 5's normalization/matching/validation services — the "motor de decisão" step in design.md's pipeline diagram was never wired to anything. Added `apps/api/app/services/extraction_processing.py` (`persist_extracted_lines`), called from the worker's `run_extraction` right after `raw_response` is saved, so every completed extraction run automatically produces reviewable lines. This needed two schema additions (migration `0003_review_versioning`): `extracted_lines.version` (the optimistic counter above) and `extracted_lines.candidate_animal_id` (design.md's "correspondência candidata com o animal", previously not a queryable column), plus `imports.declared_lot`/`imports.declared_measured_on` — Task 3's upload endpoint never actually accepted or stored the `declared_lot`/`declared_period` fields its own original interface line 208 already promised, so lot/date-mismatch validation had nothing declared to compare against. `POST /api/imports` now accepts them as optional form fields.
 
 - [ ] **Step 1: Write failing approval tests**
 
