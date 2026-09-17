@@ -10,6 +10,11 @@ _DATE_SEPARATORS = re.compile(r"[/-]")
 
 @dataclass(frozen=True)
 class NormalizedLine:
+    #: Brinco lido, como veio da ficha. A normalização canônica acontece no
+    #: matching, que preserva o valor bruto para auditoria.
+    animal_brinco: str | None
+    #: Número e nome continuam sendo lidos e exibidos ao revisor como
+    #: evidência, mas nunca são usados para correspondência automática.
     animal_number: str | None
     animal_name: str | None
     morning: Decimal | None
@@ -66,6 +71,7 @@ def normalize_date(raw: str | None, *, century_base: int = 2000) -> date | None:
 
 def normalize_line(
     *,
+    raw_animal_brinco: str | None = None,
     raw_animal_number: str | None = None,
     raw_animal_name: str | None = None,
     raw_morning: str | None = None,
@@ -77,6 +83,7 @@ def normalize_line(
     century_base: int = 2000,
 ) -> NormalizedLine:
     return NormalizedLine(
+        animal_brinco=_clean_text(raw_animal_brinco),
         animal_number=_clean_text(raw_animal_number),
         animal_name=_clean_text(raw_animal_name),
         morning=normalize_decimal(raw_morning),
