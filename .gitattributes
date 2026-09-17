@@ -1,0 +1,6 @@
+# Bibliotecas de terceiros: manter byte a byte como vieram do cdnjs (sem conversão de
+# fim de linha), já que são republicadas como arquivos do artefato.
+belo-vale-ii-projeto-completo/plataforma/vendor/*.js -text
+
+# HTML da plataforma com o estado embutido: diff de uma linha só não ajuda ninguém.
+belo-vale-ii-projeto-completo/plataforma/platform_ATUAL_publicado.html -text
