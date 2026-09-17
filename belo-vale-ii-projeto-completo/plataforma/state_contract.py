@@ -133,6 +133,15 @@ def repair_animal_ids(state: Mapping[str, Any]) -> dict[str, Any]:
     return repaired
 
 
+def project_state_without_history(
+    state: Mapping[str, Any],
+) -> dict[str, Any]:
+    projected = copy.deepcopy(state)
+    for animal in projected.get("vacas", []):
+        animal.pop("historico", None)
+    return projected
+
+
 def validate_state(
     state: Mapping[str, Any], expected: StateSummary | None = None
 ) -> ValidationReport:

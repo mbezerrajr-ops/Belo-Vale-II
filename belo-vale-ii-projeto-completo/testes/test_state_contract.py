@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from copy import deepcopy
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -13,6 +14,8 @@ sys.path.insert(0, str(PLATFORM))
 
 from state_contract import (
     extract_state_from_html,
+    inject_state_into_html,
+    project_state_without_history,
     repair_animal_ids,
     summarize_state,
     validate_state,
@@ -29,6 +32,23 @@ def without_ids(state):
 def load_baseline_state():
     html = (PLATFORM / "platform_ATUAL_publicado.html").read_text(encoding="utf-8")
     return extract_state_from_html(html)
+
+
+def load_legacy_collision_state():
+    state = load_baseline_state()
+    legacy_ids = {
+        ("CAMBRAIA", "570"): "v570",
+        ("MIMOSA", "570"): "v570",
+        ("PONTA FINA", "346"): "v346",
+        ("PONTA FINA DO ABREU", "346"): "v346",
+        ("MALHADINHA", ""): "v",
+        ("SERRANA", ""): "v",
+    }
+    for animal in state["vacas"]:
+        legacy_id = legacy_ids.get((animal["nome"], animal["numero"]))
+        if legacy_id is not None:
+            animal["id"] = legacy_id
+    return state
 
 
 class BaselineStateTests(unittest.TestCase):
@@ -51,11 +71,12 @@ class BaselineStateTests(unittest.TestCase):
         self.assertEqual(summary.supply_count, 4)
         self.assertEqual(summary.user_count, 2)
 
-    def test_baseline_reports_duplicate_or_empty_ids(self) -> None:
+    def test_canonical_baseline_has_unique_non_empty_ids(self) -> None:
         report = validate_state(self.state)
 
-        self.assertEqual(report.duplicate_ids, ("v", "v346", "v570"))
-        self.assertIn("animal_ids_not_unique", report.errors)
+        self.assertEqual(report.duplicate_ids, ())
+        self.assertNotIn("animal_id_empty", report.errors)
+        self.assertNotIn("animal_ids_not_unique", report.errors)
 
     def test_baseline_reports_del_situation_warnings_without_mutating(self) -> None:
         report = validate_state(self.state)
@@ -67,7 +88,7 @@ class BaselineStateTests(unittest.TestCase):
 class AnimalIdRepairTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.state = load_baseline_state()
+        cls.state = load_legacy_collision_state()
 
     def test_repair_changes_only_duplicate_ids(self) -> None:
         original = deepcopy(self.state)
@@ -111,6 +132,41 @@ class AnimalIdRepairTests(unittest.TestCase):
             len({repaired["vacas"][index]["id"] for index in collision_indexes}),
             6,
         )
+
+
+class StateProjectionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.state = load_baseline_state()
+
+    def test_template_round_trip_preserves_logical_state(self) -> None:
+        template = (PLATFORM / "platform_ATUAL_template.html").read_text(
+            encoding="utf-8"
+        )
+        rendered = inject_state_into_html(template, self.state)
+
+        with tempfile.TemporaryDirectory() as directory:
+            generated = Path(directory) / "platform.html"
+            generated.write_text(rendered, encoding="utf-8")
+            round_trip = extract_state_from_html(
+                generated.read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(round_trip, self.state)
+
+    def test_projection_removes_only_animal_history(self) -> None:
+        projected = project_state_without_history(self.state)
+
+        self.assertEqual(len(projected["vacas"]), 401)
+        self.assertTrue(
+            all("historico" not in animal for animal in projected["vacas"])
+        )
+        restored = deepcopy(projected)
+        for source, target in zip(
+            self.state["vacas"], restored["vacas"], strict=True
+        ):
+            target["historico"] = source.get("historico", [])
+        self.assertEqual(restored, self.state)
 
 
 if __name__ == "__main__":

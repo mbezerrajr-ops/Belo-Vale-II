@@ -3,4 +3,4 @@
 belo-vale-ii-projeto-completo/plataforma/vendor/*.js -text
 
 # HTML da plataforma com o estado embutido: diff de uma linha só não ajuda ninguém.
-belo-vale-ii-projeto-completo/plataforma/platform_ATUAL_publicado.html -text
+belo-vale-ii-projeto-completo/plataforma/platform_ATUAL_publicado.html -text whitespace=trailing-space,space-before-tab,cr-at-eol
