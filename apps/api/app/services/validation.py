@@ -66,8 +66,12 @@ def validate_line(line: NormalizedLine, context: ValidationContext) -> Validatio
             Alert(
                 ALERT_AMBIGUOUS_ANIMAL,
                 "error",
-                "Múltiplos animais correspondem ao número/nome informado.",
-                {"candidate_count": context.match.candidate_count},
+                "Mais de um animal cadastrado tem este brinco.",
+                {
+                    "candidate_count": context.match.candidate_count,
+                    "brinco_lido": context.match.brinco_lido,
+                    "brinco_normalizado": context.match.brinco_normalizado,
+                },
             )
         )
         factors["animal_match"] = 0.0
@@ -76,19 +80,26 @@ def validate_line(line: NormalizedLine, context: ValidationContext) -> Validatio
             Alert(
                 ALERT_UNKNOWN_ANIMAL,
                 "error",
-                "Nenhum animal cadastrado corresponde ao número/nome informado.",
+                context.match.reason
+                or "Nenhum animal cadastrado corresponde ao brinco informado.",
+                {
+                    "brinco_lido": context.match.brinco_lido,
+                    "brinco_normalizado": context.match.brinco_normalizado,
+                    "match_method": context.match.method,
+                },
             )
         )
         factors["animal_match"] = 0.0
     else:
         factors["animal_match"] = 1.0
 
-    if line.animal_number is None and line.animal_name is None:
+    if line.animal_brinco is None:
         alerts.append(
             Alert(
                 ALERT_MISSING_HEADER,
                 "error",
-                "Número e nome do animal estão ilegíveis ou ausentes na linha.",
+                "Brinco ilegível ou ausente na linha: sem ele não há "
+                "correspondência automática possível.",
             )
         )
         factors["header"] = 0.0
