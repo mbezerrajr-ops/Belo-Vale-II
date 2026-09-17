@@ -1,6 +1,12 @@
 import asyncio
 from playwright.async_api import async_playwright
 
+import os
+
+# Credencial legada rotacionada: o valor real nunca é versionado. Defina
+# BV_LEGACY_PASSWORD no ambiente para rodar contra um artefato real.
+LEGACY_PASSWORD = os.environ.get("BV_LEGACY_PASSWORD", "LEGADO-SEM-SEGURANCA")
+
 BASE = "/tmp/claude-0/-home-user-Balancetes-porto/6cc42e22-5678-5e79-9cba-4f9e401567a5/scratchpad/leo_figueiroa"
 
 MOCK = """
@@ -25,7 +31,7 @@ async def main():
         await page.add_init_script(MOCK)
         await page.goto(f"file://{BASE}/platform_v3.html")
         await page.fill("#loginEmail", "mbezerrajr@gmail.com")
-        await page.fill("#loginPass", "belovale2026")
+        await page.fill("#loginPass", LEGACY_PASSWORD)
         await page.click("#loginForm button[type=submit]")
         await page.wait_for_timeout(400)
 
