@@ -34,6 +34,7 @@ SYNTHETIC_TEST_VALUES = frozenset(
         "wrong password",  # apps/api/tests/test_auth.py, login inválido
         "errado",  # testes/shot_platform.py, login inválido proposital
         "senha123",  # testes/shot_platform{2,3}.py, usuário de teste do fluxo
+        "SEGREDO",  # tests/test_baseline_snapshot.py, prova que o parser não lê senhas
     }
 )
 

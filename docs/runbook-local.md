@@ -132,10 +132,78 @@ docker compose -p belo-vale-test --env-file infra/.env.local -f infra/docker-com
   --profile test run --build --rm api-tests
 ```
 
-O comando executa as **90 validações** contra PostgreSQL real, incluindo as
+O comando executa as validações contra PostgreSQL real, incluindo as
 verificações declarativas de isolamento de `AUTH_SECRET` entre API e worker e
 das regras de `.gitignore`. Nenhuma etapa copia arquivos ou instala
 dependências manualmente dentro de um container runtime.
+
+## 7.1. Importar a baseline legada
+
+Move os 401 animais e as 152 medições do estado canônico legado para o
+PostgreSQL. **Simula por padrão**: só grava com `--apply`.
+
+O comando precisa de uma fazenda já existente. Para criar a primeira:
+
+```bash
+docker compose --env-file infra/.env.local -f infra/docker-compose.yml   exec db psql -U ingestion -d ingestion   -tAc "INSERT INTO farms (name) VALUES ('Belo Vale II') RETURNING id"
+```
+
+Simulação — mostra exatamente o que aconteceria, sem escrever nada:
+
+```bash
+docker compose --env-file infra/.env.local -f infra/docker-compose.yml   exec api uv run --no-sync python -m app.core.import_baseline   --state /app/state_canonical.json   --farm-id <uuid-da-fazenda>   --approved-by "seu.nome@fazenda"   --reference-date 2026-08-25
+```
+
+Conferido o relatório, repita com `--apply` para gravar.
+
+Sobre `--reference-date`: é a data a partir da qual a lotação observada passa
+a valer. A baseline não registra desde quando cada animal está em seu lote,
+então essa data é **declarada pelo operador**, nunca inferida.
+
+Garantias do importador, todas cobertas por teste:
+
+- **valida antes de escrever** — se as contagens não baterem com 401/152, nada
+  é gravado;
+- **idempotente** — rodar de novo não duplica nada e reusa o mesmo registro de
+  auditoria;
+- **transacional** — falha no meio não deixa estado parcial;
+- **auditável** — cada medição aponta para o `baseline_imports` que a originou,
+  e esse registro guarda o SHA-256 do arquivo de origem;
+- **não migra credenciais** — usuários legados não são sequer lidos.
+
+Verificação após aplicar:
+
+```sql
+SELECT count(*) FROM animals WHERE farm_id = '<uuid>';                 -- 401
+SELECT count(*) FROM animals WHERE farm_id = '<uuid>' AND brinco IS NOT NULL;  -- 259
+SELECT measured_on, count(*) FROM official_measurements m
+  JOIN animals a ON a.id = m.animal_id
+ WHERE a.farm_id = '<uuid>' GROUP BY measured_on;  -- 2026-07-22: 107, 2026-08-25: 45
+```
+
+### Rollback
+
+A importação não tem um comando de desfazer, por decisão: remover medições
+oficiais é um ato deliberado. Para reverter uma importação inteira, apague na
+ordem — dentro de uma transação — as medições, as lotações e os animais
+daquele `baseline_imports`, e por fim o próprio registro:
+
+```sql
+BEGIN;
+DELETE FROM official_measurements WHERE baseline_import_id = '<import-uuid>';
+DELETE FROM animal_lot_assignments WHERE animal_id IN (
+  SELECT id FROM animals WHERE farm_id = '<uuid>' AND legacy_id IS NOT NULL);
+DELETE FROM animals WHERE farm_id = '<uuid>' AND legacy_id IS NOT NULL;
+DELETE FROM baseline_imports WHERE id = '<import-uuid>';
+COMMIT;
+```
+
+Confira os totais antes do `COMMIT`. Se o banco já tiver recebido medições de
+OCR para esses animais, elas **não** têm `baseline_import_id` e por isso não
+são atingidas pelo primeiro `DELETE` — mas o `DELETE FROM animals` falharia,
+porque `official_measurements.animal_id` é `ON DELETE RESTRICT`. Isso é
+proposital: um rollback só é automático enquanto a baseline for a única origem
+daqueles animais.
 
 ## 8. Rodar os testes de frontend
 
