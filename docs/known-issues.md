@@ -58,6 +58,16 @@ mesmo registro 956. A decisão exige evidência externa. PONTA CURTA (497) e GIG
 não fazem mais parte das pendências de produção: ambas têm leitura em `2026-07-22` no
 estado canônico.
 
+## Scripts Playwright históricos não são uma suíte `unittest`
+
+Nove arquivos antigos em `belo-vale-ii-projeto-completo/testes/` usam prefixo `test_`,
+executam `asyncio.run(main())` durante o import e fixam o navegador em
+`/opt/pw-browsers/chromium`. Por isso, uma descoberta ampla com
+`python -m unittest discover -p "test_*.py"` tenta executar esses scripts e falha fora do
+antigo ambiente Linux. Eles foram preservados como histórico; não são o gate desta
+baseline. Use os dois comandos de módulos explícitos documentados no runbook e o teste
+Playwright TypeScript `apps/web/e2e/legacy-platform.spec.ts`.
+
 ## npm audit — esbuild (dependência de desenvolvimento)
 
 - **Dependência:** `esbuild` (via `vite`/`vitest`/`vite-node`/`@vitest/mocker`,
