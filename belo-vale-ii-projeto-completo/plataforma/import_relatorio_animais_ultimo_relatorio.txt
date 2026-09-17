@@ -1,0 +1,310 @@
+Registros no PDF: 260 | vacas na base antes: 272 | depois: 401
+Casadas com a base: 131 | novas cadastradas: 129
+Lote alterado: 61 | Data último parto alterada: 82
+
+--- Vacas da base que NÃO aparecem no relatório (mantidas, sem alteração): 141
+    204          ALINE                    lote=LOTE 1             situacao=Em lactação  leituras=0
+    612          CATARINA                 lote=LOTE 1             situacao=Em lactação  leituras=0
+    320          COCADA                   lote=LOTE 1             situacao=Em lactação  leituras=0
+    151          COTÓ                     lote=LOTE 1             situacao=Em lactação  leituras=0
+    175          FUSQUINHA                lote=LOTE 1             situacao=Em lactação  leituras=0
+    125          MARINGÁ                  lote=LOTE 1             situacao=Em lactação  leituras=0
+    530          PASSO PRETO              lote=LOTE 1             situacao=Em lactação  leituras=0
+    205          REVISTA                  lote=LOTE 1             situacao=Em lactação  leituras=0
+    338          ROSEIRA                  lote=LOTE 1             situacao=Em lactação  leituras=0
+    604          CARINHOSA                lote=LOTE 2             situacao=Em lactação  leituras=0
+    157          CIGANA                   lote=LOTE 2             situacao=Em lactação  leituras=0
+    361          ESTRELINHA               lote=LOTE 2             situacao=Em lactação  leituras=0
+    565          PANTERA                  lote=LOTE 2             situacao=Em lactação  leituras=0
+    474          SURUBIM                  lote=LOTE 2             situacao=Em lactação  leituras=0
+    35           ALIANÇA                  lote=                   situacao=Seca         leituras=0
+    595          ALVORADA                 lote=                   situacao=Seca         leituras=0
+    010 VERDE    AMAZONA                  lote=                   situacao=Seca         leituras=0
+    124          AMERICANA                lote=                   situacao=Seca         leituras=0
+    506          AMOROSA                  lote=                   situacao=Em lactação  leituras=0
+    154          APARECIDA                lote=                   situacao=Seca         leituras=0
+    407          APARECIDA DO ABREU       lote=                   situacao=Seca         leituras=0
+    440          ARIZONA                  lote=                   situacao=Em lactação  leituras=0
+    196          ASSUCENA                 lote=                   situacao=Seca         leituras=0
+    390          BAIANA                   lote=                   situacao=Em lactação  leituras=1
+    219          BANANEIRA                lote=                   situacao=Em lactação  leituras=0
+    621          BELEZA                   lote=                   situacao=Seca         leituras=0
+    132          BETANIA                  lote=                   situacao=Seca         leituras=0
+    461          BOA VISTA                lote=                   situacao=Em lactação  leituras=0
+    228          BOLACHA                  lote=                   situacao=Seca         leituras=0
+    19           BOLINHA                  lote=                   situacao=Seca         leituras=0
+    626          BOLINHA                  lote=                   situacao=Seca         leituras=0
+    005 VERDE    BORDADA                  lote=                   situacao=Em lactação  leituras=0
+    244          BRANQUINHA 2             lote=                   situacao=Seca         leituras=0
+    137          BRILHANTE                lote=                   situacao=Em lactação  leituras=0
+    143          BURGUESA                 lote=                   situacao=Seca         leituras=0
+    108          CABOQUINHA               lote=                   situacao=Em lactação  leituras=0
+    363          CACHORRINHA              lote=                   situacao=Seca         leituras=0
+    176          CAFOFINHA                lote=                   situacao=Em lactação  leituras=0
+    36           CAMBRAIA                 lote=                   situacao=Em lactação  leituras=0
+    570          CAMBRAIA                 lote=                   situacao=Em lactação  leituras=0
+    656          CANOA                    lote=                   situacao=Em lactação  leituras=0
+    501          CARETINHA                lote=                   situacao=Em lactação  leituras=0
+    155          CARINA                   lote=                   situacao=Em lactação  leituras=0
+    147          CARRAPETA                lote=                   situacao=Seca         leituras=0
+    258          CASA GRANDE              lote=                   situacao=Em lactação  leituras=0
+    499          CHARMOZA                 lote=                   situacao=Seca         leituras=0
+    238          CHUVINHA DO ABREU        lote=                   situacao=Seca         leituras=0
+    77           CHUVISCADA               lote=                   situacao=Em lactação  leituras=0
+    628          CODORNA                  lote=                   situacao=Seca         leituras=0
+    509          CONDEÇA                  lote=                   situacao=Seca         leituras=0
+    435          CONFIANÇA                lote=                   situacao=Em lactação  leituras=0
+    84           CORAÇÃO                  lote=                   situacao=Seca         leituras=0
+    221          CORAÇÃO DO ABREU         lote=                   situacao=Seca         leituras=0
+    397          CORUJA                   lote=                   situacao=Em lactação  leituras=0
+    618          CRAUNA                   lote=                   situacao=Em lactação  leituras=0
+    166          CRAUNINHA                lote=                   situacao=Em lactação  leituras=0
+    061 VERDE    CRIOLA                   lote=                   situacao=Seca         leituras=0
+    13           CURIÓ                    lote=                   situacao=Em lactação  leituras=0
+    543          DOLORES                  lote=                   situacao=Seca         leituras=0
+    46           ESMERALDA                lote=                   situacao=Em lactação  leituras=0
+    78           ESPERANÇA                lote=                   situacao=Seca         leituras=0
+    490          ESPERANÇA 3              lote=                   situacao=Seca         leituras=0
+    009 VERMELHO FAÍSCA                   lote=                   situacao=Em lactação  leituras=0
+    387          FANTASMA                 lote=                   situacao=Em lactação  leituras=0
+    129          FANTAZIA                 lote=                   situacao=Seca         leituras=0
+    392          FILEPA                   lote=                   situacao=Em lactação  leituras=0
+    237          FORTALEZA                lote=                   situacao=Em lactação  leituras=0
+    427          FUMAÇA ABREU             lote=                   situacao=Seca         leituras=0
+    186          GAIVOTA                  lote=                   situacao=Seca         leituras=0
+    242          GALEGA                   lote=                   situacao=Em lactação  leituras=0
+    184          GIRAFA                   lote=                   situacao=Seca         leituras=0
+    009 VERDE    GIRAFA 2                 lote=                   situacao=Seca         leituras=0
+    2            GIRASSOL                 lote=                   situacao=Em lactação  leituras=0
+    507 AMARELO  GUINÉ                    lote=                   situacao=Em lactação  leituras=0
+    438          INJEITADA                lote=                   situacao=Seca         leituras=0
+    391          JADI                     lote=                   situacao=Seca         leituras=0
+    534          JANDAÍRA                 lote=                   situacao=Seca         leituras=0
+    675          JANGADA                  lote=                   situacao=Em lactação  leituras=0
+    220          JARDINEIRA               lote=                   situacao=Seca         leituras=0
+    556          JURITI                   lote=                   situacao=Em lactação  leituras=0
+    249 (BV1)    LAVANDEIRA               lote=                   situacao=Em lactação  leituras=0
+    18           LULÚ                     lote=LOTE 1             situacao=Em lactação  leituras=0
+    702          MAÇA                     lote=                   situacao=Seca         leituras=0
+    386          MADALENA                 lote=                   situacao=Em lactação  leituras=0
+    411          MADRUGADA                lote=                   situacao=Em lactação  leituras=0
+    579          MAGRELA                  lote=                   situacao=Seca         leituras=0
+    568          MALHADA                  lote=                   situacao=Seca         leituras=0
+                 MALHADINHA               lote=                   situacao=Seca         leituras=0
+    114          MANCINHA                 lote=                   situacao=Em lactação  leituras=0
+    120          MARIA BRAGA              lote=                   situacao=Seca         leituras=0
+    265          MAROMBA                  lote=                   situacao=Em lactação  leituras=0
+    686          MEDALHA                  lote=                   situacao=Seca         leituras=0
+    229          MEIOTA                   lote=                   situacao=Em lactação  leituras=0
+    245          MERCEDES                 lote=                   situacao=Em lactação  leituras=0
+    019 AZUL     MIUDA                    lote=                   situacao=Seca         leituras=0
+    181          MIUDINHA                 lote=                   situacao=Seca         leituras=0
+    62           MOEDA                    lote=                   situacao=Seca         leituras=0
+    17           MOEDA ABREU              lote=                   situacao=Seca         leituras=0
+    571          MORGANA                  lote=                   situacao=Em lactação  leituras=0
+    372          MULATA                   lote=                   situacao=Seca         leituras=1
+    635          NEBLINA                  lote=                   situacao=Seca         leituras=0
+    259          NEGONA                   lote=                   situacao=Seca         leituras=0
+    63           NOBREZA                  lote=                   situacao=Seca         leituras=0
+    529          NOCA                     lote=                   situacao=Em lactação  leituras=0
+    001 VERM.    NOVENTA E NOVE           lote=                   situacao=Seca         leituras=0
+    96           PALOMA                   lote=                   situacao=Seca         leituras=0
+    064 VERDE    PASSO PRETO              lote=                   situacao=Seca         leituras=0
+    88           PASSO PRETO              lote=                   situacao=Seca         leituras=0
+    30           PATURY                   lote=                   situacao=Em lactação  leituras=0
+    56           PEBINHA                  lote=                   situacao=Seca         leituras=0
+    418          PENSAMENTO               lote=                   situacao=Seca         leituras=0
+    104          PIEDADE                  lote=                   situacao=Seca         leituras=0
+    561          PINGO DE OURO            lote=                   situacao=Em lactação  leituras=0
+    79           PINTADINHA               lote=                   situacao=Seca         leituras=0
+    346          PONTA FINA               lote=                   situacao=Em lactação  leituras=0
+    346          PONTA FINA DO ABREU      lote=                   situacao=Seca         leituras=0
+    526          RENATINHA                lote=                   situacao=Em lactação  leituras=0
+    48           ROXINÓ                   lote=                   situacao=Em lactação  leituras=0
+    542          SAFIRA                   lote=                   situacao=Em lactação  leituras=0
+    257          SALOMÉ                   lote=                   situacao=Seca         leituras=0
+    594          SAMANTA                  lote=                   situacao=Em lactação  leituras=0
+    415          SARDINHA                 lote=                   situacao=Seca         leituras=0
+    128          SEREIA                   lote=                   situacao=Em lactação  leituras=1
+    034 VERDE    SIRI                     lote=                   situacao=Seca         leituras=0
+    436          SUCESSO                  lote=                   situacao=Em lactação  leituras=0
+    503          TAPERA                   lote=                   situacao=Em lactação  leituras=0
+    319          TETEU                    lote=                   situacao=Em lactação  leituras=0
+    10           TIETA                    lote=                   situacao=Em lactação  leituras=0
+    174          TRISTEZA                 lote=                   situacao=Em lactação  leituras=0
+    43           VIANA                    lote=                   situacao=Em lactação  leituras=0
+    409          VIOLA                    lote=                   situacao=Em lactação  leituras=0
+    404          VITÓRIA                  lote=                   situacao=Em lactação  leituras=0
+    123          XAXÁ                     lote=                   situacao=Seca         leituras=0
+    498          Meias Branca             lote=LOTE 1             situacao=Em lactação  leituras=1
+    682          Rainha                   lote=LOTE 1             situacao=Em lactação  leituras=0
+    141          Fumaca                   lote=LOTE 3             situacao=Em lactação  leituras=0
+    519          Branquinha               lote=LOTE 2             situacao=Em lactação  leituras=1
+    133          Bruna                    lote=LOTE 2             situacao=Em lactação  leituras=0
+    862          Saia Branca              lote=LOTE 2             situacao=Em lactação  leituras=1
+    508          Princesa                 lote=LOTE 1             situacao=Em lactação  leituras=0
+    666          Schuma                   lote=LOTE 1             situacao=Em lactação  leituras=0
+
+--- Nome diverge entre relatório e base (nome da base foi mantido): 13
+    brinco 432      pdf=Carolina             base=432/KAROLINA
+    brinco 434      pdf=FAISCA DO ABREU      base=434/FAÍSCA
+    brinco 448      pdf=MEIAS BRANCAS        base=448/MEIAS BRANCA
+    brinco 701      pdf=Pequena              base=701/PIQUENA
+    brinco 733      pdf=Crauna               base=733/Pauna
+    brinco 779      pdf=GESSICA              base=779/GÉSSIKA
+    brinco 967      pdf=MALHADA              base=967/Machada
+    brinco 981      pdf=CONDESA              base=981/Condessa
+    brinco 1008     pdf=DENGOSA              base=1008/CABELO DE FOGO
+    brinco 1013     pdf=CODORNA              base=1013/Boemia
+    brinco B1-263   pdf=ESPERANÇA II ABREU   base=263 ABREU/ESPERANÇA
+    brinco B2-512   pdf=Asa Negra            base=512/AZA NEGRA
+    brinco B2-523   pdf=BARONESA             base=523/BARONEZA
+
+--- Ambíguas (não atualizadas): 0
+
+--- Alterações aplicadas: 143
+    lote   26           AMANDA                   LOTE 1         -> ABREU
+    parto  26           AMANDA                   2024-10-22     -> 2026-04-10
+    lote   27           BORBOREMA                LOTE 3         -> LOTE 1
+    parto  27           BORBOREMA                2024-12-21     -> 2026-07-14
+    lote   40           MANHOSA                  LOTE 1         -> ENGORDA
+    parto  40           MANHOSA                  2025-05-08     -> 2026-06-19
+    parto  323          CHIQUINHA                2025-02-08     -> 2026-05-20
+    lote   406          QUARTINHA                LOTE 2         -> PIQUETES / REPASSE
+    lote   433          BRUNA                    LOTE 1         -> LOTE 2
+    parto  434          FAÍSCA                   2025-03-12     -> 2026-04-03
+    lote   441          FUMAÇA                   LOTE 1         -> PIQUETES / REPASSE
+    lote   442          OVELHINHA                LOTE 1         -> PRÉ-PARTO
+    lote   447          SARIEMA                  LOTE 3         -> LOTE 2
+    lote   448          MEIAS BRANCA                            -> LOTE 1
+    parto  448          MEIAS BRANCA             2025-02-27     -> 2026-07-04
+    parto  462          SABIÁ                    2025-05-14     -> 2026-06-26
+    parto  468          AMORA                    2025-09-21     -> 2026-08-02
+    lote   497          PONTA CURTA              LOTE 3         -> PRÉ-PARTO
+    parto  514          PAULA                    2025-02-03     -> 2026-04-21
+    lote   544          XENA                     LOTE 2         -> LOTE 1
+    lote   547          REBECA                   LOTE 3         -> PIQUETES / REPASSE
+    lote   701          PIQUENA                  LOTE 3         -> PIQUETES / REPASSE
+    lote   724          FILÓ                     LOTE 2         -> LOTE 3
+    parto  724          FILÓ                     2025-08-01     -> 2026-07-19
+    lote   727          CHUVINHA                 LOTE 2         -> LOTE 1
+    parto  727          CHUVINHA                 2025-10-25     -> 2026-09-11
+    lote   732          PACIÊNCIA                LOTE 2         -> LOTE 3
+    parto  732          PACIÊNCIA                2024-11-10     -> 2026-05-16
+    parto  733          Pauna                                   -> 2026-07-18
+    parto  767          NEBLINA                  2025-05-21     -> 2026-05-22
+    lote   779          GÉSSIKA                  LOTE 1         -> LOTE 2
+    parto  779          GÉSSIKA                  2025-06-16     -> 2026-04-15
+    lote   812          Esmeralda                LOTE 1         -> LOTE 2
+    parto  812          Esmeralda                               -> 2026-07-01
+    lote   821          Cigana                   LOTE 2         -> LOTE 3
+    parto  821          Cigana                                  -> 2026-01-22
+    lote   827          Revista                  LOTE 2         -> LOTE 1
+    parto  827          Revista                                 -> 2026-06-07
+    parto  832          Carinhosa                               -> 2026-04-15
+    parto  842          MORENA                   2025-10-23     -> 2026-08-20
+    parto  846          Surubim                                 -> 2025-10-23
+    lote   853          PRETINHA                 LOTE 3         -> PIQUETES / REPASSE
+    lote   854          MARAVILHA                LOTE 2         -> PIQUETES / REPASSE
+    parto  859          PREGUIÇA                 2025-09-11     -> 2026-07-24
+    lote   879          Medalha                  LOTE 3         -> PIQUETES / REPASSE
+    parto  879          Medalha                                 -> 2026-03-13
+    parto  956          Bolinha                                 -> 2026-07-11
+    parto  964          Tieta                                   -> 2026-04-12
+    lote   967          Machada                                 -> ENGORDA
+    parto  967          Machada                                 -> 2026-06-14
+    parto  981          Condessa                                -> 2026-06-14
+    parto  1001         Arizona                                 -> 2026-06-15
+    lote   1008         CABELO DE FOGO           LOTE 1         -> ENGORDA
+    lote   570          MIMOSA                                  -> LOTE 2
+    parto  570          MIMOSA                   2025-07-21     -> 2026-07-23
+    parto  1013         Boemia                                  -> 2026-04-23
+    parto  1015         Jardineira                              -> 2026-06-09
+    lote   1            XUXA                     LOTE 3         -> PIQUETES / REPASSE
+    parto  003 AMARELO  UBERÁBA                  2025-10-23     -> 2026-09-06
+    parto  016 VERDE    BORBOLETA 3              2025-03-15     -> 2026-03-15
+    lote   226          TRISTEZA 2               LOTE 1         -> PRÉ-PARTO
+    parto  263 ABREU    ESPERANÇA                2025-03-27     -> 2026-04-17
+    parto  294          CAVEIRA                  2025-03-01     -> 2026-03-08
+    parto  313          PÉROLA                   2025-03-29     -> 2026-03-06
+    lote   516          ALAGOANA                                -> PIQUETES / REPASSE
+    parto  528          CARMÉLIA                 2025-07-30     -> 2026-09-11
+    parto  610          CHOCOLATE                2025-04-15     -> 2026-04-21
+    parto  8            Cabelo De Fogo                          -> 2026-07-03
+    lote   15           MOÇA BRANCA              LOTE 1         -> LOTE 3
+    parto  15           MOÇA BRANCA              2025-04-25     -> 2026-04-17
+    lote   16           BELMONTE                 LOTE 3         -> PIQUETES / REPASSE
+    lote   162          BEIJA FLOR                              -> LOTE 1
+    parto  162          BEIJA FLOR               2025-04-23     -> 2026-07-04
+    lote   11           DOMINÓ                   LOTE 3         -> PIQUETES / REPASSE
+    parto  117          AZEITONA                 2025-05-28     -> 2026-07-04
+    parto  380          BAÉ                      2025-07-13     -> 2026-05-25
+    lote   395          LULUZINHA                LOTE 1         -> LOTE 3
+    parto  395          LULUZINHA                2025-05-30     -> 2026-04-26
+    lote   417          PANDORA                  LOTE 1         -> LOTE 3
+    parto  417          PANDORA                  2025-07-21     -> 2026-05-23
+    lote   419          VIAJANTE                 LOTE 3         -> PIQUETES / REPASSE
+    lote   511          XEXEU                    LOTE 1         -> PRÉ-PARTO
+    lote   512          AZA NEGRA                LOTE 2         -> LOTE 1
+    parto  512          AZA NEGRA                2025-05-31     -> 2026-08-07
+    parto  521          POLIANA                  2025-06-19     -> 2026-05-16
+    lote   523          BARONEZA                 LOTE 3         -> PIQUETES / REPASSE
+    parto  525          BIÁ                      2025-04-01     -> 2026-03-29
+    parto  539          PALMEIRA                 2025-02-19     -> 2026-05-09
+    parto  548          PRINCESA                 2025-03-10     -> 2026-07-20
+    lote   549          BRANQUINHA               LOTE 1         -> LOTE 2
+    parto  550          AMÉLIA                   2025-02-28     -> 2026-02-26
+    lote   567          SUZANA                   LOTE 3         -> PIQUETES / REPASSE
+    lote   573          MAYARA                   LOTE 3         -> PIQUETES / REPASSE
+    lote   577          BALIZA                                  -> PRÉ-PARTO
+    parto  582          MINEIRA                  2025-06-15     -> 2026-06-07
+    parto  584          PALOMA                   2025-05-08     -> 2026-04-10
+    parto  586          GAÚCHA                   2025-05-31     -> 2026-05-04
+    parto  591          BAHIA                    2025-07-04     -> 2026-05-24
+    parto  596          ANGÉLICA                 2025-06-11     -> 2026-04-19
+    parto  597          BIANCA                   2025-06-07     -> 2026-05-22
+    lote   598          OURO FINO                LOTE 2         -> PRÉ-PARTO
+    parto  599          PEITUDA                  2025-03-04     -> 2026-05-12
+    parto  601          JOINHA                   2025-08-03     -> 2026-06-13
+    parto  619          MARIPOZA                 2025-01-04     -> 2026-06-03
+    lote   620          BONECA                   LOTE 2         -> LOTE 1
+    parto  620          BONECA                   2025-05-22     -> 2026-07-21
+    lote   633          GIGANTE                  LOTE 3         -> PIQUETES / REPASSE
+    parto  637          CHITADA                  2025-05-17     -> 2026-04-04
+    parto  642          CARA BRANCA              2025-05-19     -> 2026-03-29
+    lote   647          NEGUINHA                 LOTE 2         -> LOTE 1
+    parto  647          NEGUINHA                 2025-06-15     -> 2026-06-07
+    parto  649          REDONDA                  2025-10-22     -> 2026-09-12
+    lote   654          BELINHA                  LOTE 2         -> PIQUETES / REPASSE
+    lote   657          MAROCA                   LOTE 3         -> PIQUETES / REPASSE
+    lote   658          CARINA                   LOTE 1         -> LOTE 3
+    parto  658          CARINA                   2024-10-14     -> 2026-07-14
+    parto  660          DIAMANTE                 2026-01-11     -> 2026-02-11
+    parto  662          BURGUESA                 2025-06-25     -> 2026-05-19
+    lote   663          MAÇA                     LOTE 3         -> LOTE 2
+    parto  663          MAÇA                     2025-07-07     -> 2026-07-08
+    parto  664          CARRAPETA                2025-05-26     -> 2026-04-03
+    lote   671          SERTANEJA                LOTE 3         -> PIQUETES / REPASSE
+    parto  672          FEITICEIRA               2025-05-25     -> 2026-06-07
+    parto  673          COTOZINHA                2024-11-30     -> 2026-08-05
+    lote   677          BAIANINHA                LOTE 2         -> LOTE 1
+    parto  677          BAIANINHA                2024-11-25     -> 2026-05-17
+    lote   678          MEIA LUA                 LOTE 2         -> PIQUETES / REPASSE
+    parto  679          CACHOEIRA                2026-01-19     -> 2026-01-18
+    lote   680          RAINHA                                  -> LOTE 1
+    parto  680          RAINHA                   2025-05-18     -> 2026-04-07
+    parto  683          MARRECA                  2025-07-28     -> 2026-06-10
+    lote   685          ASSANHADA                               -> LOTE 2
+    parto  685          ASSANHADA                2024-07-05     -> 2026-03-08
+    parto  687          Maringa                                 -> 2026-05-02
+    lote   689          BRASILEIRA               LOTE 2         -> PIQUETES / REPASSE
+    parto  691          BARBIE                   2025-05-15     -> 2026-03-03
+    parto  692          ARRUPIADA                2025-07-15     -> 2026-07-02
+    lote   694          ANDORINHA                LOTE 3         -> LOTE 2
+    lote   695          RIO NEGRO                LOTE 2         -> LOTE 1
+    parto  695          RIO NEGRO                2025-08-22     -> 2026-07-15
+    lote   696          MANAÍRA                  LOTE 2         -> LOTE 1
+    lote                SERRANA                                 -> LOTE 1
+    parto               SERRANA                  2025-06-02     -> 2026-04-29
+
+Vacas com histórico de leite: 114 | leituras totais: 152

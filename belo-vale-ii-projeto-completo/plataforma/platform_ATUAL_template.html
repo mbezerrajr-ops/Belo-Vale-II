@@ -1,3 +1,4 @@
+<meta charset="UTF-8" />
 <title>Belo Vale II</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
@@ -163,6 +164,8 @@
   .c-lote-2 { background: color-mix(in srgb, var(--series-2) 18%, transparent); color: var(--series-2); }
   .c-lote-3 { background: color-mix(in srgb, var(--series-3) 18%, transparent); color: var(--series-3); }
   .c-lote-none { background: var(--grid); color: var(--text-muted); }
+  select.lotesel { font-size: 11.5px; font-weight: 700; border: none; border-radius: 999px; padding: 4px 8px; cursor: pointer; max-width: 150px; }
+  select.lotesel:focus { outline: 1px solid var(--series-1); }
   .c-sit-lactacao { background: color-mix(in srgb, var(--series-1) 18%, transparent); color: var(--series-1); }
   .c-sit-seca { background: var(--grid); color: var(--text-secondary); }
   .c-sit-gestante { background: color-mix(in srgb, var(--series-4) 22%, transparent); color: color-mix(in srgb, var(--series-4) 70%, black); }
@@ -172,6 +175,8 @@
   .c-status-vendida { background: color-mix(in srgb, var(--status-warn) 18%, transparent); color: var(--status-warn); }
   .row-del { font-size: 13px; color: var(--text-muted); background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
   .row-del:hover { color: var(--status-critical); background: var(--grid); }
+  .row-hist { font-size: 13px; color: var(--text-muted); background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+  .row-hist:hover { color: var(--series-1); background: var(--grid); }
   .empty-state { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
   .role-pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--grid); color: var(--text-secondary); }
   .role-pill.admin { background: color-mix(in srgb, var(--series-1) 18%, transparent); color: var(--series-1); }
@@ -259,23 +264,43 @@
 <div id="printArea"></div>
 
 <script id="state-data" type="application/json">__STATE_JSON__</script>
+<script src="vendor/pdf.min.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
 <script>
 (function () {
   "use strict";
+
+  if (window.pdfjsLib) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdf.worker.min.js";
+  }
 
   // ================= STATE =================
   let state;
   try { state = JSON.parse(document.getElementById("state-data").textContent); }
   catch (e) { state = { vacas: [], insumos: [], usuarios: [], precoLeite: 2.59 }; }
 
+  // Migração: garante que toda vaca tenha um histórico de leituras (data + produção).
+  // Vacas antigas (sem histórico) recebem um único registro a partir de media/ultimaMedicao.
+  (state.vacas || []).forEach((v) => {
+    if (!Array.isArray(v.historico)) {
+      v.historico = (v.ultimaMedicao && v.media) ? [{ data: v.ultimaMedicao, producao: v.media }] : [];
+    }
+    // DEL (dias em lactação): mantido atualizado a partir da data do último parto.
+    if (v.del === undefined) v.del = "";
+    if (v.del !== "" && v.parto) v.del = diasDesde(v.parto);
+  });
+
   let session = null;
   let aba = "dashboard";
-  let dashF = { lote: "all", sit: "all", search: "" };
-  let vacasF = { busca: "", lote: "Todos", status: "Todos", situacao: "Todas" };
+  let dashF = { lote: "all", sit: "all", search: "", dataColeta: "" };
+  let vacasF = { busca: "", lote: "Todos", status: "Todos", situacao: "Todas", dataColeta: "" };
   let selecionadas = new Set();
   let modal = null; // { tipo: "completo"|"formulario" }
 
-  const LOTES = ["LOTE 1", "LOTE 2", "LOTE 3"];
+  // Lotes de produção (têm dieta e custo cadastrados) e demais grupos de manejo da fazenda.
+  const LOTES_DIETA = ["LOTE 1", "LOTE 2", "LOTE 3"];
+  const LOTES_MANEJO = ["PRÉ-PARTO", "PIQUETES / REPASSE", "ENGORDA", "ENGENHO", "INSERLEITE", "BEZERREIRO", "CAJARANAS", "PALMA", "COLÉGIO", "ABREU"];
+  const LOTES = [...LOTES_DIETA, ...LOTES_MANEJO];
   const SITUACOES = ["Em lactação", "Seca", "Gestante", "Descarte"];
   const STATUS = ["Ativo", "Inativo", "Vendida"];
   const FEED_CATS = ["Concentrado", "Caroço", "Silagem", "Casca de Mandioca"];
@@ -340,9 +365,54 @@
   const fmtL = (v) => (v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " L";
   const fmtR = (v) => "R$ " + (v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtPct = (v) => ((v || 0) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
+  const fmtDataBR = (iso) => iso ? new Date(iso + "T00:00").toLocaleDateString("pt-BR") : "—";
+  // Dias inteiros entre uma data ISO e hoje (usado no DEL).
+  function diasDesde(iso) {
+    if (!iso) return "";
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    return Math.round((hoje - new Date(iso + "T00:00")) / 86400000);
+  }
+  // DEL da vaca: recalculado pelo parto quando ela está em lactação.
+  function delDias(v) {
+    if (v.del === "" || v.del === undefined || v.del === null) return "";
+    return v.parto ? diasDesde(v.parto) : v.del;
+  }
+
+  // ================= HISTÓRICO DE LEITURAS =================
+  function datasDeColeta() {
+    const set = new Set();
+    state.vacas.forEach((v) => (v.historico || []).forEach((h) => set.add(h.data)));
+    return Array.from(set).sort().reverse();
+  }
+  function leituraNaData(v, data) {
+    return (v.historico || []).find((h) => h.data === data) || null;
+  }
+  function foiMedida(v, data) {
+    if (!data) return (v.historico || []).length > 0;
+    return !!leituraNaData(v, data);
+  }
+  function producaoNaData(v, data) {
+    if (!data) return v.media || 0;
+    const h = leituraNaData(v, data);
+    return h ? h.producao : 0;
+  }
+  function registrarLeitura(v, data, producao) {
+    if (!Array.isArray(v.historico)) v.historico = [];
+    const existente = v.historico.find((h) => h.data === data);
+    if (existente) existente.producao = producao;
+    else v.historico.push({ data, producao });
+    const maisRecente = v.historico.slice().sort((a, b) => (a.data < b.data ? 1 : -1))[0];
+    v.media = maisRecente.producao;
+    v.ultimaMedicao = maisRecente.data;
+  }
+  function opcoesDatasColetaHtml(selecionada) {
+    const datas = datasDeColeta();
+    return `<option value="" ${!selecionada ? "selected" : ""}>Mais recente</option>` +
+      datas.map((d) => `<option value="${d}" ${selecionada === d ? "selected" : ""}>${fmtDataBR(d)}</option>`).join("");
+  }
   function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
   function loteClass(l) { return l === "LOTE 1" ? "c-lote-1" : l === "LOTE 2" ? "c-lote-2" : l === "LOTE 3" ? "c-lote-3" : "c-lote-none"; }
-  function loteLabel(l) { return l ? l.replace("LOTE ", "Lote ") : "Sem lote"; }
+  function loteLabel(l) { return l ? (l.startsWith("LOTE ") ? l.replace("LOTE ", "Lote ") : l.charAt(0) + l.slice(1).toLowerCase()) : "Sem lote"; }
   function sitClass(s) { return s === "Em lactação" ? "c-sit-lactacao" : s === "Seca" ? "c-sit-seca" : s === "Gestante" ? "c-sit-gestante" : "c-sit-descarte"; }
   function statusClass(s) { return s === "Ativo" ? "c-status-ativo" : s === "Inativo" ? "c-status-inativo" : "c-status-vendida"; }
   function loteColorVar(l) { return l === "LOTE 1" ? "var(--series-1)" : l === "LOTE 2" ? "var(--series-2)" : l === "LOTE 3" ? "var(--series-3)" : "var(--text-muted)"; }
@@ -356,7 +426,8 @@
     return out;
   }
   function vacasCountPorLote() {
-    const out = { "LOTE 1": 0, "LOTE 2": 0, "LOTE 3": 0 };
+    const out = {};
+    LOTES.forEach((l) => { out[l] = 0; });
     state.vacas.forEach((v) => { if (out[v.lote] !== undefined) out[v.lote]++; });
     return out;
   }
@@ -469,6 +540,9 @@
             <button data-value="Descarte" class="${dashF.sit === "Descarte" ? "active" : ""}">Descarte</button>
           </div>
         </div>
+        <div class="fgroup"><span class="flabel">Data da coleta</span>
+          <select class="selfilter" id="dashDataColeta">${opcoesDatasColetaHtml(dashF.dataColeta)}</select>
+        </div>
         <div class="fgroup searchwrap">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9.5 9.5L13 13M11 6a5 5 0 1 1-10 0 5 5 0 0 1 10 0Z" stroke-width="1.4" stroke-linecap="round"/></svg>
           <input type="text" id="dashSearch" placeholder="Buscar por nome ou nº..." value="${esc(dashF.search)}">
@@ -477,7 +551,7 @@
         <div class="fsummary" id="dashSummary"></div>
       </div>
       <div class="kpi-grid" id="kpiRow"></div>
-      <p class="desc" style="margin-top:8px;">"Vacas na seleção" e "Produção/dia" seguem todos os filtros. Os KPIs financeiros mostram sempre o total do(s) lote(s) selecionado(s) — a dieta é por lote, não por vaca.</p>
+      <p class="desc" style="margin-top:8px;">"Vacas na seleção" conta só as vacas com leitura de produção registrada (na data escolhida, ou a mais recente de cada uma) dentro dos demais filtros. "Produção/dia" segue a mesma regra. Os KPIs financeiros mostram sempre o total do(s) lote(s) selecionado(s) — a dieta é por lote, não por vaca.</p>
       <div class="section"><h2>Composição do rebanho</h2>
         <p class="desc" id="herdDesc"></p>
         <div class="grid2">
@@ -486,7 +560,7 @@
         </div>
       </div>
       <div class="section"><h2>Comparativo por lote</h2>
-        <p class="desc">Total fixo de cada lote — só reage ao filtro de Lote.</p>
+        <p class="desc">Total fixo de cada lote — reage ao filtro de Lote e de Data da coleta.</p>
         <div class="grid2">
           <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:10px;">Produção diária de leite (L)</div><div class="chart-wrap"><svg id="prodLoteBar" width="100%" height="150"></svg></div></div>
           <div class="card"><div class="legend" id="finLegend"></div><div class="chart-wrap"><svg id="finLoteBar" width="100%" height="150"></svg></div></div>
@@ -571,7 +645,7 @@
     el("line", { x1: padL, x2: padL + plotW, y1: h - padB, y2: h - padB, class: "baseline" }, svg);
     categories.forEach((cat, ci) => {
       const gx0 = padL + groupW * ci + (groupW - (barW + barGap) * series.length + barGap) / 2;
-      const dimmed = opts.dimFn ? opts.dimFn(cat) : false;
+      const dimmed = opts.dimFn ? opts.dimFn(cat, ci) : false;
       series.forEach((s, si) => {
         const v = s.values[ci];
         const bh = Math.max(2, (v / maxV) * plotH);
@@ -622,17 +696,19 @@
     function loteStats(l, opts) {
       const inLote = cowsInLote(l, opts);
       const n = inLote.length;
-      const prod = inLote.reduce((s, c) => s + (c.media || 0), 0);
+      const prod = inLote.reduce((s, c) => s + producaoNaData(c, dashF.dataColeta), 0);
       const custo = custos[l] || 0;
       const receita = prod * state.precoLeite;
       return { lote: l, vacas: n, producao: prod, custo, receita, lucro: receita - custo, custoVaca: n ? custo / n : 0, vendaVaca: n ? receita / n : 0, mediaVaca: n ? prod / n : 0, pctCusto: receita ? custo / receita : 0 };
     }
     const inFilter = cows.filter(matchesDashAll);
     const n = inFilter.length;
+    const nMedidas = inFilter.filter((c) => foiMedida(c, dashF.dataColeta)).length;
     const parts = [];
     if (dashF.lote !== "all") parts.push(dashF.lote === "null" ? "sem lote" : loteLabel(dashF.lote).toLowerCase());
     if (dashF.sit !== "all") parts.push(dashF.sit.toLowerCase());
     if (dashF.search) parts.push(`"${dashF.search}"`);
+    if (dashF.dataColeta) parts.push(`coleta de ${fmtDataBR(dashF.dataColeta)}`);
     document.getElementById("dashSummary").innerHTML = `<b>${n}</b> de ${cows.length} vacas${parts.length ? " — " + esc(parts.join(", ")) : ""}`;
 
     const vl = inFilter.filter((c) => c.situacao === "Em lactação").length;
@@ -646,27 +722,28 @@
     horizontalBar("activeBar", [{ label: "Com lote ativo", value: comLote, color: "var(--series-1)" }, { label: "Sem lote ativo", value: semLote, color: "var(--text-muted)" }], { fmt: (v) => v + " vacas" });
 
     const kpiRow = document.getElementById("kpiRow");
-    const lotesAtivos = dashF.lote === "all" ? LOTES : (dashF.lote === "null" ? [] : [dashF.lote]);
+    const lotesAtivos = dashF.lote === "all" ? LOTES_DIETA : (dashF.lote === "null" ? [] : [dashF.lote]);
     const stats2 = lotesAtivos.map((l) => loteStats(l, { ignoreCowFilters: true }));
     const custoTot = stats2.reduce((s, l) => s + l.custo, 0);
     const receitaTot = stats2.reduce((s, l) => s + l.receita, 0);
     const lucroTot = receitaTot - custoTot;
     const semDieta = dashF.lote === "null";
     kpiRow.innerHTML = [
-      { label: "Vacas na seleção", value: n.toLocaleString("pt-BR") },
-      { label: "Produção / dia (seleção)", value: fmtL(inFilter.reduce((s, c) => s + (c.media || 0), 0)) },
+      { label: "Vacas na seleção", value: nMedidas.toLocaleString("pt-BR") },
+      { label: dashF.dataColeta ? `Produção em ${fmtDataBR(dashF.dataColeta)}` : "Produção / dia (seleção)", value: fmtL(inFilter.reduce((s, c) => s + producaoNaData(c, dashF.dataColeta), 0)) },
       { label: "Receita / dia (lote)", value: semDieta ? "—" : fmtR(receitaTot) },
       { label: "Custo / dia (lote)", value: semDieta ? "—" : fmtR(custoTot) },
       { label: "Lucro / dia (lote)", value: semDieta ? "—" : fmtR(lucroTot), good: !semDieta && lucroTot >= 0, bad: !semDieta && lucroTot < 0 },
       { label: "% custo de produção", value: semDieta ? "—" : fmtPct(receitaTot ? custoTot / receitaTot : 0) }
     ].map((it) => `<div class="kpi"><div class="label">${it.label}</div><div class="value">${it.value}</div>${it.good ? `<div class="delta good">margem positiva</div>` : it.bad ? `<div class="delta bad">margem negativa</div>` : ""}</div>`).join("");
 
-    const stats = LOTES.map((l) => loteStats(l, { ignoreCowFilters: true }));
+    const stats = LOTES.filter((l) => cowsInLote(l, { ignoreCowFilters: true }).length).map((l) => loteStats(l, { ignoreCowFilters: true }));
+    const statsDieta = LOTES_DIETA.map((l) => loteStats(l, { ignoreCowFilters: true }));
     horizontalBar("prodLoteBar", stats.map((l) => ({ label: loteLabel(l.lote), value: l.producao, color: loteColorVar(l.lote), dimmed: loteIsDimmed(l.lote) })), { fmt: fmtL });
     renderLegend("finLegend", [{ label: "Custo/dia", color: "var(--series-1)" }, { label: "Receita/dia", color: "var(--series-2)" }, { label: "Lucro/dia", color: "var(--series-3)" }]);
-    groupedBar("finLoteBar", LOTES.map(loteLabel), [{ color: "var(--series-1)", values: stats.map((l) => l.custo) }, { color: "var(--series-2)", values: stats.map((l) => l.receita) }, { color: "var(--series-3)", values: stats.map((l) => l.lucro) }], { dimFn: (cat) => loteIsDimmed("LOTE " + cat.replace("Lote ", "")) });
+    groupedBar("finLoteBar", LOTES_DIETA.map(loteLabel), [{ color: "var(--series-1)", values: statsDieta.map((l) => l.custo) }, { color: "var(--series-2)", values: statsDieta.map((l) => l.receita) }, { color: "var(--series-3)", values: statsDieta.map((l) => l.lucro) }], { dimFn: (cat, ci) => loteIsDimmed(LOTES_DIETA[ci]) });
 
-    document.getElementById("loteStats").innerHTML = stats.map((l) => {
+    document.getElementById("loteStats").innerHTML = statsDieta.map((l) => {
       const dimmed = loteIsDimmed(l.lote) ? "style=\"opacity:.4\"" : "";
       return [
         [`${loteLabel(l.lote)} · custo/vaca`, fmtR(l.custoVaca)], [`${loteLabel(l.lote)} · venda/vaca`, fmtR(l.vendaVaca)],
@@ -678,7 +755,7 @@
 
     const feedColors = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];
     renderLegend("feedLegend", FEED_CATS.map((c, i) => ({ label: c, color: feedColors[i] })));
-    const feedRows = LOTES.map((l) => ({ lote: l, values: FEED_CATS.map((cat) => { const ins = state.insumos.find((i) => i.nome === cat); return ins ? (ins.dieta[l] || 0) * ins.precoKg : 0; }) }));
+    const feedRows = LOTES_DIETA.map((l) => ({ lote: l, values: FEED_CATS.map((cat) => { const ins = state.insumos.find((i) => i.nome === cat); return ins ? (ins.dieta[l] || 0) * ins.precoKg : 0; }) }));
     stackedBarH("feedBar", feedRows, FEED_CATS, feedColors, { dimFn: loteIsDimmed });
     document.getElementById("feedTable").innerHTML = `<thead><tr><th>Lote</th>${FEED_CATS.map((c) => `<th class="num">${c}</th>`).join("")}<th class="num">Total</th></tr></thead><tbody>` +
       feedRows.map((r) => `<tr><td>${loteLabel(r.lote)}</td>${r.values.map((v) => `<td class="num">R$ ${v.toFixed(2)}</td>`).join("")}<td class="num">R$ ${r.values.reduce((a, b) => a + b, 0).toFixed(2)}</td></tr>`).join("") + `</tbody>`;
@@ -695,11 +772,13 @@
     });
     horizontalBar("delBar", Object.entries(delCounts).filter(([, v]) => v > 0).map(([label, value]) => ({ label, value, color: "var(--series-1)" })), { fmt: (v) => v + " vacas" });
 
-    const withMedia = inFilter.filter((c) => c.media).sort((a, b) => b.media - a.media);
-    document.getElementById("topBottomDesc").textContent = `Top 10 e bottom 10 entre as ${withMedia.length} vaca(s) com média cadastrada, no filtro atual.`;
+    const withMedia = inFilter.map((c) => ({ c, prod: producaoNaData(c, dashF.dataColeta) })).filter((x) => x.prod).sort((a, b) => b.prod - a.prod);
+    document.getElementById("topBottomDesc").textContent = dashF.dataColeta
+      ? `Top 10 e bottom 10 entre as ${withMedia.length} vaca(s) com leitura em ${fmtDataBR(dashF.dataColeta)}, no filtro atual.`
+      : `Top 10 e bottom 10 entre as ${withMedia.length} vaca(s) com média cadastrada, no filtro atual.`;
     renderLegend("topBottomLegend", [{ label: "Lote 1", color: "var(--series-1)" }, { label: "Lote 2", color: "var(--series-2)" }, { label: "Lote 3", color: "var(--series-3)" }, { label: "Sem lote", color: "var(--text-muted)" }]);
-    horizontalBar("topBar", withMedia.slice(0, 10).map((c) => ({ label: `${c.nome} - ${c.numero}`, value: c.media, color: loteColorVar(c.lote) })), { fmt: fmtL, labelW: 168, valueW: 50 });
-    horizontalBar("bottomBar", withMedia.slice(-10).reverse().map((c) => ({ label: `${c.nome} - ${c.numero}`, value: c.media, color: loteColorVar(c.lote) })), { fmt: fmtL, labelW: 168, valueW: 50 });
+    horizontalBar("topBar", withMedia.slice(0, 10).map(({ c, prod }) => ({ label: `${c.nome} - ${c.numero}`, value: prod, color: loteColorVar(c.lote) })), { fmt: fmtL, labelW: 168, valueW: 50 });
+    horizontalBar("bottomBar", withMedia.slice(-10).reverse().map(({ c, prod }) => ({ label: `${c.nome} - ${c.numero}`, value: prod, color: loteColorVar(c.lote) })), { fmt: fmtL, labelW: 168, valueW: 50 });
 
     document.getElementById("footerNote").innerHTML = `Dados: aba Vacas (${cows.length} cadastradas, ${cows.filter((c) => c.lote).length} com lote ativo) e aba Insumos. Preço do leite: R$ ${state.precoLeite.toFixed(2)}/L.`;
   }
@@ -710,7 +789,8 @@
       (vacasF.lote === "Todos" || v.lote === vacasF.lote) &&
       (vacasF.status === "Todos" || v.status === vacasF.status) &&
       (vacasF.situacao === "Todas" || v.situacao === vacasF.situacao) &&
-      (vacasF.busca === "" || stripAccents(v.nome).includes(stripAccents(vacasF.busca)) || String(v.numero).includes(vacasF.busca))
+      (vacasF.busca === "" || stripAccents(v.nome).includes(stripAccents(vacasF.busca)) || String(v.numero).includes(vacasF.busca)) &&
+      (!vacasF.dataColeta || foiMedida(v, vacasF.dataColeta))
     ).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
   }
 
@@ -726,37 +806,51 @@
         <select class="selfilter" id="vLote"><option ${vacasF.lote === "Todos" ? "selected" : ""}>Todos</option>${LOTES.map((l) => `<option ${vacasF.lote === l ? "selected" : ""}>${l}</option>`).join("")}</select>
         <select class="selfilter" id="vStatus"><option ${vacasF.status === "Todos" ? "selected" : ""}>Todos</option>${STATUS.map((s) => `<option ${vacasF.status === s ? "selected" : ""}>${s}</option>`).join("")}</select>
         <select class="selfilter" id="vSituacao"><option ${vacasF.situacao === "Todas" ? "selected" : ""}>Todas</option>${SITUACOES.map((s) => `<option ${vacasF.situacao === s ? "selected" : ""}>${s}</option>`).join("")}</select>
+        <select class="selfilter" id="vDataColeta" title="Data da coleta">${opcoesDatasColetaHtml(vacasF.dataColeta)}</select>
         <span class="fsummary">${filtradas.length} vacas${selecionadas.size ? ` · ${selecionadas.size} selecionada(s)` : ""}</span>
         <div style="flex:1"></div>
         <button type="button" class="btn" id="btnImprimirLista">🖨 Imprimir lista</button>
         <button type="button" class="btn" id="btnFormBranco">📋 Formulário em branco</button>
+        <button type="button" class="btn" id="btnImportarLeite">🥛 Importar leite</button>
         ${isAdmin() ? `<button type="button" class="btn primary" id="btnAddVaca">+ Adicionar vaca</button>` : ""}
       </div>
       <div class="card tablecard"><div class="table-scroll">
         <table class="cadtable"><thead><tr>
           <th><input type="checkbox" id="vSelAll" ${todasSel ? "checked" : ""}></th>
-          <th>Nº</th><th>Nome</th><th>Lote</th><th>Nascimento</th><th>Parto</th><th>Peso (kg)</th><th>Média (L/dia)</th><th>Situação</th><th>Custo/dia</th><th>Últ. medição</th><th>Status</th><th></th>
+          <th>Nº</th><th>Nome</th><th>Lote</th><th>Nascimento</th><th>Parto</th><th title="Dias em lactação">DEL</th><th>Peso (kg)</th><th>Média (L/dia)</th><th>Situação</th><th>Custo/dia</th><th>Últ. medição</th><th>Status</th><th></th>
         </tr></thead><tbody id="vacasBody">
-          ${filtradas.length ? filtradas.map(vacaRowHtml).join("") : `<tr><td colspan="13"><div class="empty-state">Nenhuma vaca corresponde a esse filtro.</div></td></tr>`}
+          ${filtradas.length ? filtradas.map(vacaRowHtml).join("") : `<tr><td colspan="14"><div class="empty-state">Nenhuma vaca corresponde a esse filtro.</div></td></tr>`}
         </tbody></table>
       </div></div>`;
   }
 
   function vacaRowHtml(v) {
+    const dataFiltro = vacasF.dataColeta;
+    const leitura = dataFiltro ? leituraNaData(v, dataFiltro) : null;
+    const mediaCell = dataFiltro
+      ? `<span style="color:${leitura ? "inherit" : "var(--text-muted)"}">${leitura ? leitura.producao.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "sem leitura"}</span>`
+      : `<span class="ed-text" data-field="media" data-id="${v.id}" data-type="number" ondblclick="window.__bv2edit(this)">${v.media ? v.media.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"}</span>`;
+    const ultMedCell = dataFiltro
+      ? `<span style="color:var(--text-muted)">${fmtDataBR(dataFiltro)}</span>`
+      : `<input type="date" data-id="${v.id}" data-field="ultimaMedicao" value="${esc(v.ultimaMedicao)}">`;
     return `<tr data-id="${v.id}" class="${selecionadas.has(v.id) ? "sel" : ""}">
       <td><input type="checkbox" class="vSelRow" data-id="${v.id}" ${selecionadas.has(v.id) ? "checked" : ""}></td>
       <td style="color:var(--text-muted)">${esc(v.numero)}</td>
       <td><span class="ed-text" data-field="nome" data-id="${v.id}" data-type="text" ondblclick="window.__bv2edit(this)">${esc(v.nome)}</span></td>
-      <td><button type="button" class="pill ${loteClass(v.lote)}" data-id="${v.id}" data-field="lote" data-cycle="lote">${loteLabel(v.lote)}</button></td>
+      <td><select class="lotesel ${loteClass(v.lote)}" data-id="${v.id}" data-field="lote">${["", ...LOTES].map((l) => `<option value="${esc(l)}" ${v.lote === l ? "selected" : ""}>${loteLabel(l)}</option>`).join("")}</select></td>
       <td><input type="date" data-id="${v.id}" data-field="nascimento" value="${esc(v.nascimento)}"></td>
       <td><input type="date" data-id="${v.id}" data-field="parto" value="${esc(v.parto)}"></td>
+      <td><span class="ed-text" data-field="del" data-id="${v.id}" data-type="number" ondblclick="window.__bv2edit(this)" title="Dias em lactação — recalculado pela data do último parto">${delDias(v) === "" ? "—" : delDias(v)}</span></td>
       <td><span class="ed-text" data-field="peso" data-id="${v.id}" data-type="number" ondblclick="window.__bv2edit(this)">${v.peso || "—"}</span></td>
-      <td><span class="ed-text" data-field="media" data-id="${v.id}" data-type="number" ondblclick="window.__bv2edit(this)">${v.media ? v.media.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"}</span></td>
+      <td>${mediaCell}</td>
       <td><button type="button" class="pill ${sitClass(v.situacao)}" data-id="${v.id}" data-field="situacao" data-cycle="situacao">${v.situacao}</button></td>
       <td style="color:var(--text-secondary);font-weight:600;">R$ ${custoDiaVaca(v).toFixed(2)}</td>
-      <td><input type="date" data-id="${v.id}" data-field="ultimaMedicao" value="${esc(v.ultimaMedicao)}"></td>
+      <td>${ultMedCell}</td>
       <td><button type="button" class="pill ${statusClass(v.status)}" data-id="${v.id}" data-field="status" data-cycle="status">${v.status}</button></td>
-      <td>${isAdmin() ? `<button type="button" class="row-del" data-id="${v.id}" data-action="del-vaca" title="Remover">✕</button>` : ""}</td>
+      <td style="white-space:nowrap;">
+        <button type="button" class="row-hist" data-id="${v.id}" data-action="ver-historico" title="Histórico de leituras">📈</button>
+        ${isAdmin() ? `<button type="button" class="row-del" data-id="${v.id}" data-action="del-vaca" title="Remover">✕</button>` : ""}
+      </td>
     </tr>`;
   }
 
@@ -785,7 +879,7 @@
       </div>
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Dieta por lote (kg/dia)</div>
       <div class="dieta-row">
-        ${LOTES.map((l) => `<div class="d"><span style="font-size:12px;font-weight:600;">${loteLabel(l)}</span><input type="number" step="0.5" data-ins="${ins.id}" data-lote="${l}" value="${ins.dieta[l] || 0}"></div>`).join("")}
+        ${LOTES_DIETA.map((l) => `<div class="d"><span style="font-size:12px;font-weight:600;">${loteLabel(l)}</span><input type="number" step="0.5" data-ins="${ins.id}" data-lote="${l}" value="${ins.dieta[l] || 0}"></div>`).join("")}
       </div>
       ${hist.length > 1 ? `<details style="margin-top:10px;"><summary style="font-size:11px;color:var(--text-muted);cursor:pointer;">Histórico de preços (${ins.historico.length})</summary>
         <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">${hist.map((h) => `<span class="hist-chip">${h.data.split("-").reverse().join("/")} — R$ ${h.preco.toFixed(2)}</span>`).join("")}</div>
@@ -881,10 +975,18 @@
 
   // ================= PRINT / PDF =================
   function abrirModalImpressao(tipo) { modal = { tipo, lote: vacasF.lote, status: vacasF.status, stage: "filtros" }; renderModal(); }
+  function abrirModalImportarLeite() { modal = { tipo: "importar", stage: "form", data: new Date().toISOString().slice(0, 10) }; renderModal(); }
+  function abrirModalHistorico(vacaId) { modal = { tipo: "historico", vacaId }; renderModal(); }
   function fecharModal() { modal = null; renderModal(); }
   function renderModal() {
     const root = document.getElementById("modalRoot");
     if (!modal) { root.innerHTML = ""; return; }
+    if (modal.tipo === "importar") {
+      if (modal.stage === "pronto") { renderModalImportarPronto(root); return; }
+      renderModalImportar(root);
+      return;
+    }
+    if (modal.tipo === "historico") { renderModalHistorico(root); return; }
     if (modal.stage === "pronto") { renderModalPronto(root); return; }
     const base = selecionadas.size > 0 ? state.vacas.filter((v) => selecionadas.has(v.id)) : vacasFiltradas();
     const filtradas = base.filter((v) => (modal.lote === "Todos" || v.lote === modal.lote) && (modal.status === "Todos" || v.status === modal.status)).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
@@ -926,16 +1028,263 @@
     document.getElementById("modalOverlay").addEventListener("click", (e) => { if (e.target.id === "modalOverlay") fecharModal(); });
     document.getElementById("mFechar").addEventListener("click", fecharModal);
   }
+  // ================= IMPORTAR LEITE =================
+  function renderModalImportar(root) {
+    root.innerHTML = `<div class="modal-overlay" id="modalOverlay"><div class="modal">
+      <h3>🥛 Importar leite</h3>
+      <p class="desc2">Selecione o arquivo (.csv, .xlsx ou .pdf) com a coleta do dia — colunas/ordem: <b>Número</b>, <b>Nome</b> e <b>Produção total (L)</b> da vaca. Em PDF digitado/exportado ou planilha a leitura funciona bem; fotos ou fichas manuscritas escaneadas podem ter trechos ilegíveis — eles aparecem listados no resumo, ao final da importação.</p>
+      <div class="grid2f">
+        <div><label>Data da coleta</label><input type="date" id="mDataColeta" value="${esc(modal.data)}"></div>
+        <div><label>Arquivo</label><input type="file" id="mArquivo" accept=".csv,.txt,.xlsx,.xls,.pdf"></div>
+      </div>
+      <div class="infobar" id="mImportInfo">${modal.arquivoNome ? esc(modal.arquivoInfoTexto || modal.arquivoNome) : "Nenhum arquivo selecionado."}</div>
+      <div class="modal-actions"><button type="button" class="btn" id="mCancel">Cancelar</button><button type="button" class="btn primary" id="mGo" ${modal.podeImportar ? "" : "disabled"}>Importar</button></div>
+    </div></div>`;
+    document.getElementById("modalOverlay").addEventListener("click", (e) => { if (e.target.id === "modalOverlay") fecharModal(); });
+    document.getElementById("mCancel").addEventListener("click", fecharModal);
+    document.getElementById("mDataColeta").addEventListener("change", (e) => { modal.data = e.target.value; });
+    document.getElementById("mArquivo").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const info = document.getElementById("mImportInfo"), goBtn = document.getElementById("mGo");
+      modal.arquivoNome = file.name;
+      modal.podeImportar = false;
+      goBtn.disabled = true;
+      const ehPdf = /\.pdf$/i.test(file.name) || file.type === "application/pdf";
+      const ehXlsx = /\.xlsx?$/i.test(file.name);
+      const marcarPronto = (linhas, ilegiveis) => {
+        modal.linhasExtraidas = linhas;
+        modal.ilegiveisExtracao = ilegiveis;
+        modal.podeImportar = (linhas.length + ilegiveis.length) > 0;
+        modal.arquivoInfoTexto = `${file.name} — ${linhas.length} linha(s) reconhecida(s)${ilegiveis.length ? `, ${ilegiveis.length} ilegível(is)` : ""}.`;
+        info.textContent = modal.arquivoInfoTexto;
+        goBtn.disabled = !modal.podeImportar;
+      };
+      const marcarErro = (err) => {
+        modal.arquivoInfoTexto = "Não foi possível ler este arquivo: " + (err && err.message ? err.message : err);
+        info.textContent = modal.arquivoInfoTexto;
+      };
+      if (ehPdf) {
+        modal.arquivoTipo = "pdf";
+        info.textContent = "Lendo PDF...";
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            if (!window.pdfjsLib) throw new Error("biblioteca de leitura de PDF não carregou");
+            const { linhas, ilegiveis } = await extrairLinhasPdf(reader.result);
+            marcarPronto(linhas, ilegiveis);
+          } catch (err) { marcarErro(err); }
+        };
+        reader.readAsArrayBuffer(file);
+      } else if (ehXlsx) {
+        modal.arquivoTipo = "xlsx";
+        info.textContent = "Lendo planilha...";
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            if (!window.XLSX) throw new Error("biblioteca de leitura de planilha não carregou");
+            const { linhas, ilegiveis } = extrairLinhasXlsx(reader.result);
+            marcarPronto(linhas, ilegiveis);
+          } catch (err) { marcarErro(err); }
+        };
+        reader.readAsArrayBuffer(file);
+      } else {
+        modal.arquivoTipo = "csv";
+        const reader = new FileReader();
+        reader.onload = () => {
+          modal.arquivoTexto = String(reader.result || "");
+          modal.arquivoLinhas = parseLeiteCsv(modal.arquivoTexto).length;
+          modal.podeImportar = modal.arquivoLinhas > 0;
+          modal.arquivoInfoTexto = `${file.name} (${modal.arquivoLinhas} linha(s))`;
+          info.textContent = modal.arquivoInfoTexto;
+          goBtn.disabled = !modal.podeImportar;
+        };
+        reader.readAsText(file, "UTF-8");
+      }
+    });
+    document.getElementById("mGo").addEventListener("click", processarImportacaoLeite);
+  }
+
+  function extrairLinhasXlsx(arrayBuffer) {
+    const linhas = [];
+    const ilegiveis = [];
+    const wb = XLSX.read(arrayBuffer, { type: "array" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    const temCabecalho = rows.length > 0 && isNaN(parseNumeroBR(rows[0][0]));
+    const dataRows = temCabecalho ? rows.slice(1) : rows;
+    dataRows.forEach((row, idx) => {
+      const numero = String(row[0] != null ? row[0] : "").replace(/\D/g, "");
+      const nome = String(row[1] != null ? row[1] : "").trim();
+      const producao = parseNumeroBR(row[2]);
+      if (numero && nome && !isNaN(producao)) {
+        linhas.push({ numero, nome, producao });
+      } else if (numero || nome || (row[2] !== "" && row[2] != null)) {
+        const linhaNum = idx + (temCabecalho ? 2 : 1);
+        ilegiveis.push(`Linha ${linhaNum} da planilha: "${[row[0], row[1], row[2]].join(" | ")}"`);
+      }
+    });
+    return { linhas, ilegiveis };
+  }
+
+  async function extrairLinhasPdf(arrayBuffer) {
+    const linhas = [];
+    const ilegiveis = [];
+    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      const totalChars = content.items.reduce((n, it) => n + it.str.trim().length, 0);
+      if (totalChars < 5) {
+        ilegiveis.push(`Página ${p}: sem texto reconhecível (provável foto/ficha escaneada, sem OCR).`);
+        continue;
+      }
+      const grupos = [];
+      content.items.forEach((it) => {
+        const y = Math.round(it.transform[5]);
+        let grupo = grupos.find((g) => Math.abs(g.y - y) <= 3);
+        if (!grupo) { grupo = { y, itens: [] }; grupos.push(grupo); }
+        grupo.itens.push(it);
+      });
+      grupos.sort((a, b) => b.y - a.y);
+      grupos.forEach((g) => {
+        g.itens.sort((a, b) => a.transform[4] - b.transform[4]);
+        const texto = g.itens.map((it) => it.str).join(" ").replace(/\s+/g, " ").trim();
+        if (!texto) return;
+        const linha = parseLinhaTextoPdf(texto);
+        if (linha) linhas.push(linha);
+        else if (/\d/.test(texto)) ilegiveis.push(`Página ${p}: "${texto}"`);
+      });
+    }
+    return { linhas, ilegiveis };
+  }
+
+  function parseLinhaTextoPdf(texto) {
+    const tokens = texto.split(/\s+/).filter(Boolean);
+    if (tokens.length < 2) return null;
+    const numero = tokens[0].replace(/\D/g, "");
+    const producao = parseNumeroBR(tokens[tokens.length - 1]);
+    const nome = tokens.slice(1, -1).join(" ");
+    if (numero && nome && !isNaN(producao)) return { numero, nome, producao };
+    return null;
+  }
+
+  function renderModalImportarPronto(root) {
+    const r = modal.resultado;
+    root.innerHTML = `<div class="modal-overlay" id="modalOverlay"><div class="modal" style="max-width:560px;">
+      <h3>✅ Importação concluída</h3>
+      <div class="infobar" style="font-size:13.5px;line-height:1.7;margin-bottom:14px;">
+        Data da coleta: <b>${new Date(modal.data + "T00:00").toLocaleDateString("pt-BR")}</b><br>
+        ${r.atualizadas} de ${r.total} vaca(s) do arquivo atualizada(s) com sucesso.
+      </div>
+      ${r.naoEncontradas.length ? `<p class="desc2" style="margin-bottom:8px;color:var(--status-critical);">Não encontradas ou com produção inválida (${r.naoEncontradas.length}):</p>
+      <div style="max-height:200px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12.5px;">${r.naoEncontradas.map((x) => esc(x)).join("<br>")}</div>` : ""}
+      ${r.ilegiveis && r.ilegiveis.length ? `<p class="desc2" style="margin:12px 0 8px;color:var(--status-critical);">Trechos não interpretados do arquivo — grafia ilegível, imagem sem texto ou linha incompleta (${r.ilegiveis.length}):</p>
+      <div style="max-height:200px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12.5px;">${r.ilegiveis.map((x) => esc(x)).join("<br>")}</div>
+      <p class="desc2" style="margin-top:8px;">Confira essas linhas no arquivo original e lance manualmente na tabela de vacas.</p>` : ""}
+      <div class="modal-actions" style="margin-top:16px;"><button type="button" class="btn primary" id="mFechar">Fechar</button></div>
+    </div></div>`;
+    document.getElementById("modalOverlay").addEventListener("click", (e) => { if (e.target.id === "modalOverlay") fecharModal(); });
+    document.getElementById("mFechar").addEventListener("click", fecharModal);
+  }
+
+  function renderModalHistorico(root) {
+    const v = state.vacas.find((x) => x.id === modal.vacaId);
+    if (!v) { fecharModal(); return; }
+    const hist = (v.historico || []).slice().sort((a, b) => (a.data < b.data ? 1 : -1));
+    root.innerHTML = `<div class="modal-overlay" id="modalOverlay"><div class="modal" style="max-width:480px;">
+      <h3>📈 Histórico de leituras — ${esc(v.nome)} (nº ${esc(v.numero)})</h3>
+      <p class="desc2">Todas as coletas registradas para esta vaca, da mais recente para a mais antiga.</p>
+      ${hist.length ? `<div style="max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:8px;">
+        <table class="cadtable" style="width:100%;"><thead><tr><th>Data</th><th>Produção (L)</th><th></th></tr></thead><tbody>
+          ${hist.map((h) => `<tr><td>${fmtDataBR(h.data)}</td><td>${h.producao.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</td><td><button type="button" class="row-del" data-data="${h.data}" data-action="del-historico" title="Remover leitura">✕</button></td></tr>`).join("")}
+        </tbody></table>
+      </div>` : `<div class="empty-state">Nenhuma leitura registrada ainda. Use "Importar leite" na aba Vacas.</div>`}
+      <div class="modal-actions" style="margin-top:16px;"><button type="button" class="btn primary" id="mFechar">Fechar</button></div>
+    </div></div>`;
+    document.getElementById("modalOverlay").addEventListener("click", (e) => { if (e.target.id === "modalOverlay") fecharModal(); });
+    document.getElementById("mFechar").addEventListener("click", fecharModal);
+    document.querySelectorAll('[data-action="del-historico"]').forEach((btn) => btn.addEventListener("click", () => {
+      if (!confirm("Remover esta leitura do histórico?")) return;
+      v.historico = (v.historico || []).filter((h) => h.data !== btn.dataset.data);
+      const maisRecente = v.historico.slice().sort((a, b) => (a.data < b.data ? 1 : -1))[0];
+      v.media = maisRecente ? maisRecente.producao : 0;
+      v.ultimaMedicao = maisRecente ? maisRecente.data : "";
+      renderApp();
+      scheduleSave();
+    }));
+  }
+
+  function parseNumeroBR(str) {
+    if (str == null) return NaN;
+    let s = String(str).trim().replace(/[^\d,.-]/g, "");
+    if (s === "") return NaN;
+    if (s.includes(",") && s.includes(".")) s = s.replace(/\./g, "").replace(",", ".");
+    else if (s.includes(",")) s = s.replace(",", ".");
+    return parseFloat(s);
+  }
+
+  function splitCsvLine(line, delim) {
+    const out = []; let cur = ""; let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQuotes = !inQuotes; continue; }
+      if (c === delim && !inQuotes) { out.push(cur); cur = ""; continue; }
+      cur += c;
+    }
+    out.push(cur);
+    return out.map((s) => s.trim());
+  }
+
+  function parseLeiteCsv(text) {
+    const rawLines = String(text || "").split(/\r\n|\n|\r/).map((l) => l.trim()).filter((l) => l !== "");
+    if (!rawLines.length) return [];
+    const delim = rawLines[0].includes(";") ? ";" : (rawLines[0].includes("\t") ? "\t" : ",");
+    const first = splitCsvLine(rawLines[0], delim);
+    const temCabecalho = isNaN(parseNumeroBR(first[0]));
+    const linhas = temCabecalho ? rawLines.slice(1) : rawLines;
+    return linhas.map((l) => {
+      const cols = splitCsvLine(l, delim);
+      const numero = (cols[0] || "").replace(/\D/g, "");
+      return { numero, nome: (cols[1] || "").trim(), producao: parseNumeroBR(cols[2]) };
+    }).filter((r) => r.numero || r.nome);
+  }
+
+  function processarImportacaoLeite() {
+    const data = document.getElementById("mDataColeta").value || modal.data;
+    if (!data) { alert("Informe a data da coleta."); return; }
+    modal.data = data;
+    const usaExtracao = modal.arquivoTipo === "pdf" || modal.arquivoTipo === "xlsx";
+    const linhas = usaExtracao ? (modal.linhasExtraidas || []) : parseLeiteCsv(modal.arquivoTexto);
+    const ilegiveis = usaExtracao ? (modal.ilegiveisExtracao || []) : [];
+    let atualizadas = 0;
+    const naoEncontradas = [];
+    linhas.forEach((row) => {
+      let v = row.numero ? state.vacas.find((x) => String(x.numero).trim() === row.numero) : null;
+      if (!v && row.nome) v = state.vacas.find((x) => stripAccents(x.nome) === stripAccents(row.nome));
+      if (v && !isNaN(row.producao)) {
+        registrarLeitura(v, data, row.producao);
+        atualizadas++;
+      } else {
+        naoEncontradas.push(`${row.numero || "—"} ${row.nome || ""}`.trim());
+      }
+    });
+    modal.resultado = { total: linhas.length, atualizadas, naoEncontradas, ilegiveis };
+    modal.stage = "pronto";
+    renderApp();
+    scheduleSave();
+  }
+
   function montarConteudoImpressao(tipo, vacasFiltradas) {
     const titulo = tipo === "completo" ? "Lista de Vacas — Belo Vale II" : "Formulário de Produção — Belo Vale II";
     const filtrosDesc = `Data: ${new Date().toLocaleDateString("pt-BR")} | ${vacasFiltradas.length} vacas`;
     let linhas;
     if (tipo === "completo") {
-      linhas = `<table><thead><tr><th>Nº</th><th>Nome</th><th>Lote</th><th>Parto</th><th>Situação</th><th>Média (L/dia)</th><th>Custo/dia</th><th>Status</th></tr></thead><tbody>` +
-        vacasFiltradas.map((v) => `<tr><td>${esc(v.numero)}</td><td>${esc(v.nome)}</td><td>${esc(loteLabel(v.lote))}</td><td>${v.parto ? new Date(v.parto + "T00:00").toLocaleDateString("pt-BR") : "—"}</td><td>${esc(v.situacao)}</td><td>${(v.media || 0).toFixed(1)}</td><td>R$ ${custoDiaVaca(v).toFixed(2)}</td><td>${esc(v.status)}</td></tr>`).join("") + `</tbody></table>`;
+      linhas = `<table><thead><tr><th>Nº</th><th>Nome</th><th>Lote</th><th>Parto</th><th>DEL</th><th>Situação</th><th>Média (L/dia)</th><th>Custo/dia</th><th>Status</th></tr></thead><tbody>` +
+        vacasFiltradas.map((v) => `<tr><td>${esc(v.numero)}</td><td>${esc(v.nome)}</td><td>${esc(loteLabel(v.lote))}</td><td>${v.parto ? new Date(v.parto + "T00:00").toLocaleDateString("pt-BR") : "—"}</td><td>${delDias(v) === "" ? "—" : delDias(v)}</td><td>${esc(v.situacao)}</td><td>${(v.media || 0).toFixed(1)}</td><td>R$ ${custoDiaVaca(v).toFixed(2)}</td><td>${esc(v.status)}</td></tr>`).join("") + `</tbody></table>`;
     } else {
-      linhas = `<table><thead><tr><th>Nº</th><th>Nome</th><th>Lote</th><th>Parto</th><th>Média (L/dia)</th></tr></thead><tbody>` +
-        vacasFiltradas.map((v) => `<tr><td>${esc(v.numero)}</td><td>${esc(v.nome)}</td><td>${esc(loteLabel(v.lote))}</td><td>${v.parto ? new Date(v.parto + "T00:00").toLocaleDateString("pt-BR") : "—"}</td><td style="min-width:80px"></td></tr>`).join("") + `</tbody></table>`;
+      linhas = `<table><thead><tr><th>Nº</th><th>Nome</th><th>Lote</th><th>Parto</th><th>DEL</th><th>Média (L/dia)</th></tr></thead><tbody>` +
+        vacasFiltradas.map((v) => `<tr><td>${esc(v.numero)}</td><td>${esc(v.nome)}</td><td>${esc(loteLabel(v.lote))}</td><td>${v.parto ? new Date(v.parto + "T00:00").toLocaleDateString("pt-BR") : "—"}</td><td>${delDias(v) === "" ? "—" : delDias(v)}</td><td style="min-width:80px"></td></tr>`).join("") + `</tbody></table>`;
     }
     return { titulo, filtrosDesc, linhas };
   }
@@ -957,12 +1306,14 @@
       document.getElementById("segLote").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { dashF.lote = b.dataset.value; renderApp(); }));
       document.getElementById("segSit").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { dashF.sit = b.dataset.value; renderApp(); }));
       document.getElementById("dashSearch").addEventListener("input", (e) => { dashF.search = e.target.value; renderDashboardCharts(); });
-      document.getElementById("dashClear").addEventListener("click", () => { dashF = { lote: "all", sit: "all", search: "" }; renderApp(); });
+      document.getElementById("dashDataColeta").addEventListener("change", (e) => { dashF.dataColeta = e.target.value; renderApp(); });
+      document.getElementById("dashClear").addEventListener("click", () => { dashF = { lote: "all", sit: "all", search: "", dataColeta: "" }; renderApp(); });
     } else if (aba === "vacas") {
       document.getElementById("vBusca").addEventListener("input", (e) => { vacasF.busca = e.target.value; renderVacasBodyOnly(); });
       document.getElementById("vLote").addEventListener("change", (e) => { vacasF.lote = e.target.value; renderApp(); });
       document.getElementById("vStatus").addEventListener("change", (e) => { vacasF.status = e.target.value; renderApp(); });
       document.getElementById("vSituacao").addEventListener("change", (e) => { vacasF.situacao = e.target.value; renderApp(); });
+      document.getElementById("vDataColeta").addEventListener("change", (e) => { vacasF.dataColeta = e.target.value; renderApp(); });
       document.getElementById("vSelAll").addEventListener("change", (e) => {
         const filtradas = vacasFiltradas();
         if (e.target.checked) filtradas.forEach((v) => selecionadas.add(v.id)); else filtradas.forEach((v) => selecionadas.delete(v.id));
@@ -975,11 +1326,12 @@
       }));
       document.getElementById("btnImprimirLista").addEventListener("click", () => abrirModalImpressao("completo"));
       document.getElementById("btnFormBranco").addEventListener("click", () => abrirModalImpressao("formulario"));
+      document.getElementById("btnImportarLeite").addEventListener("click", abrirModalImportarLeite);
       const addBtn = document.getElementById("btnAddVaca");
       if (addBtn) addBtn.addEventListener("click", () => {
         const nums = state.vacas.map((v) => parseInt(v.numero, 10)).filter((n) => !isNaN(n));
         const novoNum = (nums.length ? Math.max(...nums) : 0) + 1;
-        state.vacas.push({ id: "v" + novoNum + "_" + Date.now(), numero: String(novoNum), nome: "Nova vaca", lote: "", nascimento: "", parto: "", peso: "", media: 0, situacao: "Em lactação", ultimaMedicao: "", status: "Ativo" });
+        state.vacas.push({ id: "v" + novoNum + "_" + Date.now(), numero: String(novoNum), nome: "Nova vaca", lote: "", nascimento: "", parto: "", peso: "", media: 0, del: "", situacao: "Em lactação", ultimaMedicao: "", status: "Ativo", historico: [] });
         renderApp(); scheduleSave();
       });
       document.querySelectorAll("[data-cycle]").forEach((btn) => btn.addEventListener("click", () => {
@@ -991,7 +1343,20 @@
       document.querySelectorAll('input[type="date"][data-id]').forEach((inp) => inp.addEventListener("change", (e) => {
         const v = state.vacas.find((x) => x.id === e.target.dataset.id);
         v[e.target.dataset.field] = e.target.value;
+        // DEL acompanha a data do último parto das vacas em lactação.
+        if (e.target.dataset.field === "parto") {
+          if (v.situacao === "Em lactação" || v.del !== "") v.del = diasDesde(v.parto);
+          renderApp();
+        }
         scheduleSave();
+      }));
+      document.querySelectorAll("select.lotesel").forEach((sel) => sel.addEventListener("change", (e) => {
+        const v = state.vacas.find((x) => x.id === e.target.dataset.id);
+        v.lote = e.target.value;
+        renderApp(); scheduleSave();
+      }));
+      document.querySelectorAll('[data-action="ver-historico"]').forEach((btn) => btn.addEventListener("click", () => {
+        abrirModalHistorico(btn.dataset.id);
       }));
       document.querySelectorAll('[data-action="del-vaca"]').forEach((btn) => btn.addEventListener("click", () => {
         if (!confirm("Excluir esta vaca?")) return;
@@ -1045,10 +1410,14 @@
 
   function renderVacasBodyOnly() {
     const filtradas = vacasFiltradas();
-    document.getElementById("vacasBody").innerHTML = filtradas.length ? filtradas.map(vacaRowHtml).join("") : `<tr><td colspan="13"><div class="empty-state">Nenhuma vaca corresponde a esse filtro.</div></td></tr>`;
+    document.getElementById("vacasBody").innerHTML = filtradas.length ? filtradas.map(vacaRowHtml).join("") : `<tr><td colspan="14"><div class="empty-state">Nenhuma vaca corresponde a esse filtro.</div></td></tr>`;
+    const summary = document.querySelector(".fsummary");
+    if (summary) summary.textContent = `${filtradas.length} vacas${selecionadas.size ? ` · ${selecionadas.size} selecionada(s)` : ""}`;
     document.querySelectorAll(".vSelRow").forEach((cb) => cb.addEventListener("change", (e) => { const id = e.target.dataset.id; if (e.target.checked) selecionadas.add(id); else selecionadas.delete(id); renderApp(); }));
     document.querySelectorAll("[data-cycle]").forEach((btn) => btn.addEventListener("click", () => { const id = btn.dataset.id, field = btn.dataset.field, kind = btn.dataset.cycle; const v = state.vacas.find((x) => x.id === id); v[field] = cycleValue(kind, v[field]); renderApp(); scheduleSave(); }));
-    document.querySelectorAll('input[type="date"][data-id]').forEach((inp) => inp.addEventListener("change", (e) => { const v = state.vacas.find((x) => x.id === e.target.dataset.id); v[e.target.dataset.field] = e.target.value; scheduleSave(); }));
+    document.querySelectorAll('input[type="date"][data-id]').forEach((inp) => inp.addEventListener("change", (e) => { const v = state.vacas.find((x) => x.id === e.target.dataset.id); v[e.target.dataset.field] = e.target.value; if (e.target.dataset.field === "parto") { if (v.situacao === "Em lactação" || v.del !== "") v.del = diasDesde(v.parto); renderApp(); } scheduleSave(); }));
+    document.querySelectorAll("select.lotesel").forEach((sel) => sel.addEventListener("change", (e) => { const v = state.vacas.find((x) => x.id === e.target.dataset.id); v.lote = e.target.value; renderApp(); scheduleSave(); }));
+    document.querySelectorAll('[data-action="ver-historico"]').forEach((btn) => btn.addEventListener("click", () => abrirModalHistorico(btn.dataset.id)));
     document.querySelectorAll('[data-action="del-vaca"]').forEach((btn) => btn.addEventListener("click", () => { if (!confirm("Excluir esta vaca?")) return; state.vacas = state.vacas.filter((v) => v.id !== btn.dataset.id); renderApp(); scheduleSave(); }));
   }
 

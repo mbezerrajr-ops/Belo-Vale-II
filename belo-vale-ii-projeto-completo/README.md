@@ -9,7 +9,7 @@ https://claude.ai/code/artifact/2f0720ab-cd19-48da-8344-a6ecdc86c81c
 Login de acesso: e-mail `mbezerrajr@gmail.com`, senha `belovale2026` (Administrador).
 
 **ATENÇÃO — segurança:** este ZIP contém, em texto puro, as credenciais de login da
-plataforma (aba Usuários) e os dados reais do rebanho (272 vacas, produção, custos).
+plataforma (aba Usuários) e os dados reais do rebanho (401 animais, produção, custos).
 Trate como confidencial. Se for subir para o GitHub, use um repositório **privado**.
 
 ---
@@ -36,6 +36,14 @@ O código-fonte da aplicação (HTML + CSS + JS em arquivo único, sem build ste
 - **`dashboard*.html`, `full*.html`** — versões anteriores, só do painel (dashboard), antes
   de virar plataforma com login e cadastros.
 - **`gen_dashboard.py`** — script Python usado para gerar as versões antigas do dashboard.
+- **`import_relatorio_animais.py`** — importa o PDF "RELATÓRIO DE TODOS ANIMAIS"
+  (`docs/`) para dentro do estado: atualiza **Lote**, **Data do último parto** e **DEL** das
+  vacas já cadastradas, cadastra as que faltam e preserva o histórico de medições de leite.
+  Roda sem argumento extra para simular; com `--write` grava. Gera
+  `import_relatorio_animais_ultimo_relatorio.txt` com tudo que mudou, o que não casou e o
+  que ficou ambíguo. Rodar duas vezes seguidas não duplica nada.
+- **`vendor/`** — pdf.js e SheetJS servidos junto com a plataforma (o Artifact bloqueia CDN
+  externo). Ver `vendor/README.md`.
 
 Para gerar um novo `platform_ATUAL_publicado.html` a partir do template com dados
 atualizados: substituir a string `__STATE_JSON__` em `platform_ATUAL_template.html` pelo
@@ -43,6 +51,10 @@ JSON do estado desejado (ver os scripts de build usados nas pastas `testes/` com
 
 ### `dados/`
 Os dados do rebanho em diferentes estágios de processamento.
+
+> Estes arquivos refletem o rebanho de julho/2026 (272 vacas). A base viva — 401 animais,
+> com DEL e os lotes de manejo — está em `plataforma/state_dados_atuais.json` e no bloco
+> `state-data` de `plataforma/platform_ATUAL_publicado.html`.
 
 - **`cows_full_DADOS_ATUAIS.json`** — **fonte de dados definitiva.** 272 vacas, cada uma com
   `id, nome, sit (VL/VS), lote, parto, av (produção do dia 22/07/2026), fase (estágio DEL),
@@ -112,6 +124,16 @@ não o estado atual necessariamente.
   própria página, com CSS `@media print` isolando só essa área, e o usuário aciona a
   impressão manualmente via **Ctrl+P / Cmd+P** (atalho de teclado do navegador, que não
   passa pelo mesmo bloqueio de sandbox).
+- **Lote é o grupo de manejo, mas só 1/2/3 têm dieta.** Além de LOTE 1/2/3, o campo `lote`
+  aceita os grupos do relatório da fazenda (PRÉ-PARTO, PIQUETES / REPASSE, ENGORDA,
+  ENGENHO, INSERLEITE, BEZERREIRO, CAJARANAS, PALMA, COLÉGIO, ABREU). Custo/dia, dieta e os
+  gráficos financeiros continuam calculados só sobre `LOTES_DIETA` (os lotes 1/2/3, os
+  únicos com dieta cadastrada); produção por lote e a tabela por lote mostram todos os
+  grupos que têm animais. Com 13 valores, o selo de ciclo do lote virou um `select`.
+- **DEL é derivado, não digitado.** O campo `del` (dias em lactação) guarda o valor do
+  relatório, mas é recalculado como `hoje − parto` a cada abertura da página e a cada
+  mudança da data de parto — então não envelhece. Fica vazio para animal sem DEL no
+  relatório (seco, pré-parto, piquete, recria).
 - **Dados reais, não fictícios.** Os 3 lotes (LOTE 1/2/3), os 4 insumos (Concentrado,
   Caroço, Silagem, Casca de Mandioca) com preços e dietas reais, e o preço do leite
   (R$ 2,59/L) vêm da planilha e das conversas — nada foi inventado como placeholder.
