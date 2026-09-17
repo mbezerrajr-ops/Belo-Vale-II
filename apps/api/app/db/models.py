@@ -14,6 +14,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     text,
@@ -79,8 +80,39 @@ class User(TimestampedModel, Base):
 
 
 class Animal(TimestampedModel, Base):
+    """Cadastro do animal.
+
+    Três identificadores com papéis distintos, deliberadamente separados:
+
+    - ``id``: identidade interna, imutável, nunca reaproveitada;
+    - ``brinco``: chave de *matching automático* de arquivos novos. Nulo é um
+      estado válido — 142 registros da baseline não têm brinco legível — e
+      significa apenas que o animal não recebe associação automática, nunca
+      que o cadastro é inválido;
+    - ``legacy_id``: chave de *migração* e reconciliação com a baseline legada.
+
+    ``numero_legado`` é informativo e deliberadamente **não** tem índice único:
+    colide em três casos reais da baseline e não é identidade.
+    """
+
     __tablename__ = "animals"
-    __table_args__ = (Index("uq_animals_farm_identifier", "farm_id", "identifier", unique=True),)
+    __table_args__ = (
+        Index("uq_animals_farm_identifier", "farm_id", "identifier", unique=True),
+        Index(
+            "uq_animals_farm_brinco",
+            "farm_id",
+            "brinco",
+            unique=True,
+            postgresql_where=text("brinco IS NOT NULL"),
+        ),
+        Index(
+            "uq_animals_farm_legacy_id",
+            "farm_id",
+            "legacy_id",
+            unique=True,
+            postgresql_where=text("legacy_id IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(
         PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()")
@@ -88,7 +120,88 @@ class Animal(TimestampedModel, Base):
     farm_id: Mapped[UUID] = mapped_column(ForeignKey("farms.id", ondelete="RESTRICT"), nullable=False)
     identifier: Mapped[str] = mapped_column(String(128), nullable=False)
     name: Mapped[str | None] = mapped_column(String(255))
+    brinco: Mapped[str | None] = mapped_column(String(64))
+    brinco_origem: Mapped[str | None] = mapped_column(String(64))
+    legacy_id: Mapped[str | None] = mapped_column(String(64))
+    numero_legado: Mapped[str | None] = mapped_column(String(64))
+    situacao: Mapped[str | None] = mapped_column(String(32))
+    status: Mapped[str | None] = mapped_column(String(32))
+    ultimo_parto: Mapped[date | None] = mapped_column(Date)
+    nascimento: Mapped[date | None] = mapped_column(Date)
+    peso: Mapped[float | None] = mapped_column(Numeric(6, 2))
+    observacoes: Mapped[str | None] = mapped_column(Text)
     farm: Mapped[Farm] = relationship(back_populates="animals")
+    lot_assignments: Mapped[list[AnimalLotAssignment]] = relationship(
+        back_populates="animal"
+    )
+
+
+class AnimalLotAssignment(TimestampedModel, Base):
+    """Histórico de lotação.
+
+    A vaca muda de lote, e lote não é parte da identidade. Um lote novo não
+    sobrescreve o anterior: encerra a vigência do anterior e abre uma nova
+    linha, de modo que relatórios históricos não sejam reinterpretados com o
+    lote de hoje.
+    """
+
+    __tablename__ = "animal_lot_assignments"
+    __table_args__ = (
+        CheckConstraint(
+            "source IN ('legacy_baseline', 'import', 'manual')",
+            name="ck_animal_lot_assignments_source",
+        ),
+        CheckConstraint(
+            "valid_to IS NULL OR valid_to >= valid_from",
+            name="ck_animal_lot_assignments_period",
+        ),
+        Index(
+            "uq_animal_lot_assignments_current",
+            "animal_id",
+            unique=True,
+            postgresql_where=text("valid_to IS NULL"),
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()")
+    )
+    animal_id: Mapped[UUID] = mapped_column(
+        ForeignKey("animals.id", ondelete="CASCADE"), nullable=False
+    )
+    lote: Mapped[str] = mapped_column(String(64), nullable=False)
+    valid_from: Mapped[date] = mapped_column(Date, nullable=False)
+    valid_to: Mapped[date | None] = mapped_column(Date)
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_import_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("imports.id", ondelete="SET NULL")
+    )
+    reviewed_by: Mapped[str | None] = mapped_column(String(255))
+    animal: Mapped[Animal] = relationship(back_populates="lot_assignments")
+
+
+class BaselineImport(TimestampedModel, Base):
+    """Importação administrativa da baseline legada.
+
+    Existe para que uma medição histórica possa declarar honestamente de onde
+    veio, em vez de fabricar uma revisão de OCR que nunca aconteceu. O
+    ``source_sha256`` torna a migração verificável depois: dá para provar qual
+    versão exata do arquivo originou cada medição.
+    """
+
+    __tablename__ = "baseline_imports"
+
+    id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()")
+    )
+    farm_id: Mapped[UUID] = mapped_column(ForeignKey("farms.id", ondelete="RESTRICT"), nullable=False)
+    source_path: Mapped[str] = mapped_column(String(512), nullable=False)
+    source_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    animal_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    measurement_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    approved_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
 
 
 class Import(TimestampedModel, Base):
@@ -187,7 +300,24 @@ class OfficialMeasurement(TimestampedModel, Base):
     __table_args__ = (
         CheckConstraint("status IN ('active', 'superseded')", name="ck_official_measurements_status"),
         CheckConstraint(
-            "status <> 'active' OR (review_decision_id IS NOT NULL AND reviewed_by IS NOT NULL AND length(btrim(reviewed_by)) > 0)",
+            "provenance IN ('ocr_review', 'legacy_baseline')",
+            name="ck_official_measurements_provenance",
+        ),
+        # Toda medição ativa continua obrigada a ter proveniência rastreável e
+        # um responsável. O que muda em relação à versão anterior é que o
+        # sistema deixa de exigir uma revisão de OCR para dados que nunca
+        # passaram por OCR: uma medição da baseline declara que veio da
+        # baseline, em vez de fabricar uma ReviewDecision inexistente.
+        CheckConstraint(
+            "status <> 'active' OR ("
+            " (provenance = 'ocr_review'"
+            "  AND review_decision_id IS NOT NULL"
+            "  AND reviewed_by IS NOT NULL AND length(btrim(reviewed_by)) > 0)"
+            " OR"
+            " (provenance = 'legacy_baseline'"
+            "  AND baseline_import_id IS NOT NULL"
+            "  AND reviewed_by IS NOT NULL AND length(btrim(reviewed_by)) > 0)"
+            ")",
             name="ck_official_measurements_active_review_provenance",
         ),
         Index(
@@ -207,11 +337,18 @@ class OfficialMeasurement(TimestampedModel, Base):
     review_decision_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("review_decisions.id", ondelete="RESTRICT")
     )
+    baseline_import_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("baseline_imports.id", ondelete="RESTRICT")
+    )
     measured_on: Mapped[date] = mapped_column(Date, nullable=False)
     values: Mapped[dict[str, Any]] = mapped_column(
         JSONB, default=dict, server_default=text("'{}'::jsonb"), nullable=False
     )
     status: Mapped[str] = mapped_column(String(16), nullable=False)
+    provenance: Mapped[str] = mapped_column(
+        String(32), default="ocr_review", server_default=text("'ocr_review'"), nullable=False
+    )
+    lote_observado: Mapped[str | None] = mapped_column(String(64))
     reviewed_by: Mapped[str | None] = mapped_column(String(255))
 
 
