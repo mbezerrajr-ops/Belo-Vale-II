@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import re
+import unicodedata
 from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Mapping
@@ -68,6 +69,68 @@ def summarize_state(state: Mapping[str, Any]) -> StateSummary:
         supply_count=len(state.get("insumos", [])),
         user_count=len(state.get("usuarios", [])),
     )
+
+
+def _ascii_slug(value: str) -> str:
+    ascii_value = "".join(
+        character
+        for character in unicodedata.normalize("NFKD", value)
+        if not unicodedata.combining(character)
+    ).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]+", "-", ascii_value.lower()).strip("-")
+
+
+def repair_animal_ids(state: Mapping[str, Any]) -> dict[str, Any]:
+    repaired = copy.deepcopy(state)
+    animals = repaired.get("vacas", [])
+    raw_ids = [str(animal.get("id", "")).strip() for animal in animals]
+    counts = Counter(raw_ids)
+    target_indexes = [
+        index
+        for index, animal_id in enumerate(raw_ids)
+        if not animal_id or counts[animal_id] > 1
+    ]
+    occupied = {
+        animal_id
+        for animal_id in raw_ids
+        if animal_id and counts[animal_id] == 1
+    }
+
+    def identity(index: int) -> tuple[str, str, str, int]:
+        animal = animals[index]
+        return (
+            str(animal.get("brinco", "")),
+            str(animal.get("numero", "")),
+            str(animal.get("nome", "")),
+            index,
+        )
+
+    for index in sorted(target_indexes, key=identity):
+        animal = animals[index]
+        old_id = raw_ids[index]
+        business_identifier = str(
+            animal.get("brinco") or animal.get("numero") or ""
+        )
+        candidate = _ascii_slug(
+            "-".join(
+                part
+                for part in (
+                    old_id or "v",
+                    business_identifier,
+                    str(animal.get("nome", "")),
+                )
+                if part
+            )
+        ) or "v-animal"
+        unique_candidate = candidate
+        suffix = 2
+        while unique_candidate in occupied:
+            unique_candidate = f"{candidate}-{suffix}"
+            suffix += 1
+        animal["id"] = unique_candidate
+        occupied.add(unique_candidate)
+
+    return repaired
 
 
 def validate_state(
