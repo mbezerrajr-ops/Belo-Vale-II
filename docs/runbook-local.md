@@ -7,11 +7,42 @@ da raiz do repositório, salvo indicação contrária.
 ## Limite de integração com o legado
 
 A `main` histórica ainda é a POC baseada em HTML/JSON. Esta arquitetura nova
-fornece API, banco e frontend operacionais, mas **não migra os 272 animais nem
-seus dados históricos**. Portanto, integrar o código não é um cutover: os
+fornece API, banco e frontend operacionais, mas **não migra os 401 animais nem
+suas 152 medições da baseline canônica**. Portanto, integrar o código não é um cutover: os
 JSONs, planilhas e HTMLs legados permanecem necessários para uma futura
 migração e validação. PostgreSQL ainda não é a fonte definitiva dos dados
 históricos.
+
+## Validação da baseline legada
+
+Rode a partir da raiz do repositório. A fonte de verdade é
+`belo-vale-ii-projeto-completo/plataforma/state_canonical.json`; o HTML publicado e a
+projeção sem histórico são derivados.
+
+```powershell
+python -m unittest belo-vale-ii-projeto-completo/testes/test_state_contract.py -v
+python -m unittest belo-vale-ii-projeto-completo/testes/test_import_relatorio_animais.py -v
+python belo-vale-ii-projeto-completo/plataforma/build_platform_state.py validate --canonical belo-vale-ii-projeto-completo/plataforma/state_canonical.json
+```
+
+O resultado esperado da validação é 401 animais, 152 medições (107 em `2026-07-22` e 45
+em `2026-08-25`), zero erro estrutural e 30 avisos de negócio. Avisos não bloqueiam a
+geração e não alteram situação ou DEL automaticamente.
+
+Para regenerar os derivados depois de uma alteração canônica validada:
+
+```powershell
+python belo-vale-ii-projeto-completo/plataforma/build_platform_state.py generate --canonical belo-vale-ii-projeto-completo/plataforma/state_canonical.json --template belo-vale-ii-projeto-completo/plataforma/platform_ATUAL_template.html --published belo-vale-ii-projeto-completo/plataforma/platform_ATUAL_publicado.html --projection belo-vale-ii-projeto-completo/plataforma/state_dados_atuais.json
+```
+
+Para ler novamente o PDF, instale primeiro
+`belo-vale-ii-projeto-completo/plataforma/requirements-import.txt`. Execute o importador
+sem `--write` para simular e atualizar somente o relatório; use `--write` apenas após
+revisar a reconciliação. Em PowerShell, se o nome acentuado do PDF for corrompido pelo
+terminal, descubra o caminho com `Path.glob("REL*ANIMAIS.pdf")`, como faz o teste real.
+
+O PostgreSQL **ainda não recebeu esta baseline**. Não trate a execução dos comandos acima
+como migração ou cutover.
 
 ## 1. Configurar variáveis de ambiente
 

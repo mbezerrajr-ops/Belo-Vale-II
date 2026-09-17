@@ -1,0 +1,199 @@
+Registros no PDF: 260 | vacas na base antes: 401 | depois: 401
+Casadas com a base: 260 | novas cadastradas: 0
+Lote alterado: 0 | Data último parto alterada: 0
+
+--- Vacas da base que NÃO aparecem no relatório (mantidas, sem alteração): 141
+    204          ALINE                    lote=LOTE 1             situacao=Em lactação  leituras=0
+    612          CATARINA                 lote=LOTE 1             situacao=Em lactação  leituras=0
+    320          COCADA                   lote=LOTE 1             situacao=Em lactação  leituras=0
+    151          COTÓ                     lote=LOTE 1             situacao=Em lactação  leituras=0
+    175          FUSQUINHA                lote=LOTE 1             situacao=Em lactação  leituras=0
+    125          MARINGÁ                  lote=LOTE 1             situacao=Em lactação  leituras=0
+    530          PASSO PRETO              lote=LOTE 1             situacao=Em lactação  leituras=0
+    205          REVISTA                  lote=LOTE 1             situacao=Em lactação  leituras=0
+    338          ROSEIRA                  lote=LOTE 1             situacao=Em lactação  leituras=0
+    604          CARINHOSA                lote=LOTE 2             situacao=Em lactação  leituras=0
+    157          CIGANA                   lote=LOTE 2             situacao=Em lactação  leituras=0
+    361          ESTRELINHA               lote=LOTE 2             situacao=Em lactação  leituras=0
+    565          PANTERA                  lote=LOTE 2             situacao=Em lactação  leituras=0
+    474          SURUBIM                  lote=LOTE 2             situacao=Em lactação  leituras=0
+    35           ALIANÇA                  lote=                   situacao=Seca         leituras=0
+    595          ALVORADA                 lote=                   situacao=Seca         leituras=0
+    010 VERDE    AMAZONA                  lote=                   situacao=Seca         leituras=0
+    124          AMERICANA                lote=                   situacao=Seca         leituras=0
+    506          AMOROSA                  lote=                   situacao=Em lactação  leituras=0
+    154          APARECIDA                lote=                   situacao=Seca         leituras=0
+    407          APARECIDA DO ABREU       lote=                   situacao=Seca         leituras=0
+    440          ARIZONA                  lote=                   situacao=Em lactação  leituras=0
+    196          ASSUCENA                 lote=                   situacao=Seca         leituras=0
+    390          BAIANA                   lote=                   situacao=Em lactação  leituras=1
+    219          BANANEIRA                lote=                   situacao=Em lactação  leituras=0
+    621          BELEZA                   lote=                   situacao=Seca         leituras=0
+    132          BETANIA                  lote=                   situacao=Seca         leituras=0
+    461          BOA VISTA                lote=                   situacao=Em lactação  leituras=0
+    228          BOLACHA                  lote=                   situacao=Seca         leituras=0
+    19           BOLINHA                  lote=                   situacao=Seca         leituras=0
+    626          BOLINHA                  lote=                   situacao=Seca         leituras=0
+    005 VERDE    BORDADA                  lote=                   situacao=Em lactação  leituras=0
+    244          BRANQUINHA 2             lote=                   situacao=Seca         leituras=0
+    137          BRILHANTE                lote=                   situacao=Em lactação  leituras=0
+    143          BURGUESA                 lote=                   situacao=Seca         leituras=0
+    108          CABOQUINHA               lote=                   situacao=Em lactação  leituras=0
+    363          CACHORRINHA              lote=                   situacao=Seca         leituras=0
+    176          CAFOFINHA                lote=                   situacao=Em lactação  leituras=0
+    36           CAMBRAIA                 lote=                   situacao=Em lactação  leituras=0
+    570          CAMBRAIA                 lote=                   situacao=Em lactação  leituras=0
+    656          CANOA                    lote=                   situacao=Em lactação  leituras=0
+    501          CARETINHA                lote=                   situacao=Em lactação  leituras=0
+    155          CARINA                   lote=                   situacao=Em lactação  leituras=0
+    147          CARRAPETA                lote=                   situacao=Seca         leituras=0
+    258          CASA GRANDE              lote=                   situacao=Em lactação  leituras=0
+    499          CHARMOZA                 lote=                   situacao=Seca         leituras=0
+    238          CHUVINHA DO ABREU        lote=                   situacao=Seca         leituras=0
+    77           CHUVISCADA               lote=                   situacao=Em lactação  leituras=0
+    628          CODORNA                  lote=                   situacao=Seca         leituras=0
+    509          CONDEÇA                  lote=                   situacao=Seca         leituras=0
+    435          CONFIANÇA                lote=                   situacao=Em lactação  leituras=0
+    84           CORAÇÃO                  lote=                   situacao=Seca         leituras=0
+    221          CORAÇÃO DO ABREU         lote=                   situacao=Seca         leituras=0
+    397          CORUJA                   lote=                   situacao=Em lactação  leituras=0
+    618          CRAUNA                   lote=                   situacao=Em lactação  leituras=0
+    166          CRAUNINHA                lote=                   situacao=Em lactação  leituras=0
+    061 VERDE    CRIOLA                   lote=                   situacao=Seca         leituras=0
+    13           CURIÓ                    lote=                   situacao=Em lactação  leituras=0
+    543          DOLORES                  lote=                   situacao=Seca         leituras=0
+    46           ESMERALDA                lote=                   situacao=Em lactação  leituras=0
+    78           ESPERANÇA                lote=                   situacao=Seca         leituras=0
+    490          ESPERANÇA 3              lote=                   situacao=Seca         leituras=0
+    009 VERMELHO FAÍSCA                   lote=                   situacao=Em lactação  leituras=0
+    387          FANTASMA                 lote=                   situacao=Em lactação  leituras=0
+    129          FANTAZIA                 lote=                   situacao=Seca         leituras=0
+    392          FILEPA                   lote=                   situacao=Em lactação  leituras=0
+    237          FORTALEZA                lote=                   situacao=Em lactação  leituras=0
+    427          FUMAÇA ABREU             lote=                   situacao=Seca         leituras=0
+    186          GAIVOTA                  lote=                   situacao=Seca         leituras=0
+    242          GALEGA                   lote=                   situacao=Em lactação  leituras=0
+    184          GIRAFA                   lote=                   situacao=Seca         leituras=0
+    009 VERDE    GIRAFA 2                 lote=                   situacao=Seca         leituras=0
+    2            GIRASSOL                 lote=                   situacao=Em lactação  leituras=0
+    507 AMARELO  GUINÉ                    lote=                   situacao=Em lactação  leituras=0
+    438          INJEITADA                lote=                   situacao=Seca         leituras=0
+    391          JADI                     lote=                   situacao=Seca         leituras=0
+    534          JANDAÍRA                 lote=                   situacao=Seca         leituras=0
+    675          JANGADA                  lote=                   situacao=Em lactação  leituras=0
+    220          JARDINEIRA               lote=                   situacao=Seca         leituras=0
+    556          JURITI                   lote=                   situacao=Em lactação  leituras=0
+    249 (BV1)    LAVANDEIRA               lote=                   situacao=Em lactação  leituras=0
+    18           LULÚ                     lote=LOTE 1             situacao=Em lactação  leituras=0
+    702          MAÇA                     lote=                   situacao=Seca         leituras=0
+    386          MADALENA                 lote=                   situacao=Em lactação  leituras=0
+    411          MADRUGADA                lote=                   situacao=Em lactação  leituras=0
+    579          MAGRELA                  lote=                   situacao=Seca         leituras=0
+    568          MALHADA                  lote=                   situacao=Seca         leituras=0
+                 MALHADINHA               lote=                   situacao=Seca         leituras=0
+    114          MANCINHA                 lote=                   situacao=Em lactação  leituras=0
+    120          MARIA BRAGA              lote=                   situacao=Seca         leituras=0
+    265          MAROMBA                  lote=                   situacao=Em lactação  leituras=0
+    686          MEDALHA                  lote=                   situacao=Seca         leituras=0
+    229          MEIOTA                   lote=                   situacao=Em lactação  leituras=0
+    245          MERCEDES                 lote=                   situacao=Em lactação  leituras=0
+    019 AZUL     MIUDA                    lote=                   situacao=Seca         leituras=0
+    181          MIUDINHA                 lote=                   situacao=Seca         leituras=0
+    62           MOEDA                    lote=                   situacao=Seca         leituras=0
+    17           MOEDA ABREU              lote=                   situacao=Seca         leituras=0
+    571          MORGANA                  lote=                   situacao=Em lactação  leituras=0
+    372          MULATA                   lote=                   situacao=Seca         leituras=1
+    635          NEBLINA                  lote=                   situacao=Seca         leituras=0
+    259          NEGONA                   lote=                   situacao=Seca         leituras=0
+    63           NOBREZA                  lote=                   situacao=Seca         leituras=0
+    529          NOCA                     lote=                   situacao=Em lactação  leituras=0
+    001 VERM.    NOVENTA E NOVE           lote=                   situacao=Seca         leituras=0
+    96           PALOMA                   lote=                   situacao=Seca         leituras=0
+    064 VERDE    PASSO PRETO              lote=                   situacao=Seca         leituras=0
+    88           PASSO PRETO              lote=                   situacao=Seca         leituras=0
+    30           PATURY                   lote=                   situacao=Em lactação  leituras=0
+    56           PEBINHA                  lote=                   situacao=Seca         leituras=0
+    418          PENSAMENTO               lote=                   situacao=Seca         leituras=0
+    104          PIEDADE                  lote=                   situacao=Seca         leituras=0
+    561          PINGO DE OURO            lote=                   situacao=Em lactação  leituras=0
+    79           PINTADINHA               lote=                   situacao=Seca         leituras=0
+    346          PONTA FINA               lote=                   situacao=Em lactação  leituras=0
+    346          PONTA FINA DO ABREU      lote=                   situacao=Seca         leituras=0
+    526          RENATINHA                lote=                   situacao=Em lactação  leituras=0
+    48           ROXINÓ                   lote=                   situacao=Em lactação  leituras=0
+    542          SAFIRA                   lote=                   situacao=Em lactação  leituras=0
+    257          SALOMÉ                   lote=                   situacao=Seca         leituras=0
+    594          SAMANTA                  lote=                   situacao=Em lactação  leituras=0
+    415          SARDINHA                 lote=                   situacao=Seca         leituras=0
+    128          SEREIA                   lote=                   situacao=Em lactação  leituras=1
+    034 VERDE    SIRI                     lote=                   situacao=Seca         leituras=0
+    436          SUCESSO                  lote=                   situacao=Em lactação  leituras=0
+    503          TAPERA                   lote=                   situacao=Em lactação  leituras=0
+    319          TETEU                    lote=                   situacao=Em lactação  leituras=0
+    10           TIETA                    lote=                   situacao=Em lactação  leituras=0
+    174          TRISTEZA                 lote=                   situacao=Em lactação  leituras=0
+    43           VIANA                    lote=                   situacao=Em lactação  leituras=0
+    409          VIOLA                    lote=                   situacao=Em lactação  leituras=0
+    404          VITÓRIA                  lote=                   situacao=Em lactação  leituras=0
+    123          XAXÁ                     lote=                   situacao=Seca         leituras=0
+    498          Meias Branca             lote=LOTE 1             situacao=Em lactação  leituras=1
+    682          Rainha                   lote=LOTE 1             situacao=Em lactação  leituras=0
+    141          Fumaca                   lote=LOTE 3             situacao=Em lactação  leituras=0
+    519          Branquinha               lote=LOTE 2             situacao=Em lactação  leituras=1
+    133          Bruna                    lote=LOTE 2             situacao=Em lactação  leituras=0
+    862          Saia Branca              lote=LOTE 2             situacao=Em lactação  leituras=1
+    508          Princesa                 lote=LOTE 1             situacao=Em lactação  leituras=0
+    666          Schuma                   lote=LOTE 1             situacao=Em lactação  leituras=0
+
+--- Nome diverge entre relatório e base (nome da base foi mantido): 13
+    brinco 432      pdf=Carolina             base=432/KAROLINA
+    brinco 434      pdf=FAISCA DO ABREU      base=434/FAÍSCA
+    brinco 448      pdf=MEIAS BRANCAS        base=448/MEIAS BRANCA
+    brinco 701      pdf=Pequena              base=701/PIQUENA
+    brinco 733      pdf=Crauna               base=733/Pauna
+    brinco 779      pdf=GESSICA              base=779/GÉSSIKA
+    brinco 967      pdf=MALHADA              base=967/Machada
+    brinco 981      pdf=CONDESA              base=981/Condessa
+    brinco 1008     pdf=DENGOSA              base=1008/CABELO DE FOGO
+    brinco 1013     pdf=CODORNA              base=1013/Boemia
+    brinco B1-263   pdf=ESPERANÇA II ABREU   base=263 ABREU/ESPERANÇA
+    brinco B2-512   pdf=Asa Negra            base=512/AZA NEGRA
+    brinco B2-523   pdf=BARONESA             base=523/BARONEZA
+
+--- Avisos DEL/situação: 30
+    id=v523                     numero=523          brinco=B2-523       nome=BARONEZA                 situacao=Em lactação DEL=vazio
+    id=v1008                    numero=1008         brinco=1008         nome=CABELO DE FOGO           situacao=Em lactação DEL=vazio
+    id=v441                     numero=441          brinco=441          nome=FUMAÇA                   situacao=Em lactação DEL=vazio
+    id=v40                      numero=40           brinco=040          nome=MANHOSA                  situacao=Em lactação DEL=vazio
+    id=v573                     numero=573          brinco=B2-573       nome=MAYARA                   situacao=Em lactação DEL=vazio
+    id=v598                     numero=598          brinco=B2-598       nome=OURO FINO                situacao=Em lactação DEL=vazio
+    id=v442                     numero=442          brinco=442          nome=OVELHINHA                situacao=Em lactação DEL=vazio
+    id=v497                     numero=497          brinco=497          nome=PONTA CURTA              situacao=Em lactação DEL=vazio
+    id=v406                     numero=406          brinco=406          nome=QUARTINHA                situacao=Em lactação DEL=vazio
+    id=v226                     numero=226          brinco=B1-226       nome=TRISTEZA 2               situacao=Em lactação DEL=vazio
+    id=v419                     numero=419          brinco=B2-419       nome=VIAJANTE                 situacao=Em lactação DEL=vazio
+    id=v511                     numero=511          brinco=B2-511       nome=XEXEU                    situacao=Em lactação DEL=vazio
+    id=v1                       numero=1            brinco=B1-001       nome=XUXA                     situacao=Em lactação DEL=vazio
+    id=v654                     numero=654          brinco=B2-654       nome=BELINHA                  situacao=Em lactação DEL=vazio
+    id=v16                      numero=16           brinco=B2-016       nome=BELMONTE                 situacao=Em lactação DEL=vazio
+    id=v689                     numero=689          brinco=B2-689       nome=BRASILEIRA               situacao=Em lactação DEL=vazio
+    id=v11                      numero=11           brinco=B2-11        nome=DOMINÓ                   situacao=Em lactação DEL=vazio
+    id=v633                     numero=633          brinco=B2-633       nome=GIGANTE                  situacao=Em lactação DEL=vazio
+    id=v854                     numero=854          brinco=854          nome=MARAVILHA                situacao=Em lactação DEL=vazio
+    id=v657                     numero=657          brinco=B2-657       nome=MAROCA                   situacao=Em lactação DEL=vazio
+    id=v678                     numero=678          brinco=B2-678       nome=MEIA LUA                 situacao=Em lactação DEL=vazio
+    id=v701                     numero=701          brinco=701          nome=PIQUENA                  situacao=Em lactação DEL=vazio
+    id=v853                     numero=853          brinco=853          nome=PRETINHA                 situacao=Em lactação DEL=vazio
+    id=v547                     numero=547          brinco=547          nome=REBECA                   situacao=Em lactação DEL=vazio
+    id=v671                     numero=671          brinco=B2-671       nome=SERTANEJA                situacao=Em lactação DEL=vazio
+    id=v567                     numero=567          brinco=B2-567       nome=SUZANA                   situacao=Em lactação DEL=vazio
+    id=v516                     numero=516          brinco=B1-516       nome=ALAGOANA                 situacao=Em lactação DEL=vazio
+    id=v26                      numero=26           brinco=026          nome=AMANDA                   situacao=Em lactação DEL=vazio
+    id=v577                     numero=577          brinco=B2-577       nome=BALIZA                   situacao=Em lactação DEL=vazio
+    id=v879                     numero=879          brinco=879          nome=Medalha                  situacao=Em lactação DEL=vazio
+
+--- Ambíguas (não atualizadas): 0
+
+--- Alterações aplicadas: 0
+
+Vacas com histórico de leite: 114 | leituras totais: 152

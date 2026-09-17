@@ -9,17 +9,33 @@ https://claude.ai/code/artifact/2f0720ab-cd19-48da-8344-a6ecdc86c81c
 Login de acesso: e-mail `mbezerrajr@gmail.com`, senha `belovale2026` (Administrador).
 
 **ATENÇÃO — segurança:** este ZIP contém, em texto puro, as credenciais de login da
-plataforma (aba Usuários) e os dados reais do rebanho (272 vacas, produção, custos).
+plataforma (aba Usuários) e os dados reais do rebanho (401 animais, produção, custos).
 Trate como confidencial. Se for subir para o GitHub, use um repositório **privado**.
 
 ---
+
+## Baseline legada atual
+
+A fonte de verdade versionada é `plataforma/state_canonical.json`: **401 animais**,
+**152 medições** (107 em `2026-07-22` e 45 em `2026-08-25`), 4 insumos e 2 usuários.
+O HTML publicado e `state_dados_atuais.json` são derivados e não devem ser editados como
+fontes independentes.
+
+```powershell
+python plataforma/build_platform_state.py validate --canonical plataforma/state_canonical.json
+python plataforma/build_platform_state.py generate --canonical plataforma/state_canonical.json --template plataforma/platform_ATUAL_template.html --published plataforma/platform_ATUAL_publicado.html --projection plataforma/state_dados_atuais.json
+```
+
+Esses comandos validam antes da escrita e substituem os derivados atomicamente. Essa
+baseline ainda não foi migrada para o PostgreSQL da aplicação nova.
 
 ## Estrutura das pastas
 
 ### `plataforma/`
 O código-fonte da aplicação (HTML + CSS + JS em arquivo único, sem build step).
 
-- **`platform_ATUAL_template.html`** — **fonte da versão atual em produção.** Template com
+- **`state_canonical.json`** — **fonte de verdade versionada**, incluindo históricos.
+- **`platform_ATUAL_template.html`** — template de código da versão atual, com
   o placeholder `__STATE_JSON__` no lugar dos dados. Arquitetura: um objeto `state`
   (vacas/insumos/usuários/preço do leite) guardado num `<script id="state-data"
   type="application/json">`, renderizado inteiramente via JS, e salvo de volta via
@@ -28,23 +44,35 @@ O código-fonte da aplicação (HTML + CSS + JS em arquivo único, sem build ste
 - **`platform_ATUAL_publicado.html`** — o HTML final já com os dados injetados (o que foi
   de fato publicado no artefato acima, num dado momento — os dados no artefato ao vivo podem
   ter mudado desde então pelas edições feitas por quem usa a plataforma).
-- **`state_dados_atuais.json`** / **`state_inicial.json`** — o objeto de estado
-  (vacas/insumos/usuários) em JSON puro, para inspecionar ou reprocessar os dados sem abrir o HTML.
+- **`state_dados_atuais.json`** — projeção derivada sem o histórico por animal.
+  `state_inicial.json` é histórico e nenhum dos dois substitui o canônico.
+- **`build_platform_state.py`** — valida e gera atomicamente o HTML e a projeção.
 - **`v1_*.html`, `vacas_rows.html`, `insumos_rows.html`, `insumos_hist_rows.html`** —
   primeira versão da plataforma (arquitetura antiga de sincronização direta no DOM, sem
   login com múltiplos perfis, sem impressão). Mantida como histórico/referência.
 - **`dashboard*.html`, `full*.html`** — versões anteriores, só do painel (dashboard), antes
   de virar plataforma com login e cadastros.
 - **`gen_dashboard.py`** — script Python usado para gerar as versões antigas do dashboard.
+- **`import_relatorio_animais.py`** — importa o PDF "RELATÓRIO DE TODOS ANIMAIS"
+  (`docs/`) para dentro do estado: atualiza **Lote**, **Data do último parto** e **DEL** das
+  vacas já cadastradas, cadastra as que faltam e preserva o histórico de medições de leite.
+  A leitura de PDF requer `pip install -r plataforma/requirements-import.txt`. Sem
+  `--write`, simula e atualiza somente o relatório; com `--write`, valida e grava o canônico. Gera
+  `import_relatorio_animais_ultimo_relatorio.txt` com tudo que mudou, o que não casou e o
+  que ficou ambíguo. Rodar duas vezes seguidas não duplica nada.
+- **`vendor/`** — pdf.js e SheetJS servidos junto com a plataforma (o Artifact bloqueia CDN
+  externo). Ver `vendor/README.md`.
 
-Para gerar um novo `platform_ATUAL_publicado.html` a partir do template com dados
-atualizados: substituir a string `__STATE_JSON__` em `platform_ATUAL_template.html` pelo
-JSON do estado desejado (ver os scripts de build usados nas pastas `testes/` como exemplo).
+Use exclusivamente os comandos da seção "Baseline legada atual" para validar e gerar.
 
 ### `dados/`
 Os dados do rebanho em diferentes estágios de processamento.
 
-- **`cows_full_DADOS_ATUAIS.json`** — **fonte de dados definitiva.** 272 vacas, cada uma com
+> Estes arquivos refletem o rebanho histórico de julho/2026 (272 vacas). A baseline atual
+> de 401 animais está em `plataforma/state_canonical.json`; a projeção e o bloco
+> `state-data` são derivados dela.
+
+- **`cows_full_DADOS_ATUAIS.json`** — fonte histórica de 272 vacas, cada uma com
   `id, nome, sit (VL/VS), lote, parto, av (produção do dia 22/07/2026), fase (estágio DEL),
   media_historica, n_medicoes, ultima_medicao`.
 - **`cows_final.json`, `cows_with_avg.json`, `cows_compact.json`** — estágios intermediários
@@ -79,13 +107,12 @@ fotografadas de controle de produção.
 - **`fotos_medicoes/`** — as 5 fotos originais das fichas de controle diário (lotes 1, 2 e 3)
   usadas na transcrição acima.
 
-**Pendência conhecida:** as vacas "PONTA CURTA" (nº 497) e "GIGANTE" (nº 633) foram
-resolvidas manualmente na aba REVISAR, mas o valor de produção do dia 22/07 delas nunca foi
-propagado para a coluna AV — vale conferir com quem fez a medição original.
+As vacas **PONTA CURTA** (nº 497) e **GIGANTE** (nº 633) já possuem leituras de
+`2026-07-22` na baseline canônica. Planilhas históricas podem continuar sem esses valores.
 
 ### `testes/`
-Scripts Python (Playwright + Chromium headless) usados para testar a plataforma antes de
-cada publicação — login, navegação entre abas, edição de campos, ciclo dos selos
+Testes Python de contrato/importação e regressões Playwright usados antes de cada
+publicação — invariantes, idempotência, login, navegação, edição de campos, ciclo dos selos
 (Lote/Situação/Status), seleção em massa, geração da área de impressão, modo escuro, etc.
 Não fazem parte do produto final; documentam como cada mudança foi validada.
 
@@ -112,6 +139,16 @@ não o estado atual necessariamente.
   própria página, com CSS `@media print` isolando só essa área, e o usuário aciona a
   impressão manualmente via **Ctrl+P / Cmd+P** (atalho de teclado do navegador, que não
   passa pelo mesmo bloqueio de sandbox).
+- **Lote é o grupo de manejo, mas só 1/2/3 têm dieta.** Além de LOTE 1/2/3, o campo `lote`
+  aceita os grupos do relatório da fazenda (PRÉ-PARTO, PIQUETES / REPASSE, ENGORDA,
+  ENGENHO, INSERLEITE, BEZERREIRO, CAJARANAS, PALMA, COLÉGIO, ABREU). Custo/dia, dieta e os
+  gráficos financeiros continuam calculados só sobre `LOTES_DIETA` (os lotes 1/2/3, os
+  únicos com dieta cadastrada); produção por lote e a tabela por lote mostram todos os
+  grupos que têm animais. Com 13 valores, o selo de ciclo do lote virou um `select`.
+- **DEL é derivado, não digitado.** O campo `del` (dias em lactação) guarda o valor do
+  relatório, mas é recalculado como `hoje − parto` a cada abertura da página e a cada
+  mudança da data de parto — então não envelhece. Fica vazio para animal sem DEL no
+  relatório (seco, pré-parto, piquete, recria).
 - **Dados reais, não fictícios.** Os 3 lotes (LOTE 1/2/3), os 4 insumos (Concentrado,
   Caroço, Silagem, Casca de Mandioca) com preços e dietas reais, e o preço do leite
   (R$ 2,59/L) vêm da planilha e das conversas — nada foi inventado como placeholder.
