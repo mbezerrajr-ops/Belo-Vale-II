@@ -1,0 +1,2375 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Conflitos de reconciliação manual — Belo Vale II</title>
+  <style>
+    :root {
+      --ink: #18342b;
+      --muted: #5e6f68;
+      --green: #285e4a;
+      --green-soft: #e9f2ed;
+      --cream: #f8f5ed;
+      --amber: #a76413;
+      --amber-soft: #fff1d8;
+      --red: #9c382e;
+      --red-soft: #fbe8e5;
+      --line: #cbd7d1;
+      --white: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    @page {
+      size: A4;
+      margin: 14mm 12mm 16mm;
+    }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--white);
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 9.4pt;
+      line-height: 1.42;
+    }
+    h1, h2, h3 { break-after: avoid; color: var(--ink); }
+    h1 { margin: 0; font-size: 26pt; line-height: 1.08; }
+    h2 {
+      margin: 0 0 4mm;
+      padding-bottom: 2mm;
+      border-bottom: 2px solid var(--green);
+      font-size: 17pt;
+    }
+    h3 { margin: 5mm 0 2mm; font-size: 12pt; }
+    p { margin: 0 0 3mm; }
+    ul, ol { margin: 2mm 0 4mm; padding-left: 6mm; }
+    li { margin-bottom: 1.5mm; }
+    .cover {
+      min-height: 267mm;
+      padding: 16mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: var(--white);
+      background:
+        linear-gradient(150deg, rgba(18, 57, 44, .97), rgba(43, 99, 76, .94)),
+        radial-gradient(circle at top right, #82a78f, transparent 45%);
+      break-after: page;
+    }
+    .cover .eyebrow {
+      font-size: 10pt;
+      font-weight: 700;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: #cce2d6;
+    }
+    .cover h1 { max-width: 150mm; color: var(--white); }
+    .cover .subtitle {
+      max-width: 145mm;
+      margin-top: 8mm;
+      font-size: 14pt;
+      color: #e5f0e9;
+    }
+    .cover-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 3mm;
+      margin-top: 12mm;
+    }
+    .cover-stat {
+      padding: 5mm;
+      border: 1px solid rgba(255,255,255,.3);
+      border-radius: 3mm;
+      background: rgba(255,255,255,.08);
+    }
+    .cover-stat strong { display: block; font-size: 22pt; }
+    .cover-meta {
+      padding-top: 5mm;
+      border-top: 1px solid rgba(255,255,255,.35);
+      font-size: 9pt;
+      color: #d8e8df;
+    }
+    .page { break-before: page; }
+    .section { padding: 2mm 0; }
+    .lead {
+      margin-bottom: 5mm;
+      font-size: 11pt;
+      color: #344e44;
+    }
+    .callout {
+      margin: 4mm 0;
+      padding: 4mm 5mm;
+      border-left: 4px solid var(--green);
+      border-radius: 1.5mm;
+      background: var(--green-soft);
+    }
+    .callout.warning { border-color: var(--amber); background: var(--amber-soft); }
+    .callout.danger { border-color: var(--red); background: var(--red-soft); }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 3mm;
+      margin: 5mm 0;
+    }
+    .summary-card {
+      min-height: 32mm;
+      padding: 4mm;
+      border: 1px solid var(--line);
+      border-radius: 2mm;
+      background: var(--cream);
+    }
+    .summary-card strong {
+      display: block;
+      margin-bottom: 1mm;
+      font-size: 20pt;
+      color: var(--green);
+    }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 2mm;
+      margin: 5mm 0;
+    }
+    .flow div {
+      position: relative;
+      padding: 4mm 3mm;
+      border-radius: 2mm;
+      color: var(--white);
+      background: var(--green);
+      text-align: center;
+      font-weight: 700;
+    }
+    .flow div:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      right: -4mm;
+      top: 30%;
+      z-index: 2;
+      color: var(--green);
+      font-size: 16pt;
+    }
+    table {
+      width: 100%;
+      margin: 3mm 0 5mm;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 8.2pt;
+    }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; }
+    th {
+      padding: 2.2mm;
+      border: 1px solid var(--green);
+      color: var(--white);
+      background: var(--green);
+      text-align: left;
+      font-size: 8pt;
+    }
+    td {
+      min-height: 8mm;
+      padding: 2mm;
+      border: 1px solid var(--line);
+      vertical-align: top;
+    }
+    tbody tr:nth-child(even) { background: #f6f9f7; }
+    .check { width: 8mm; text-align: center; font-size: 13pt; }
+    .write-cell { height: 13mm; color: #50635b; }
+    .decision { min-width: 60mm; font-size: 7.6pt; }
+    .risk-row { background: var(--red-soft) !important; }
+    .tag {
+      display: inline-block;
+      margin-right: 2mm;
+      padding: 1mm 2mm;
+      border-radius: 1mm;
+      background: var(--green-soft);
+      color: var(--green);
+      font-weight: 700;
+    }
+    .small { font-size: 8pt; color: var(--muted); }
+    .signoff {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8mm;
+      margin-top: 14mm;
+    }
+    .sign-line { padding-top: 12mm; border-bottom: 1px solid var(--ink); }
+    .footer-note {
+      margin-top: 6mm;
+      padding-top: 3mm;
+      border-top: 1px solid var(--line);
+      font-size: 7.8pt;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div>
+      <div class="eyebrow">Belo Vale II · Controle de qualidade de dados</div>
+      <h1>Conflitos de reconciliação para conferência manual</h1>
+      <p class="subtitle">
+        Guia operacional para validar cadastros antes da migração da baseline legada
+        para o PostgreSQL.
+      </p>
+      <div class="cover-grid">
+        <div class="cover-stat"><strong>30</strong>animais em lactação com DEL vazio</div>
+        <div class="cover-stat"><strong>13</strong>divergências de nome por brinco</div>
+        <div class="cover-stat"><strong>27</strong>possíveis duplicidades por nome</div>
+        <div class="cover-stat"><strong>141</strong>animais ausentes no PDF recente</div>
+      </div>
+    </div>
+    <div class="cover-meta">
+      <strong>Versão 1.0 · 17/09/2026</strong><br>
+      Baseline: 401 animais · PDF: 260 registros · 260 correspondências por identificador<br>
+      Estado analisado: <code>state_canonical.json</code>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>1. Objetivo e limite deste relatório</h2>
+    <p class="lead">
+      Este documento organiza os casos em que o sistema não possui evidência suficiente
+      para tomar uma decisão sozinho. Ele serve como roteiro de conferência, não como
+      autorização para alterar, excluir ou fundir cadastros.
+    </p>
+    <div class="summary-grid">
+      <div class="summary-card"><strong>401</strong>animais preservados na baseline canônica</div>
+      <div class="summary-card"><strong>152</strong>leituras de leite preservadas</div>
+      <div class="summary-card"><strong>0</strong>cadastros criados automaticamente nesta reconciliação</div>
+      <div class="summary-card"><strong>0</strong>alterações automáticas de lote ou último parto</div>
+    </div>
+    <div class="callout danger">
+      <strong>Regra de segurança:</strong> não apagar, fundir, renomear, trocar situação
+      nem preencher DEL apenas por semelhança de nome. Toda decisão precisa registrar
+      fonte, responsável e data.
+    </div>
+
+    <h3>Como os conflitos aconteceram</h3>
+    <p>
+      O PDF recente foi comparado com a base legada. Quando existe um brinco compatível,
+      ele é usado como identificador principal. O nome funciona apenas como sinal de
+      conferência: grafias podem variar e nomes podem se repetir. Animais que não aparecem
+      no PDF continuam preservados porque ausência não comprova venda, descarte, óbito ou
+      duplicidade.
+    </p>
+    <div class="flow">
+      <div>1. Localizar evidência</div>
+      <div>2. Confirmar identidade</div>
+      <div>3. Registrar decisão</div>
+      <div>4. Revisar antes de aplicar</div>
+    </div>
+
+    <h3>Evidências recomendadas</h3>
+    <ol>
+      <li><strong>Primária:</strong> brinco físico ou registro oficial equivalente.</li>
+      <li><strong>Secundária:</strong> ficha individual, histórico reprodutivo, foto identificada,
+        registro de compra/venda ou confirmação do responsável pelo rebanho.</li>
+      <li><strong>Auditoria:</strong> anotar a fonte usada, a decisão, a data e quem conferiu.</li>
+    </ol>
+    <div class="callout warning">
+      Nome igual, sozinho, não comprova identidade. Para fusão ou exclusão, use o brinco
+      e pelo menos mais uma evidência independente.
+    </div>
+  </section>
+
+  <section class="page section">
+    <h2>2. Ordem recomendada de resolução</h2>
+    <table>
+      <thead><tr><th style="width:13mm">Ordem</th><th>Grupo</th><th>Risco</th><th>Decisão esperada</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>13 nomes divergentes</td><td>Identidade incorreta</td><td>Confirmar o nome oficial sem trocar o vínculo do brinco.</td></tr>
+        <tr><td>2</td><td>30 DEL vazios</td><td>Indicador reprodutivo inconsistente</td><td>Confirmar último parto ou corrigir situação com evidência.</td></tr>
+        <tr><td>3</td><td>27 pares candidatos</td><td>Duplicidade ou fusão indevida</td><td>Marcar “mesmo animal” somente com duas evidências.</td></tr>
+        <tr><td>4</td><td>141 ausentes do PDF</td><td>Exclusão indevida de histórico</td><td>Classificar destino; preservar cadastro e histórico.</td></tr>
+      </tbody>
+    </table>
+    <h3>Critério de encerramento</h3>
+    <p>
+      Um item só está resolvido quando a decisão é inequívoca, possui evidência registrada
+      e foi revisada por outra pessoa. Caso contrário, deve permanecer como
+      <span class="tag">PENDENTE</span>.
+    </p>
+    <h3>Como aplicar as decisões</h3>
+    <ul>
+      <li>Faça uma cópia da baseline antes de qualquer alteração.</li>
+      <li>Aplique mudanças em lote somente após concluir e revisar a planilha de decisões.</li>
+      <li>Valide identificadores únicos e totais de animais e medições depois da alteração.</li>
+      <li>Guarde este relatório preenchido como evidência do processo.</li>
+    </ul>
+    <div class="callout">
+      <strong>Princípio:</strong> em dúvida, preservar. É mais seguro manter um cadastro
+      pendente do que apagar ou fundir históricos que depois não possam ser reconstruídos.
+    </div>
+  </section>
+
+  <section class="page section">
+    <h2>3. Divergências de nome — 13 casos</h2>
+    <p class="lead">
+      O brinco encontrou um registro, mas o nome do PDF difere do nome da base. Confirme
+      a grafia oficial e registre a evidência. O nome da base foi mantido até essa decisão.
+    </p>
+    <table>
+      <thead>
+        <tr><th class="check">OK</th><th style="width:19mm">Brinco</th><th>Nome no PDF</th><th>Nome atual na base</th><th style="width:66mm">Conferência</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="check">☐</td>
+          <td>432</td>
+          <td>Carolina</td>
+          <td>432 / KAROLINA</td>
+          <td class="write-cell">Nome confirmado: ____________________<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>434</td>
+          <td>FAISCA DO ABREU</td>
+          <td>434 / FAÍSCA</td>
+          <td class="write-cell">Nome confirmado: ____________________<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>448</td>
+          <td>MEIAS BRANCAS</td>
+          <td>448 / MEIAS BRANCA</td>
+          <td class="write-cell">Nome confirmado: ____________________<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>701</td>
+          <td>Pequena</td>
+          <td>701 / PIQUENA</td>
+          <td class="write-cell">Nome confirmado: ____________________<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>733</td>
+          <td>Crauna</td>
+          <td>733 / Pauna</td>
+          <td class="write-cell">Nome confirmado: ____________________<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>779</td>
+          <td>GESSICA</td>
+          <td>779 / GÉSSIKA</td>
+          <td class="write-cell">Nome confirmado: ____________________<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>967</td>
+          <td>MALHADA</td>
+          <td>967 / Machada</td>
+          <td class="write-cell">Nome confirmado: ____________________<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>981</td>
+          <td>CONDESA</td>
+          <td>981 / Condessa</td>
+          <td class="write-cell">Nome confirmado: ____________________<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>1008</td>
+          <td>DENGOSA</td>
+          <td>1008 / CABELO DE FOGO</td>
+          <td class="write-cell">Nome confirmado: ____________________<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>1013</td>
+          <td>CODORNA</td>
+          <td>1013 / Boemia</td>
+          <td class="write-cell">Nome confirmado: ____________________<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B1-263</td>
+          <td>ESPERANÇA II ABREU</td>
+          <td>263 ABREU / ESPERANÇA</td>
+          <td class="write-cell">Nome confirmado: ____________________<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-512</td>
+          <td>Asa Negra</td>
+          <td>512 / AZA NEGRA</td>
+          <td class="write-cell">Nome confirmado: ____________________<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-523</td>
+          <td>BARONESA</td>
+          <td>523 / BARONEZA</td>
+          <td class="write-cell">Nome confirmado: ____________________<br>Evidência: ________________________</td>
+        </tr></tbody>
+    </table>
+    <div class="callout danger">
+      <strong>Prioridade alta:</strong> DENGOSA/CABELO DE FOGO, CODORNA/BOEMIA,
+      MALHADA/MACHADA e CRAUNA/PAUNA não parecem apenas variações ortográficas.
+    </div>
+  </section>
+
+  <section class="page section">
+    <h2>4. DEL vazio em animais em lactação — 30 casos</h2>
+    <p class="lead">
+      Esses animais têm brinco e estão marcados como “Em lactação”, mas não possuem DEL.
+      Verifique a data do último parto. Se não houve parto compatível, confirme se a situação
+      está errada; não invente um DEL apenas para eliminar o alerta.
+    </p>
+    <table>
+      <thead>
+        <tr><th class="check">OK</th><th style="width:18mm">Brinco</th><th style="width:15mm">Número</th><th>Animal</th><th style="width:24mm">Situação</th><th style="width:67mm">Conferência</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-523</td>
+          <td>523</td>
+          <td>BARONEZA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>1008</td>
+          <td>1008</td>
+          <td>CABELO DE FOGO</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>441</td>
+          <td>441</td>
+          <td>FUMAÇA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>040</td>
+          <td>40</td>
+          <td>MANHOSA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-573</td>
+          <td>573</td>
+          <td>MAYARA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-598</td>
+          <td>598</td>
+          <td>OURO FINO</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>442</td>
+          <td>442</td>
+          <td>OVELHINHA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>497</td>
+          <td>497</td>
+          <td>PONTA CURTA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>406</td>
+          <td>406</td>
+          <td>QUARTINHA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B1-226</td>
+          <td>226</td>
+          <td>TRISTEZA 2</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-419</td>
+          <td>419</td>
+          <td>VIAJANTE</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-511</td>
+          <td>511</td>
+          <td>XEXEU</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B1-001</td>
+          <td>1</td>
+          <td>XUXA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-654</td>
+          <td>654</td>
+          <td>BELINHA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-016</td>
+          <td>16</td>
+          <td>BELMONTE</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-689</td>
+          <td>689</td>
+          <td>BRASILEIRA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-11</td>
+          <td>11</td>
+          <td>DOMINÓ</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-633</td>
+          <td>633</td>
+          <td>GIGANTE</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>854</td>
+          <td>854</td>
+          <td>MARAVILHA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-657</td>
+          <td>657</td>
+          <td>MAROCA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-678</td>
+          <td>678</td>
+          <td>MEIA LUA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>701</td>
+          <td>701</td>
+          <td>PIQUENA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>853</td>
+          <td>853</td>
+          <td>PRETINHA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>547</td>
+          <td>547</td>
+          <td>REBECA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-671</td>
+          <td>671</td>
+          <td>SERTANEJA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-567</td>
+          <td>567</td>
+          <td>SUZANA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B1-516</td>
+          <td>516</td>
+          <td>ALAGOANA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>026</td>
+          <td>26</td>
+          <td>AMANDA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>B2-577</td>
+          <td>577</td>
+          <td>BALIZA</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>879</td>
+          <td>879</td>
+          <td>Medalha</td>
+          <td>Em lactação</td>
+          <td class="write-cell">Último parto: ____/____/______<br>Fonte: ____________________________</td>
+        </tr></tbody>
+    </table>
+  </section>
+
+  <section class="page section">
+    <h2>5. Possíveis duplicidades por nome — 27 pares</h2>
+    <p class="lead">
+      Estes pares têm nomes iguais ou muito próximos, mas identificadores diferentes.
+      A semelhança é apenas uma pista. Confirme brinco, histórico, características físicas
+      e origem antes de decidir.
+    </p>
+    <table>
+      <thead>
+        <tr><th class="check">OK</th><th>Registro legado</th><th>Registro do relatório</th><th style="width:72mm">Decisão e evidência</th></tr>
+      </thead>
+      <tbody>
+        <tr class="">
+          <td class="check">☐</td>
+          <td>125 / MARINGÁ</td>
+          <td>B2-687 / Maringa</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>205 / REVISTA</td>
+          <td>827 / Revista</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>604 / CARINHOSA</td>
+          <td>832 / Carinhosa</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>157 / CIGANA</td>
+          <td>821 / Cigana</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>474 / SURUBIM</td>
+          <td>846 / Surubim</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>440 / ARIZONA</td>
+          <td>1001 / Arizona</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="risk-row">
+          <td class="check">☐</td>
+          <td>19 / BOLINHA</td>
+          <td>956 / Bolinha</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="risk-row">
+          <td class="check">☐</td>
+          <td>626 / BOLINHA</td>
+          <td>956 / Bolinha</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>143 / BURGUESA</td>
+          <td>B2-662 / BURGUESA</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>155 / CARINA</td>
+          <td>B2-658 / CARINA</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>147 / CARRAPETA</td>
+          <td>B2-664 / CARRAPETA</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>46 / ESMERALDA</td>
+          <td>812 / Esmeralda</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>78 / ESPERANÇA</td>
+          <td>B1-263 / ESPERANÇA</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>009 VERMELHO / FAÍSCA</td>
+          <td>434 / FAÍSCA</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>220 / JARDINEIRA</td>
+          <td>1015 / Jardineira</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>702 / MAÇA</td>
+          <td>B2-663 / MAÇA</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>686 / MEDALHA</td>
+          <td>879 / Medalha</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>635 / NEBLINA</td>
+          <td>767 / NEBLINA</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>96 / PALOMA</td>
+          <td>B2-584 / PALOMA</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>10 / TIETA</td>
+          <td>964 / Tieta</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>498 / Meias Branca</td>
+          <td>448 / MEIAS BRANCA</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>682 / Rainha</td>
+          <td>B2-680 / RAINHA</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>141 / Fumaca</td>
+          <td>441 / FUMAÇA</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>519 / Branquinha</td>
+          <td>B2-549 / BRANQUINHA</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>133 / Bruna</td>
+          <td>433 / BRUNA</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>862 / Saia Branca</td>
+          <td>861 / SAIA BRANCA</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr>
+
+        <tr class="">
+          <td class="check">☐</td>
+          <td>508 / Princesa</td>
+          <td>B2-548 / PRINCESA</td>
+          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+        </tr></tbody>
+    </table>
+    <div class="callout danger">
+      <strong>BOLINHA exige investigação separada:</strong> os registros legados 19 e 626
+      apontam pelo nome para o mesmo registro 956. Nenhuma fusão deve ocorrer até identificar
+      fisicamente qual registro, se algum, corresponde ao brinco 956.
+    </div>
+  </section>
+
+  <section class="page section">
+    <h2>6. Animais ausentes no PDF recente — 141 casos</h2>
+    <p class="lead">
+      Ausência no PDF não significa que o cadastro possa ser removido. Para cada item,
+      confirme o destino e registre a evidência. Mesmo após venda, descarte ou óbito,
+      preserve o histórico e altere apenas o status conforme a regra oficial.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th class="check">OK</th><th style="width:22mm">Número</th><th>Animal</th>
+          <th style="width:20mm">Lote</th><th style="width:21mm">Situação</th>
+          <th style="width:12mm">Leit.</th><th style="width:62mm">Classificação manual</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="check">☐</td>
+          <td>204</td>
+          <td>ALINE</td>
+          <td>LOTE 1</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>612</td>
+          <td>CATARINA</td>
+          <td>LOTE 1</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>320</td>
+          <td>COCADA</td>
+          <td>LOTE 1</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>151</td>
+          <td>COTÓ</td>
+          <td>LOTE 1</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>175</td>
+          <td>FUSQUINHA</td>
+          <td>LOTE 1</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>125</td>
+          <td>MARINGÁ</td>
+          <td>LOTE 1</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>530</td>
+          <td>PASSO PRETO</td>
+          <td>LOTE 1</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>205</td>
+          <td>REVISTA</td>
+          <td>LOTE 1</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>338</td>
+          <td>ROSEIRA</td>
+          <td>LOTE 1</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>604</td>
+          <td>CARINHOSA</td>
+          <td>LOTE 2</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>157</td>
+          <td>CIGANA</td>
+          <td>LOTE 2</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>361</td>
+          <td>ESTRELINHA</td>
+          <td>LOTE 2</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>565</td>
+          <td>PANTERA</td>
+          <td>LOTE 2</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>474</td>
+          <td>SURUBIM</td>
+          <td>LOTE 2</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>35</td>
+          <td>ALIANÇA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>595</td>
+          <td>ALVORADA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>010 VERDE</td>
+          <td>AMAZONA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>124</td>
+          <td>AMERICANA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>506</td>
+          <td>AMOROSA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>154</td>
+          <td>APARECIDA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>407</td>
+          <td>APARECIDA DO ABREU</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>440</td>
+          <td>ARIZONA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>196</td>
+          <td>ASSUCENA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>390</td>
+          <td>BAIANA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>1</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>219</td>
+          <td>BANANEIRA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>621</td>
+          <td>BELEZA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>132</td>
+          <td>BETANIA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>461</td>
+          <td>BOA VISTA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>228</td>
+          <td>BOLACHA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>19</td>
+          <td>BOLINHA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>626</td>
+          <td>BOLINHA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>005 VERDE</td>
+          <td>BORDADA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>244</td>
+          <td>BRANQUINHA 2</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>137</td>
+          <td>BRILHANTE</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>143</td>
+          <td>BURGUESA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>108</td>
+          <td>CABOQUINHA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>363</td>
+          <td>CACHORRINHA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>176</td>
+          <td>CAFOFINHA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>36</td>
+          <td>CAMBRAIA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>570</td>
+          <td>CAMBRAIA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>656</td>
+          <td>CANOA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>501</td>
+          <td>CARETINHA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>155</td>
+          <td>CARINA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>147</td>
+          <td>CARRAPETA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>258</td>
+          <td>CASA GRANDE</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>499</td>
+          <td>CHARMOZA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>238</td>
+          <td>CHUVINHA DO ABREU</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>77</td>
+          <td>CHUVISCADA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>628</td>
+          <td>CODORNA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>509</td>
+          <td>CONDEÇA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>435</td>
+          <td>CONFIANÇA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>84</td>
+          <td>CORAÇÃO</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>221</td>
+          <td>CORAÇÃO DO ABREU</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>397</td>
+          <td>CORUJA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>618</td>
+          <td>CRAUNA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>166</td>
+          <td>CRAUNINHA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>061 VERDE</td>
+          <td>CRIOLA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>13</td>
+          <td>CURIÓ</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>543</td>
+          <td>DOLORES</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>46</td>
+          <td>ESMERALDA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>78</td>
+          <td>ESPERANÇA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>490</td>
+          <td>ESPERANÇA 3</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>009 VERMELHO</td>
+          <td>FAÍSCA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>387</td>
+          <td>FANTASMA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>129</td>
+          <td>FANTAZIA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>392</td>
+          <td>FILEPA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>237</td>
+          <td>FORTALEZA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>427</td>
+          <td>FUMAÇA ABREU</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>186</td>
+          <td>GAIVOTA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>242</td>
+          <td>GALEGA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>184</td>
+          <td>GIRAFA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>009 VERDE</td>
+          <td>GIRAFA 2</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>2</td>
+          <td>GIRASSOL</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>507 AMARELO</td>
+          <td>GUINÉ</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>438</td>
+          <td>INJEITADA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>391</td>
+          <td>JADI</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>534</td>
+          <td>JANDAÍRA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>675</td>
+          <td>JANGADA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>220</td>
+          <td>JARDINEIRA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>556</td>
+          <td>JURITI</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>249 (BV1)</td>
+          <td>LAVANDEIRA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>18</td>
+          <td>LULÚ</td>
+          <td>LOTE 1</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>702</td>
+          <td>MAÇA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>386</td>
+          <td>MADALENA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>411</td>
+          <td>MADRUGADA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>579</td>
+          <td>MAGRELA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>568</td>
+          <td>MALHADA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>—</td>
+          <td>MALHADINHA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>114</td>
+          <td>MANCINHA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>120</td>
+          <td>MARIA BRAGA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>265</td>
+          <td>MAROMBA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>686</td>
+          <td>MEDALHA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>229</td>
+          <td>MEIOTA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>245</td>
+          <td>MERCEDES</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>019 AZUL</td>
+          <td>MIUDA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>181</td>
+          <td>MIUDINHA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>62</td>
+          <td>MOEDA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>17</td>
+          <td>MOEDA ABREU</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>571</td>
+          <td>MORGANA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>372</td>
+          <td>MULATA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>1</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>635</td>
+          <td>NEBLINA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>259</td>
+          <td>NEGONA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>63</td>
+          <td>NOBREZA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>529</td>
+          <td>NOCA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>001 VERM.</td>
+          <td>NOVENTA E NOVE</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>96</td>
+          <td>PALOMA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>064 VERDE</td>
+          <td>PASSO PRETO</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>88</td>
+          <td>PASSO PRETO</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>30</td>
+          <td>PATURY</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>56</td>
+          <td>PEBINHA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>418</td>
+          <td>PENSAMENTO</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>104</td>
+          <td>PIEDADE</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>561</td>
+          <td>PINGO DE OURO</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>79</td>
+          <td>PINTADINHA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>346</td>
+          <td>PONTA FINA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>346</td>
+          <td>PONTA FINA DO ABREU</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>526</td>
+          <td>RENATINHA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>48</td>
+          <td>ROXINÓ</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>542</td>
+          <td>SAFIRA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>257</td>
+          <td>SALOMÉ</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>594</td>
+          <td>SAMANTA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>415</td>
+          <td>SARDINHA</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>128</td>
+          <td>SEREIA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>1</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>034 VERDE</td>
+          <td>SIRI</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>436</td>
+          <td>SUCESSO</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>503</td>
+          <td>TAPERA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>319</td>
+          <td>TETEU</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>10</td>
+          <td>TIETA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>174</td>
+          <td>TRISTEZA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>43</td>
+          <td>VIANA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>409</td>
+          <td>VIOLA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>404</td>
+          <td>VITÓRIA</td>
+          <td>—</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>123</td>
+          <td>XAXÁ</td>
+          <td>—</td>
+          <td>Seca</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>498</td>
+          <td>Meias Branca</td>
+          <td>LOTE 1</td>
+          <td>Em lactação</td>
+          <td>1</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>682</td>
+          <td>Rainha</td>
+          <td>LOTE 1</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>141</td>
+          <td>Fumaca</td>
+          <td>LOTE 3</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>519</td>
+          <td>Branquinha</td>
+          <td>LOTE 2</td>
+          <td>Em lactação</td>
+          <td>1</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>133</td>
+          <td>Bruna</td>
+          <td>LOTE 2</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>862</td>
+          <td>Saia Branca</td>
+          <td>LOTE 2</td>
+          <td>Em lactação</td>
+          <td>1</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>508</td>
+          <td>Princesa</td>
+          <td>LOTE 1</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr>
+
+        <tr>
+          <td class="check">☐</td>
+          <td>666</td>
+          <td>Schuma</td>
+          <td>LOTE 1</td>
+          <td>Em lactação</td>
+          <td>0</td>
+          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+        </tr></tbody>
+    </table>
+  </section>
+
+  <section class="page section">
+    <h2>7. Aprovação e rastreabilidade</h2>
+    <p class="lead">
+      Use esta página depois que todos os itens estiverem preenchidos. Conte novamente os
+      itens pendentes e registre qualquer exceção antes de aplicar as decisões na base.
+    </p>
+    <table>
+      <thead><tr><th>Controle</th><th style="width:25mm">Resolvidos</th><th style="width:25mm">Pendentes</th><th>Observações</th></tr></thead>
+      <tbody>
+        <tr><td>Divergências de nome (13)</td><td></td><td></td><td class="write-cell"></td></tr>
+        <tr><td>Alertas de DEL (30)</td><td></td><td></td><td class="write-cell"></td></tr>
+        <tr><td>Pares candidatos (27)</td><td></td><td></td><td class="write-cell"></td></tr>
+        <tr><td>Ausentes do PDF (141)</td><td></td><td></td><td class="write-cell"></td></tr>
+      </tbody>
+    </table>
+    <div class="signoff">
+      <div><div class="sign-line"></div><p>Responsável pela conferência · nome e data</p></div>
+      <div><div class="sign-line"></div><p>Revisor · nome e data</p></div>
+    </div>
+    <div class="callout warning">
+      A migração para PostgreSQL só deve ser declarada reconciliada depois que as decisões
+      forem aplicadas em ambiente controlado, validadas e comparadas com esta ficha.
+    </div>
+    <p class="footer-note">
+      Fontes: belo-vale-ii-projeto-completo\plataforma\state_canonical.json e docs\RELÁTORIO DE TODOS ANIMAIS.pdf.
+      Documento gerado automaticamente; os campos de decisão permanecem deliberadamente
+      em branco para conferência humana.
+    </p>
+  </section>
+</body>
+</html>
