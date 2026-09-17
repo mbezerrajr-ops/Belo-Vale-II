@@ -6,11 +6,22 @@ planilha "PLANILHA DO UMAR PESAGEM DO LEITE.xlsx" e das fichas de controle diár
 Artefato publicado (link vivo, atualizado automaticamente pela plataforma):
 https://claude.ai/code/artifact/2f0720ab-cd19-48da-8344-a6ecdc86c81c
 
-Login de acesso: e-mail `mbezerrajr@gmail.com`, senha `belovale2026` (Administrador).
+Login de acesso: e-mail `mbezerrajr@gmail.com` (Administrador). A credencial legada foi rotacionada e **não é versionada** — o estado canônico traz apenas o marcador `LEGADO-SEM-SEGURANCA`. Para abrir um artefato real, defina `BV_LEGACY_PASSWORD` no ambiente.
 
-**ATENÇÃO — segurança:** este ZIP contém, em texto puro, as credenciais de login da
-plataforma (aba Usuários) e os dados reais do rebanho (401 animais, produção, custos).
-Trate como confidencial. Se for subir para o GitHub, use um repositório **privado**.
+**ATENÇÃO — segurança:** este repositório contém os **dados reais do rebanho**
+(401 animais, produção, custos). Trate como confidencial e mantenha o repositório
+**privado**.
+
+As credenciais legadas que ficavam em texto puro no estado e na documentação foram
+**redigidas do HEAD** e substituídas pelo marcador `LEGADO-SEM-SEGURANCA`; o gate
+`tools/credential_scan.py` impede a reintrodução. Duas ressalvas permanecem, por
+decisão registrada:
+
+- **O histórico Git não foi reescrito.** O valor entra no commit raiz, e reescrever
+  invalidaria todos os SHAs e os PRs já mergeados. A mitigação correta é a rotação
+  da credencial, que torna o valor histórico inofensivo — não a remoção do registro.
+- **O login legado nunca foi segurança.** É um gate client-side: quem tem o link do
+  artefato lê o código-fonte. A proteção real é o link ser privado.
 
 ---
 
