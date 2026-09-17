@@ -51,6 +51,101 @@ CANDIDATE_PAIRS = (
     ("508", "Princesa", "B2-548", "PRINCESA"),
 )
 
+PROJECT_DECISIONS = (
+    (
+        "Todo arquivo submetido deverá conter todo o rebanho?",
+        "Não. O sistema deve aceitar arquivos parciais e incrementais, desde que o "
+        "escopo seja declarado.",
+        "O arquivo pode representar apenas um lote, uma ordenha ou um grupo novo. "
+        "Exigir o rebanho completo transformaria uma ausência no arquivo em uma falsa "
+        "remoção e colocaria o histórico em risco.",
+    ),
+    (
+        "Conflito significa substituição?",
+        "Não. Conflito é um sinal de dados incompatíveis que bloqueia a atualização "
+        "automática daquele campo.",
+        "Substituir antes de confirmar identidade e precedência pode apagar o dado "
+        "correto. A substituição só ocorre após decisão explícita e auditável.",
+    ),
+    (
+        "O que acontece quando um animal não aparece no arquivo?",
+        "O cadastro, a última medição e todo o histórico permanecem inalterados até "
+        "chegar uma atualização identificada para esse animal.",
+        "Não aparecer em um arquivo parcial não comprova venda, descarte, óbito, "
+        "inatividade nem produção zero.",
+    ),
+    (
+        "Qual identificador determina a correspondência?",
+        "O brinco deve ser a chave operacional primária, combinado com a origem ou "
+        "fazenda quando houver possibilidade de repetição entre rebanhos.",
+        "Nomes variam, podem se repetir e sofrem erros de digitação. Um identificador "
+        "estável reduz fusões e atualizações no animal errado.",
+    ),
+    (
+        "Nome igual significa que é o mesmo animal?",
+        "Não. Registros com brincos diferentes permanecem separados até existirem "
+        "evidências independentes de que representam o mesmo animal.",
+        "A base já contém nomes repetidos. Usar apenas o nome pode fundir históricos "
+        "de animais distintos.",
+    ),
+    (
+        "Como tratar o mesmo brinco com nomes diferentes?",
+        "Preservar o nome cadastrado, registrar a divergência e solicitar conferência "
+        "manual antes de renomear.",
+        "O brinco sugere a mesma identidade, mas uma diferença relevante de nome pode "
+        "indicar erro de leitura, troca de brinco ou cadastro incorreto.",
+    ),
+    (
+        "Como cadastrar um animal realmente novo?",
+        "Criar um novo cadastro somente quando houver brinco confiável, contexto de "
+        "origem e ausência de colisão com identificadores existentes.",
+        "Esse conjunto mínimo evita criar duplicidades por diferença de grafia ou por "
+        "um brinco lido incorretamente.",
+    ),
+    (
+        "Uma nova medição substitui a medição anterior?",
+        "Não. A nova medição deve ser acrescentada ao histórico com sua data de "
+        "referência; a última medição passa a apontar para o evento mais recente.",
+        "Medições são eventos temporais. Sobrescrever elimina a série histórica e "
+        "impede auditoria, comparação e correção posterior.",
+    ),
+    (
+        "Quando lote, situação e último parto podem ser atualizados?",
+        "Somente quando o arquivo trouxer o campo explicitamente, a fonte for "
+        "autorizada e o animal estiver identificado sem ambiguidade.",
+        "Campo ausente não significa campo vazio. Atualizações implícitas podem apagar "
+        "informações válidas de um arquivo anterior.",
+    ),
+    (
+        "Como tratar DEL vazio?",
+        "Não inventar nem zerar o DEL. Confirmar a data do último parto ou corrigir a "
+        "situação do animal com evidência.",
+        "DEL depende do evento reprodutivo e da data de referência. Um valor fabricado "
+        "contamina indicadores produtivos e reprodutivos.",
+    ),
+    (
+        "O arquivo deve declarar se é parcial ou completo?",
+        "Sim. Exigir metadados de escopo, fazenda ou origem, data de referência, tipo "
+        "de relatório e indicação de parcial ou completo.",
+        "Sem esses metadados o sistema não consegue distinguir uma atualização "
+        "incremental de um retrato completo do rebanho.",
+    ),
+    (
+        "Quando um arquivo pode substituir uma baseline?",
+        "Somente quando for declarado como retrato completo, passar por validação de "
+        "totais e identificadores, possuir versão e tiver aprovação humana.",
+        "Uma substituição ampla é difícil de reverter e pode remover dados que não "
+        "estavam no escopo do arquivo.",
+    ),
+    (
+        "Como desfazer uma importação incorreta?",
+        "Registrar cada importação como um lote auditável e manter snapshot anterior "
+        "ou operações inversas testadas.",
+        "Origem, hash do arquivo, horário, operador e alterações por campo permitem "
+        "identificar o impacto e restaurar o estado sem apagar eventos legítimos.",
+    ),
+)
+
 
 def e(value: object) -> str:
     return html.escape(str(value or "—"))
@@ -103,25 +198,35 @@ def build_html() -> str:
     candidate_rows = "\n".join(
         f"""
         <tr class="{'risk-row' if legacy_name.upper() == 'BOLINHA' else ''}">
-          <td class="check">☐</td>
           <td>{e(legacy_number)} / {e(legacy_name)}</td>
           <td>{e(report_tag)} / {e(report_name)}</td>
-          <td class="write-cell">☐ Mesmo animal &nbsp; ☐ Diferentes<br>Evidência: ________________________</td>
+          <td>Não relacionar automaticamente. Investigar somente se houver evidência
+          adicional de identidade.</td>
         </tr>"""
         for legacy_number, legacy_name, report_tag, report_name in CANDIDATE_PAIRS
     )
     legacy_rows = "\n".join(
         f"""
         <tr>
-          <td class="check">☐</td>
           <td>{e(number)}</td>
           <td>{e(name)}</td>
           <td>{e(lot)}</td>
           <td>{e(situation)}</td>
           <td>{history_count}</td>
-          <td class="write-cell decision">☐ Ativo ☐ Vendido ☐ Descartado<br>☐ Óbito ☐ Duplicado ☐ Pendente</td>
+          <td>Preservado — aguardar atualização explícita deste animal.</td>
         </tr>"""
         for number, name, lot, situation, history_count in legacy_only
+    )
+    project_decision_rows = "\n".join(
+        f"""
+        <tr>
+          <td>{e(question)}</td>
+          <td>{e(recommendation)}</td>
+          <td>{e(rationale)}</td>
+          <td class="write-cell"></td>
+          <td class="write-cell"></td>
+        </tr>"""
+        for question, recommendation, rationale in PROJECT_DECISIONS
     )
 
     return f"""<!doctype html>
@@ -129,7 +234,7 @@ def build_html() -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Conflitos de reconciliação manual — Belo Vale II</title>
+  <title>Regras e verificações de reconciliação — Belo Vale II</title>
   <style>
     :root {{
       --ink: #18342b;
@@ -300,6 +405,8 @@ def build_html() -> str:
     .check {{ width: 8mm; text-align: center; font-size: 13pt; }}
     .write-cell {{ height: 13mm; color: #50635b; }}
     .decision {{ min-width: 60mm; font-size: 7.6pt; }}
+    .decision-table {{ font-size: 7.3pt; }}
+    .decision-table td {{ padding: 1.7mm; }}
     .risk-row {{ background: var(--red-soft) !important; }}
     .tag {{
       display: inline-block;
@@ -331,20 +438,20 @@ def build_html() -> str:
   <section class="cover">
     <div>
       <div class="eyebrow">Belo Vale II · Controle de qualidade de dados</div>
-      <h1>Conflitos de reconciliação para conferência manual</h1>
+      <h1>Regras e verificações de reconciliação</h1>
       <p class="subtitle">
-        Guia operacional para validar cadastros antes da migração da baseline legada
-        para o PostgreSQL.
+        Guia operacional para importar arquivos incrementais, preservar históricos e
+        resolver somente os conflitos que exigem decisão humana.
       </p>
       <div class="cover-grid">
-        <div class="cover-stat"><strong>30</strong>animais em lactação com DEL vazio</div>
-        <div class="cover-stat"><strong>13</strong>divergências de nome por brinco</div>
-        <div class="cover-stat"><strong>27</strong>possíveis duplicidades por nome</div>
-        <div class="cover-stat"><strong>141</strong>animais ausentes no PDF recente</div>
+        <div class="cover-stat"><strong>43</strong>verificações manuais reais</div>
+        <div class="cover-stat"><strong>27</strong>coincidências não conclusivas</div>
+        <div class="cover-stat"><strong>141</strong>cadastros preservados sem ação</div>
+        <div class="cover-stat"><strong>0</strong>substituições automáticas</div>
       </div>
     </div>
     <div class="cover-meta">
-      <strong>Versão 1.0 · {REPORT_DATE}</strong><br>
+      <strong>Versão 1.1 · {REPORT_DATE}</strong><br>
       Baseline: 401 animais · PDF: 260 registros · 260 correspondências por identificador<br>
       Estado analisado: <code>state_canonical.json</code>
     </div>
@@ -353,15 +460,15 @@ def build_html() -> str:
   <section class="section">
     <h2>1. Objetivo e limite deste relatório</h2>
     <p class="lead">
-      Este documento organiza os casos em que o sistema não possui evidência suficiente
-      para tomar uma decisão sozinho. Ele serve como roteiro de conferência, não como
-      autorização para alterar, excluir ou fundir cadastros.
+      Este documento define como arquivos parciais devem atualizar a base sem apagar
+      informações anteriores. Também organiza os poucos casos em que o sistema não possui
+      evidência suficiente para tomar uma decisão sozinho.
     </p>
     <div class="summary-grid">
-      <div class="summary-card"><strong>401</strong>animais preservados na baseline canônica</div>
-      <div class="summary-card"><strong>152</strong>leituras de leite preservadas</div>
-      <div class="summary-card"><strong>0</strong>cadastros criados automaticamente nesta reconciliação</div>
-      <div class="summary-card"><strong>0</strong>alterações automáticas de lote ou último parto</div>
+      <div class="summary-card"><strong>43</strong>verificações manuais reais</div>
+      <div class="summary-card"><strong>27</strong>coincidências não conclusivas</div>
+      <div class="summary-card"><strong>141</strong>cadastros preservados sem ação</div>
+      <div class="summary-card"><strong>152</strong>leituras históricas preservadas</div>
     </div>
     <div class="callout danger">
       <strong>Regra de segurança:</strong> não apagar, fundir, renomear, trocar situação
@@ -369,19 +476,19 @@ def build_html() -> str:
       fonte, responsável e data.
     </div>
 
-    <h3>Como os conflitos aconteceram</h3>
+    <h3>Como interpretar o arquivo recente</h3>
     <p>
-      O PDF recente foi comparado com a base legada. Quando existe um brinco compatível,
-      ele é usado como identificador principal. O nome funciona apenas como sinal de
-      conferência: grafias podem variar e nomes podem se repetir. Animais que não aparecem
-      no PDF continuam preservados porque ausência não comprova venda, descarte, óbito ou
-      duplicidade.
+      O PDF recente pode conter outro grupo de gado e não representa necessariamente uma
+      atualização completa dos animais antigos. Quando existe um brinco compatível, a nova
+      informação é associada àquele cadastro. Quando um cadastro anterior não aparece,
+      a medição e o histórico anteriores continuam válidos até que uma atualização explícita
+      daquele animal seja fornecida.
     </p>
     <div class="flow">
-      <div>1. Localizar evidência</div>
-      <div>2. Confirmar identidade</div>
-      <div>3. Registrar decisão</div>
-      <div>4. Revisar antes de aplicar</div>
+      <div>1. Declarar o escopo</div>
+      <div>2. Identificar o animal</div>
+      <div>3. Acrescentar o evento</div>
+      <div>4. Preservar o restante</div>
     </div>
 
     <h3>Evidências recomendadas</h3>
@@ -392,8 +499,8 @@ def build_html() -> str:
       <li><strong>Auditoria:</strong> anotar a fonte usada, a decisão, a data e quem conferiu.</li>
     </ol>
     <div class="callout warning">
-      Nome igual, sozinho, não comprova identidade. Para fusão ou exclusão, use o brinco
-      e pelo menos mais uma evidência independente.
+      Um arquivo parcial atualiza somente os animais que identifica. Campo ausente não
+      significa valor vazio, e animal não listado não significa animal removido.
     </div>
   </section>
 
@@ -404,15 +511,15 @@ def build_html() -> str:
       <tbody>
         <tr><td>1</td><td>13 nomes divergentes</td><td>Identidade incorreta</td><td>Confirmar o nome oficial sem trocar o vínculo do brinco.</td></tr>
         <tr><td>2</td><td>30 DEL vazios</td><td>Indicador reprodutivo inconsistente</td><td>Confirmar último parto ou corrigir situação com evidência.</td></tr>
-        <tr><td>3</td><td>27 pares candidatos</td><td>Duplicidade ou fusão indevida</td><td>Marcar “mesmo animal” somente com duas evidências.</td></tr>
-        <tr><td>4</td><td>141 ausentes do PDF</td><td>Exclusão indevida de histórico</td><td>Classificar destino; preservar cadastro e histórico.</td></tr>
+        <tr><td>3</td><td>27 coincidências por nome</td><td>Fusão indevida</td><td>Não agir; investigar somente se uma futura decisão de fusão exigir.</td></tr>
+        <tr><td>4</td><td>141 sem nova medição</td><td>Perda de histórico</td><td>Preservar automaticamente; nenhuma classificação manual é necessária.</td></tr>
       </tbody>
     </table>
     <h3>Critério de encerramento</h3>
     <p>
-      Um item só está resolvido quando a decisão é inequívoca, possui evidência registrada
-      e foi revisada por outra pessoa. Caso contrário, deve permanecer como
-      <span class="tag">PENDENTE</span>.
+      As 43 verificações obrigatórias só estão resolvidas quando a decisão possui evidência
+      e foi revisada. As 27 coincidências e os 141 cadastros preservados não se tornam
+      pendências apenas por aparecerem nestas listas.
     </p>
     <h3>Como aplicar as decisões</h3>
     <ul>
@@ -428,7 +535,28 @@ def build_html() -> str:
   </section>
 
   <section class="page section">
-    <h2>3. Divergências de nome — 13 casos</h2>
+    <h2>3. Decisões de negócio e contrato dos arquivos</h2>
+    <p class="lead">
+      Estas perguntas definem o comportamento esperado do produto. A orientação técnica
+      registra a opção mais segura; o argumento explica o problema que ela evita. A decisão
+      final e seu responsável devem ser confirmados pelo negócio antes da migração.
+    </p>
+    <table class="decision-table">
+      <thead>
+        <tr>
+          <th style="width:31mm">Pergunta</th>
+          <th style="width:45mm">Orientação técnica</th>
+          <th>Argumento</th>
+          <th style="width:25mm">Decisão final</th>
+          <th style="width:25mm">Responsável/data</th>
+        </tr>
+      </thead>
+      <tbody>{project_decision_rows}</tbody>
+    </table>
+  </section>
+
+  <section class="page section">
+    <h2>4. Divergências de nome — 13 casos</h2>
     <p class="lead">
       O brinco encontrou um registro, mas o nome do PDF difere do nome da base. Confirme
       a grafia oficial e registre a evidência. O nome da base foi mantido até essa decisão.
@@ -446,7 +574,7 @@ def build_html() -> str:
   </section>
 
   <section class="page section">
-    <h2>4. DEL vazio em animais em lactação — 30 casos</h2>
+    <h2>5. DEL vazio em animais em lactação — 30 casos</h2>
     <p class="lead">
       Esses animais têm brinco e estão marcados como “Em lactação”, mas não possuem DEL.
       Verifique a data do último parto. Se não houve parto compatível, confirme se a situação
@@ -461,38 +589,43 @@ def build_html() -> str:
   </section>
 
   <section class="page section">
-    <h2>5. Possíveis duplicidades por nome — 27 pares</h2>
+    <h2>6. Coincidências de nome não conclusivas — 27 pares</h2>
     <p class="lead">
-      Estes pares têm nomes iguais ou muito próximos, mas identificadores diferentes.
-      A semelhança é apenas uma pista. Confirme brinco, histórico, características físicas
-      e origem antes de decidir.
+      Estes pares têm nomes iguais ou próximos, mas identificadores diferentes. Eles não
+      são conflitos nem duplicidades presumidas. Permanecem separados e só precisam ser
+      investigados se surgir uma razão concreta para relacioná-los.
     </p>
     <table>
       <thead>
-        <tr><th class="check">OK</th><th>Registro legado</th><th>Registro do relatório</th><th style="width:72mm">Decisão e evidência</th></tr>
+        <tr><th>Registro legado</th><th>Registro do relatório</th><th style="width:82mm">Tratamento</th></tr>
       </thead>
       <tbody>{candidate_rows}</tbody>
     </table>
     <div class="callout danger">
-      <strong>BOLINHA exige investigação separada:</strong> os registros legados 19 e 626
-      apontam pelo nome para o mesmo registro 956. Nenhuma fusão deve ocorrer até identificar
-      fisicamente qual registro, se algum, corresponde ao brinco 956.
+      <strong>BOLINHA demonstra por que nome não identifica:</strong> os registros legados
+      19 e 626 têm o mesmo nome do registro 956. Os três permanecem separados; uma eventual
+      fusão exigirá brinco e outra evidência independente.
     </div>
   </section>
 
   <section class="page section">
-    <h2>6. Animais ausentes no PDF recente — 141 casos</h2>
+    <h2>7. Cadastros preservados sem nova medição neste arquivo — 141</h2>
     <p class="lead">
-      Ausência no PDF não significa que o cadastro possa ser removido. Para cada item,
-      confirme o destino e registre a evidência. Mesmo após venda, descarte ou óbito,
-      preserve o histórico e altere apenas o status conforme a regra oficial.
+      Esta lista é informativa e não exige classificação manual. O arquivo pode representar
+      outro grupo de gado; por isso, a medição e o histórico anteriores continuam válidos.
+      Cada cadastro permanecerá inalterado até uma atualização futura identificá-lo
+      explicitamente.
     </p>
+    <div class="callout">
+      <strong>Nenhuma ação:</strong> não zerar produção, não alterar situação e não inferir
+      venda, descarte, óbito ou duplicidade a partir da ausência neste arquivo.
+    </div>
     <table>
       <thead>
         <tr>
-          <th class="check">OK</th><th style="width:22mm">Número</th><th>Animal</th>
+          <th style="width:22mm">Número</th><th>Animal</th>
           <th style="width:20mm">Lote</th><th style="width:21mm">Situação</th>
-          <th style="width:12mm">Leit.</th><th style="width:62mm">Classificação manual</th>
+          <th style="width:12mm">Leit.</th><th style="width:72mm">Tratamento</th>
         </tr>
       </thead>
       <tbody>{legacy_rows}</tbody>
@@ -500,7 +633,7 @@ def build_html() -> str:
   </section>
 
   <section class="page section">
-    <h2>7. Aprovação e rastreabilidade</h2>
+    <h2>8. Aprovação e rastreabilidade</h2>
     <p class="lead">
       Use esta página depois que todos os itens estiverem preenchidos. Conte novamente os
       itens pendentes e registre qualquer exceção antes de aplicar as decisões na base.
@@ -510,8 +643,8 @@ def build_html() -> str:
       <tbody>
         <tr><td>Divergências de nome (13)</td><td></td><td></td><td class="write-cell"></td></tr>
         <tr><td>Alertas de DEL (30)</td><td></td><td></td><td class="write-cell"></td></tr>
-        <tr><td>Pares candidatos (27)</td><td></td><td></td><td class="write-cell"></td></tr>
-        <tr><td>Ausentes do PDF (141)</td><td></td><td></td><td class="write-cell"></td></tr>
+        <tr><td>Decisões de contrato (13 tópicos)</td><td></td><td></td><td class="write-cell"></td></tr>
+        <tr><td>Coincidências investigadas quando aplicável (27)</td><td></td><td></td><td class="write-cell"></td></tr>
       </tbody>
     </table>
     <div class="signoff">
@@ -519,8 +652,9 @@ def build_html() -> str:
       <div><div class="sign-line"></div><p>Revisor · nome e data</p></div>
     </div>
     <div class="callout warning">
-      A migração para PostgreSQL só deve ser declarada reconciliada depois que as decisões
-      forem aplicadas em ambiente controlado, validadas e comparadas com esta ficha.
+      A migração para PostgreSQL só deve ser declarada reconciliada depois que as 43
+      verificações obrigatórias e as decisões de contrato forem aprovadas. Os 141
+      cadastros informativos permanecem preservados e não bloqueiam a migração.
     </div>
     <p class="footer-note">
       Fontes: {e(CANONICAL.relative_to(ROOT))} e {e(REPORT_PDF.relative_to(ROOT))}.
