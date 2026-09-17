@@ -5,6 +5,7 @@ from copy import deepcopy
 import importlib.util
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -17,9 +18,11 @@ sys.path.insert(0, str(PLATFORM))
 
 from import_relatorio_animais import (
     apply_report_rows,
+    main,
     read_pdf_rows,
     render_import_report,
 )
+from build_platform_state import StateValidationError
 from state_contract import summarize_state
 
 
@@ -128,6 +131,38 @@ class ApplyReportRowsTests(unittest.TestCase):
         self.assertEqual(summarize_state(first.state), summarize_state(canonical))
         self.assertEqual(second.state, first.state)
         self.assertIn("--- Avisos DEL/situação: 30", report)
+
+    def test_write_mode_validates_before_replacing_any_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            canonical = root / "canonical.json"
+            report = root / "report.txt"
+            canonical_text = json.dumps(sample_state(), ensure_ascii=False)
+            canonical.write_text(canonical_text, encoding="utf-8")
+            report.write_text("relatório anterior\n", encoding="utf-8")
+
+            with patch(
+                "import_relatorio_animais.read_pdf_rows",
+                return_value=REPORT_ROWS,
+            ):
+                with self.assertRaises(StateValidationError):
+                    main(
+                        [
+                            "ignored.pdf",
+                            "--canonical",
+                            str(canonical),
+                            "--report",
+                            str(report),
+                            "--write",
+                        ]
+                    )
+
+            self.assertEqual(
+                canonical.read_text(encoding="utf-8"), canonical_text
+            )
+            self.assertEqual(
+                report.read_text(encoding="utf-8"), "relatório anterior\n"
+            )
 
 
 if __name__ == "__main__":

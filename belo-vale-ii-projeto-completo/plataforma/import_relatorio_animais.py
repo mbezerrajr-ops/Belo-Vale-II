@@ -424,9 +424,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     state = load_json_object(args.canonical)
     result = apply_report_rows(state, rows)
     report = render_import_report(result)
-    atomic_write_text(args.report, report)
     if args.write:
         require_valid(result.state)
+    atomic_write_text(args.report, report)
+    if args.write:
         atomic_write_text(args.canonical, encode_json(result.state))
         print("estado canônico gravado")
     else:
