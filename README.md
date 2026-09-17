@@ -9,8 +9,27 @@ https://claude.ai/code/artifact/2f0720ab-cd19-48da-8344-a6ecdc86c81c
 Login de acesso: e-mail `mbezerrajr@gmail.com`, senha `belovale2026` (Administrador).
 
 **ATENÇÃO — segurança:** este ZIP contém, em texto puro, as credenciais de login da
-plataforma (aba Usuários) e os dados reais do rebanho (272 vacas, produção, custos).
+plataforma (aba Usuários) e os dados reais do rebanho (401 animais, produção, custos).
 Trate como confidencial. Se for subir para o GitHub, use um repositório **privado**.
+
+---
+
+## Baseline legada atual
+
+A baseline da branch mais recente contém **401 animais**, **152 medições de leite**
+(107 em `2026-07-22` e 45 em `2026-08-25`), 4 insumos e 2 usuários. A fonte versionada
+é `belo-vale-ii-projeto-completo/plataforma/state_canonical.json`.
+
+`platform_ATUAL_publicado.html` e `state_dados_atuais.json` são artefatos derivados.
+Valide e regenere sempre pela CLI; não edite o JSON embutido manualmente:
+
+```powershell
+python belo-vale-ii-projeto-completo/plataforma/build_platform_state.py validate --canonical belo-vale-ii-projeto-completo/plataforma/state_canonical.json
+python belo-vale-ii-projeto-completo/plataforma/build_platform_state.py generate --canonical belo-vale-ii-projeto-completo/plataforma/state_canonical.json --template belo-vale-ii-projeto-completo/plataforma/platform_ATUAL_template.html --published belo-vale-ii-projeto-completo/plataforma/platform_ATUAL_publicado.html --projection belo-vale-ii-projeto-completo/plataforma/state_dados_atuais.json
+```
+
+O PostgreSQL da aplicação nova ainda **não** recebeu essa baseline; a migração continua
+como etapa futura e deve preservar os identificadores e históricos validados aqui.
 
 ---
 
@@ -19,7 +38,9 @@ Trate como confidencial. Se for subir para o GitHub, use um repositório **priva
 ### `plataforma/`
 O código-fonte da aplicação (HTML + CSS + JS em arquivo único, sem build step).
 
-- **`platform_ATUAL_template.html`** — **fonte da versão atual em produção.** Template com
+- **`state_canonical.json`** — **fonte de verdade versionada da baseline legada.** Contém
+  todos os históricos e é validada antes de qualquer geração.
+- **`platform_ATUAL_template.html`** — template de código da versão atual. Contém
   o placeholder `__STATE_JSON__` no lugar dos dados. Arquitetura: um objeto `state`
   (vacas/insumos/usuários/preço do leite) guardado num `<script id="state-data"
   type="application/json">`, renderizado inteiramente via JS, e salvo de volta via
@@ -28,8 +49,10 @@ O código-fonte da aplicação (HTML + CSS + JS em arquivo único, sem build ste
 - **`platform_ATUAL_publicado.html`** — o HTML final já com os dados injetados (o que foi
   de fato publicado no artefato acima, num dado momento — os dados no artefato ao vivo podem
   ter mudado desde então pelas edições feitas por quem usa a plataforma).
-- **`state_dados_atuais.json`** / **`state_inicial.json`** — o objeto de estado
-  (vacas/insumos/usuários) em JSON puro, para inspecionar ou reprocessar os dados sem abrir o HTML.
+- **`state_dados_atuais.json`** — projeção derivada sem `vacas[*].historico`, útil para
+  inspeção. **Não é fonte de verdade.** `state_inicial.json` é histórico.
+- **`build_platform_state.py`** — valida a baseline e gera atomicamente o HTML publicado
+  e a projeção. Estados estruturalmente inválidos não substituem os artefatos.
 - **`v1_*.html`, `vacas_rows.html`, `insumos_rows.html`, `insumos_hist_rows.html`** —
   primeira versão da plataforma (arquitetura antiga de sincronização direta no DOM, sem
   login com múltiplos perfis, sem impressão). Mantida como histórico/referência.
@@ -37,14 +60,12 @@ O código-fonte da aplicação (HTML + CSS + JS em arquivo único, sem build ste
   de virar plataforma com login e cadastros.
 - **`gen_dashboard.py`** — script Python usado para gerar as versões antigas do dashboard.
 
-Para gerar um novo `platform_ATUAL_publicado.html` a partir do template com dados
-atualizados: substituir a string `__STATE_JSON__` em `platform_ATUAL_template.html` pelo
-JSON do estado desejado (ver os scripts de build usados nas pastas `testes/` como exemplo).
+Os comandos oficiais de validação e geração estão na seção "Baseline legada atual".
 
 ### `dados/`
 Os dados do rebanho em diferentes estágios de processamento.
 
-- **`cows_full_DADOS_ATUAIS.json`** — **fonte de dados definitiva.** 272 vacas, cada uma com
+- **`cows_full_DADOS_ATUAIS.json`** — fonte histórica de julho/2026 com 272 vacas, cada uma com
   `id, nome, sit (VL/VS), lote, parto, av (produção do dia 22/07/2026), fase (estágio DEL),
   media_historica, n_medicoes, ultima_medicao`.
 - **`cows_final.json`, `cows_with_avg.json`, `cows_compact.json`** — estágios intermediários
@@ -79,13 +100,13 @@ fotografadas de controle de produção.
 - **`fotos_medicoes/`** — as 5 fotos originais das fichas de controle diário (lotes 1, 2 e 3)
   usadas na transcrição acima.
 
-**Pendência conhecida:** as vacas "PONTA CURTA" (nº 497) e "GIGANTE" (nº 633) foram
-resolvidas manualmente na aba REVISAR, mas o valor de produção do dia 22/07 delas nunca foi
-propagado para a coluna AV — vale conferir com quem fez a medição original.
+As vacas **PONTA CURTA** (nº 497) e **GIGANTE** (nº 633) já possuem leituras de
+`2026-07-22` na baseline canônica. A ausência desses valores em planilhas históricas não
+deve mais ser interpretada como ausência na plataforma atual.
 
 ### `testes/`
-Scripts Python (Playwright + Chromium headless) usados para testar a plataforma antes de
-cada publicação — login, navegação entre abas, edição de campos, ciclo dos selos
+Testes Python de contrato/importação e regressões Playwright usados antes de cada
+publicação — invariantes da baseline, idempotência do PDF, login, navegação, edição de campos, ciclo dos selos
 (Lote/Situação/Status), seleção em massa, geração da área de impressão, modo escuro, etc.
 Não fazem parte do produto final; documentam como cada mudança foi validada.
 
