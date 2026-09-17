@@ -15,7 +15,11 @@ PLATFORM = ROOT / "plataforma"
 IMPORTER = PLATFORM / "import_relatorio_animais.py"
 sys.path.insert(0, str(PLATFORM))
 
-from import_relatorio_animais import apply_report_rows, read_pdf_rows
+from import_relatorio_animais import (
+    apply_report_rows,
+    read_pdf_rows,
+    render_import_report,
+)
 from state_contract import summarize_state
 
 
@@ -117,11 +121,13 @@ class ApplyReportRowsTests(unittest.TestCase):
         rows = read_pdf_rows(report_path)
         first = apply_report_rows(deepcopy(canonical), rows)
         second = apply_report_rows(first.state, rows)
+        report = render_import_report(first)
 
         self.assertEqual(len(rows), 260)
         self.assertEqual(second.new_animal_count, 0)
         self.assertEqual(summarize_state(first.state), summarize_state(canonical))
         self.assertEqual(second.state, first.state)
+        self.assertIn("--- Avisos DEL/situação: 30", report)
 
 
 if __name__ == "__main__":

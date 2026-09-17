@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -26,6 +27,10 @@ EXPECTED_BASELINE = StateSummary(
     supply_count=4,
     user_count=2,
 )
+
+
+class StateValidationError(ValueError):
+    pass
 
 
 def load_json_object(path: Path) -> dict[str, Any]:
@@ -66,7 +71,7 @@ def atomic_write_text(path: Path, content: str) -> None:
 def require_valid(state: Mapping[str, Any]) -> ValidationReport:
     report = validate_state(state, expected=EXPECTED_BASELINE)
     if report.errors:
-        raise ValueError(
+        raise StateValidationError(
             "state validation failed: " + ", ".join(report.errors)
         )
     return report
@@ -139,17 +144,31 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if args.command == "bootstrap":
-        bootstrap(args.published, args.canonical)
-    elif args.command == "validate":
-        validate(args.canonical)
-    else:
-        generate(
-            args.canonical,
-            args.template,
-            args.published,
-            args.projection,
+    try:
+        if args.command == "bootstrap":
+            bootstrap(args.published, args.canonical)
+        elif args.command == "validate":
+            validate(args.canonical)
+        else:
+            generate(
+                args.canonical,
+                args.template,
+                args.published,
+                args.projection,
+            )
+    except StateValidationError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except json.JSONDecodeError as error:
+        print(
+            f"invalid JSON: {error.msg} "
+            f"(line {error.lineno}, column {error.colno})",
+            file=sys.stderr,
         )
+        return 2
+    except (OSError, UnicodeError, ValueError) as error:
+        print(f"input error: {error}", file=sys.stderr)
+        return 2
     return 0
 
 

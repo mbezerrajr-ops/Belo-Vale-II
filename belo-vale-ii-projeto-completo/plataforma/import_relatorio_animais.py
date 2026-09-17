@@ -17,7 +17,7 @@ from build_platform_state import (
     load_json_object,
     require_valid,
 )
-from state_contract import repair_animal_ids
+from state_contract import find_del_situation_warnings, repair_animal_ids
 
 
 COLS = (
@@ -370,6 +370,14 @@ def render_import_report(result: ImportResult) -> str:
         lines.append(
             f"    brinco {tag:<8} pdf={pdf_name:<20} "
             f"base={number}/{base_name}"
+        )
+    warnings = find_del_situation_warnings(result.state)
+    lines.extend(["", f"--- Avisos DEL/situação: {len(warnings)}"])
+    for warning in warnings:
+        lines.append(
+            f"    id={warning.animal_id:<24} "
+            f"numero={warning.number:<12} brinco={warning.tag:<12} "
+            f"nome={warning.name:<24} situacao={warning.situation} DEL=vazio"
         )
     lines.extend(["", f"--- Ambíguas (não atualizadas): {len(result.match.ambiguities)}"])
     for ambiguity in result.match.ambiguities:

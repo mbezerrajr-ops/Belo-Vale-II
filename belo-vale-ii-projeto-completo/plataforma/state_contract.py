@@ -31,6 +31,16 @@ class ValidationReport:
     del_situation_warning_count: int
 
 
+@dataclass(frozen=True)
+class DelSituationWarning:
+    code: str
+    animal_id: str
+    number: str
+    tag: str
+    name: str
+    situation: str
+
+
 def extract_state_from_html(html: str) -> dict[str, Any]:
     match = STATE_PATTERN.search(html)
     if match is None:
@@ -142,6 +152,25 @@ def project_state_without_history(
     return projected
 
 
+def find_del_situation_warnings(
+    state: Mapping[str, Any],
+) -> tuple[DelSituationWarning, ...]:
+    return tuple(
+        DelSituationWarning(
+            code="del_empty_while_lactating",
+            animal_id=str(animal.get("id", "")),
+            number=str(animal.get("numero", "")),
+            tag=str(animal.get("brinco", "")),
+            name=str(animal.get("nome", "")),
+            situation=str(animal.get("situacao", "")),
+        )
+        for animal in state.get("vacas", [])
+        if "brinco" in animal
+        and str(animal.get("del", "")) == ""
+        and animal.get("situacao") == "Em lactação"
+    )
+
+
 def validate_state(
     state: Mapping[str, Any], expected: StateSummary | None = None
 ) -> ValidationReport:
@@ -158,13 +187,7 @@ def validate_state(
     summary = summarize_state(state)
     if expected is not None and summary != expected:
         errors.append("baseline_summary_changed")
-    del_situation_warnings = [
-        animal
-        for animal in animals
-        if "brinco" in animal
-        and str(animal.get("del", "")) == ""
-        and animal.get("situacao") == "Em lactação"
-    ]
+    del_situation_warnings = find_del_situation_warnings(state)
     warning_codes = (
         ("del_empty_while_lactating",) if del_situation_warnings else ()
     )
