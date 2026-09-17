@@ -49,19 +49,35 @@ autorização explícita.
 A baseline canônica validada possui 401 animais e 152 medições. O relatório operacional
 completo está em
 `belo-vale-ii-projeto-completo/plataforma/import_relatorio_animais_ultimo_relatorio.txt`.
-Permanecem pendentes de decisão humana:
+O relatório de reconciliação (`docs/reports/conflitos-reconciliacao-manual.pdf`, versão
+1.2) formaliza o brinco como única chave de identidade operacional: nome é descrição,
+não identificador, e não é usado para localizar, casar ou fundir animais. Sob essa regra,
+das quatro categorias encontradas, apenas uma exige decisão humana antes da migração.
 
-- **141 animais legados** não aparecem no PDF mais recente. Todos foram preservados, sem
-  alteração ou exclusão automática.
-- **13 divergências de nome** entre PDF e base: 432 Carolina/KAROLINA; 434 FAISCA DO
+### Pendência real: 30 animais com brinco, situação "Em lactação" e DEL vazio
+
+São avisos de qualidade de dado genuínos — o DEL não pôde ser calculado por falta de
+data de último parto compatível. Resolver exige confirmar o último parto ou corrigir a
+situação com evidência; nunca inventar ou zerar o DEL apenas para eliminar o alerta.
+
+### Não são pendências — apenas preservados ou registrados como observação
+
+- **141 animais legados** não aparecem no PDF mais recente. O brinco já resolveu a
+  correspondência: a ausência significa apenas que esse arquivo não trouxe uma leitura
+  nova para esses animais, nunca remoção, venda, óbito, descarte ou produção zero. Todos
+  foram preservados, sem alteração ou exclusão automática, e não exigem classificação.
+- **13 divergências de nome** entre PDF e base — o brinco já confirmou a identidade;
+  o nome do PDF apenas difere do nome cadastrado: 432 Carolina/KAROLINA; 434 FAISCA DO
   ABREU/FAÍSCA; 448 MEIAS BRANCAS/MEIAS BRANCA; 701 Pequena/PIQUENA; 733 Crauna/Pauna;
   779 GESSICA/GÉSSIKA; 967 MALHADA/Machada; 981 CONDESA/Condessa; 1008
   DENGOSA/CABELO DE FOGO; 1013 CODORNA/Boemia; B1-263 ESPERANÇA II ABREU/ESPERANÇA;
-  B2-512 Asa Negra/AZA NEGRA; B2-523 BARONESA/BARONEZA. O nome da base foi mantido.
-- **30 animais com brinco, situação “Em lactação” e DEL vazio**. São avisos de qualidade,
-  não autorização para mudar situação, lote ou DEL automaticamente.
+  B2-512 Asa Negra/AZA NEGRA; B2-523 BARONESA/BARONEZA. O nome da base foi mantido; uma
+  eventual atualização de nome é uma ação cadastral separada e auditada, nunca
+  automática, e não bloqueia a migração.
 - **27 pares candidatos por nome normalizado** entre registros legados e registros com
-  brinco do relatório. Eles não são equivalências confirmadas e não foram fundidos:
+  brinco do relatório. Nome igual ou parecido não é evidência de duplicidade: os
+  registros têm brincos diferentes (ou nenhum brinco) e por isso permanecem separados.
+  Não são equivalências confirmadas e não foram fundidos:
 
 | Legado | Registro do relatório |
 | --- | --- |
@@ -93,10 +109,11 @@ Permanecem pendentes de decisão humana:
 | 862 Saia Branca | 861 SAIA BRANCA |
 | 508 Princesa | B2-548 PRINCESA |
 
-O caso BOLINHA é explicitamente ambíguo: dois registros legados apontam pelo nome para o
-mesmo registro 956. A decisão exige evidência externa. PONTA CURTA (497) e GIGANTE (633)
-não fazem mais parte das pendências de produção: ambas têm leitura em `2026-07-22` no
-estado canônico.
+O caso BOLINHA ilustra por que nome não identifica: dois registros legados apontam pelo
+nome para o mesmo registro 956. Os três permanecem separados; uma eventual fusão exigiria
+brinco e outra evidência independente, nunca similaridade de nome — e essa investigação
+não bloqueia a migração. PONTA CURTA (497) e GIGANTE (633) não fazem mais parte das
+pendências de produção: ambas têm leitura em `2026-07-22` no estado canônico.
 
 ## Achados de integridade da baseline (verificados em 2026-09-17)
 

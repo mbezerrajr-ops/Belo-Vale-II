@@ -117,6 +117,15 @@ PROJECT_DECISIONS = (
         "informações válidas de um arquivo anterior.",
     ),
     (
+        "Como registrar a mudança de lote de um animal?",
+        "A vaca pode mudar de lote ao longo do tempo: lote não é parte da identidade "
+        "nem bloqueia a medição. Manter um histórico de lotação (lote, vigência, "
+        "origem e revisor) em vez de sobrescrever o lote atual.",
+        "Um lote novo não deve apagar silenciosamente o lote anterior, e um relatório "
+        "histórico não pode ser reinterpretado usando somente o lote de hoje. A "
+        "medição também preserva o lote observado no momento em que foi registrada.",
+    ),
+    (
         "Como tratar DEL vazio?",
         "Não inventar nem zerar o DEL. Confirmar a data do último parto ou corrigir a "
         "situação do animal com evidência.",
@@ -444,14 +453,15 @@ def build_html() -> str:
         resolver somente os conflitos que exigem decisão humana.
       </p>
       <div class="cover-grid">
-        <div class="cover-stat"><strong>43</strong>verificações manuais reais</div>
+        <div class="cover-stat"><strong>30</strong>verificações manuais obrigatórias</div>
+        <div class="cover-stat"><strong>13</strong>observações de nome, não bloqueiam</div>
         <div class="cover-stat"><strong>27</strong>coincidências não conclusivas</div>
         <div class="cover-stat"><strong>141</strong>cadastros preservados sem ação</div>
         <div class="cover-stat"><strong>0</strong>substituições automáticas</div>
       </div>
     </div>
     <div class="cover-meta">
-      <strong>Versão 1.1 · {REPORT_DATE}</strong><br>
+      <strong>Versão 1.2 · {REPORT_DATE}</strong><br>
       Baseline: 401 animais · PDF: 260 registros · 260 correspondências por identificador<br>
       Estado analisado: <code>state_canonical.json</code>
     </div>
@@ -465,7 +475,8 @@ def build_html() -> str:
       evidência suficiente para tomar uma decisão sozinho.
     </p>
     <div class="summary-grid">
-      <div class="summary-card"><strong>43</strong>verificações manuais reais</div>
+      <div class="summary-card"><strong>30</strong>verificações manuais obrigatórias</div>
+      <div class="summary-card"><strong>13</strong>observações de nome, não bloqueiam</div>
       <div class="summary-card"><strong>27</strong>coincidências não conclusivas</div>
       <div class="summary-card"><strong>141</strong>cadastros preservados sem ação</div>
       <div class="summary-card"><strong>152</strong>leituras históricas preservadas</div>
@@ -474,6 +485,19 @@ def build_html() -> str:
       <strong>Regra de segurança:</strong> não apagar, fundir, renomear, trocar situação
       nem preencher DEL apenas por semelhança de nome. Toda decisão precisa registrar
       fonte, responsável e data.
+    </div>
+
+    <h3>Identidade do animal</h3>
+    <p>
+      O brinco é a única chave de identidade operacional deste rebanho. Nome é informação descritiva, não identificadora: a base contém nomes repetidos, e o
+      mesmo nome em brincos diferentes significa animais diferentes. O nome não deve ser usado para localizar, casar ou fundir animais —
+      nem como critério primário, nem como alternativa quando o brinco está ausente.
+    </p>
+    <div class="flow">
+      <div>1. Buscar pelo brinco</div>
+      <div>2. Registrar o método usado</div>
+      <div>3. Sem brinco, não associar automaticamente</div>
+      <div>4. Nome divergente é observação, não bloqueio</div>
     </div>
 
     <h3>Como interpretar o arquivo recente</h3>
@@ -509,17 +533,18 @@ def build_html() -> str:
     <table>
       <thead><tr><th style="width:13mm">Ordem</th><th>Grupo</th><th>Risco</th><th>Decisão esperada</th></tr></thead>
       <tbody>
-        <tr><td>1</td><td>13 nomes divergentes</td><td>Identidade incorreta</td><td>Confirmar o nome oficial sem trocar o vínculo do brinco.</td></tr>
-        <tr><td>2</td><td>30 DEL vazios</td><td>Indicador reprodutivo inconsistente</td><td>Confirmar último parto ou corrigir situação com evidência.</td></tr>
-        <tr><td>3</td><td>27 coincidências por nome</td><td>Fusão indevida</td><td>Não agir; investigar somente se uma futura decisão de fusão exigir.</td></tr>
-        <tr><td>4</td><td>141 sem nova medição</td><td>Perda de histórico</td><td>Preservar automaticamente; nenhuma classificação manual é necessária.</td></tr>
+        <tr><td>1</td><td>30 DEL vazios</td><td>Indicador reprodutivo inconsistente</td><td>Confirmar último parto ou corrigir situação com evidência. Única verificação obrigatória.</td></tr>
+        <tr><td>—</td><td>13 nomes divergentes</td><td>Observação cadastral, não identidade</td><td>O brinco já confirmou a identidade deste animal; confirmar o nome oficial é uma ação cadastral separada, não um bloqueio.</td></tr>
+        <tr><td>—</td><td>27 coincidências por nome</td><td>Fusão indevida se agido sem evidência</td><td>Não agir; investigar somente se uma futura decisão de fusão exigir.</td></tr>
+        <tr><td>—</td><td>141 sem nova medição</td><td>Perda de histórico</td><td>Preservar automaticamente; nenhuma classificação manual é necessária.</td></tr>
       </tbody>
     </table>
     <h3>Critério de encerramento</h3>
     <p>
-      As 43 verificações obrigatórias só estão resolvidas quando a decisão possui evidência
-      e foi revisada. As 27 coincidências e os 141 cadastros preservados não se tornam
-      pendências apenas por aparecerem nestas listas.
+      Os 30 alertas de DEL são a única verificação obrigatória desta baseline: só estão
+      resolvidos quando a decisão possui evidência e foi revisada.
+      As divergências de nome e as coincidências de nome são observações e não bloqueiam a migração.
+      Os 141 cadastros preservados não se tornam pendências apenas por aparecerem nesta lista.
     </p>
     <h3>Como aplicar as decisões</h3>
     <ul>
@@ -556,20 +581,25 @@ def build_html() -> str:
   </section>
 
   <section class="page section">
-    <h2>4. Divergências de nome — 13 casos</h2>
+    <h2>4. Divergências de nome — 13 casos, não bloqueiam a migração</h2>
     <p class="lead">
-      O brinco encontrou um registro, mas o nome do PDF difere do nome da base. Confirme
-      a grafia oficial e registre a evidência. O nome da base foi mantido até essa decisão.
+      Nestes 13 casos o brinco já confirmou a identidade deste animal — o nome do PDF
+      apenas difere do nome cadastrado na base. Isto não é um conflito de identidade e
+      não exige decisão antes da migração. É uma observação cadastral opcional: se a
+      grafia oficial for confirmada, a atualização do nome deve ser uma ação separada e
+      auditada, nunca automática.
     </p>
     <table>
       <thead>
-        <tr><th class="check">OK</th><th style="width:19mm">Brinco</th><th>Nome no PDF</th><th>Nome atual na base</th><th style="width:66mm">Conferência</th></tr>
+        <tr><th class="check">OK</th><th style="width:19mm">Brinco</th><th>Nome no PDF</th><th>Nome atual na base</th><th style="width:66mm">Conferência (opcional)</th></tr>
       </thead>
       <tbody>{divergence_rows}</tbody>
     </table>
-    <div class="callout danger">
-      <strong>Prioridade alta:</strong> DENGOSA/CABELO DE FOGO, CODORNA/BOEMIA,
-      MALHADA/MACHADA e CRAUNA/PAUNA não parecem apenas variações ortográficas.
+    <div class="callout warning">
+      <strong>Vale conferir com mais atenção:</strong> DENGOSA/CABELO DE FOGO,
+      CODORNA/BOEMIA, MALHADA/MACHADA e CRAUNA/PAUNA não parecem apenas variações
+      ortográficas. Mesmo assim, o brinco já é a identidade válida; a conferência serve
+      só para decidir se o nome cadastrado deve ser atualizado.
     </div>
   </section>
 
@@ -641,10 +671,10 @@ def build_html() -> str:
     <table>
       <thead><tr><th>Controle</th><th style="width:25mm">Resolvidos</th><th style="width:25mm">Pendentes</th><th>Observações</th></tr></thead>
       <tbody>
-        <tr><td>Divergências de nome (13)</td><td></td><td></td><td class="write-cell"></td></tr>
-        <tr><td>Alertas de DEL (30)</td><td></td><td></td><td class="write-cell"></td></tr>
-        <tr><td>Decisões de contrato (13 tópicos)</td><td></td><td></td><td class="write-cell"></td></tr>
-        <tr><td>Coincidências investigadas quando aplicável (27)</td><td></td><td></td><td class="write-cell"></td></tr>
+        <tr><td>Alertas de DEL (30) — obrigatório</td><td></td><td></td><td class="write-cell"></td></tr>
+        <tr><td>Decisões de contrato (14 tópicos)</td><td></td><td></td><td class="write-cell"></td></tr>
+        <tr><td>Divergências de nome revisadas quando aplicável (13, opcional)</td><td></td><td></td><td class="write-cell"></td></tr>
+        <tr><td>Coincidências investigadas quando aplicável (27, opcional)</td><td></td><td></td><td class="write-cell"></td></tr>
       </tbody>
     </table>
     <div class="signoff">
@@ -652,9 +682,11 @@ def build_html() -> str:
       <div><div class="sign-line"></div><p>Revisor · nome e data</p></div>
     </div>
     <div class="callout warning">
-      A migração para PostgreSQL só deve ser declarada reconciliada depois que as 43
-      verificações obrigatórias e as decisões de contrato forem aprovadas. Os 141
-      cadastros informativos permanecem preservados e não bloqueiam a migração.
+      Os 30 alertas de DEL são a única verificação obrigatória desta baseline. A
+      migração para PostgreSQL só deve ser declarada reconciliada depois que eles e
+      as decisões de contrato forem aprovados. As divergências de nome e as
+      coincidências de nome são observações e não bloqueiam a migração; os 141
+      cadastros informativos permanecem preservados sem exigir ação.
     </div>
     <p class="footer-note">
       Fontes: {e(CANONICAL.relative_to(ROOT))} e {e(REPORT_PDF.relative_to(ROOT))}.
