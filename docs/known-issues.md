@@ -4,6 +4,46 @@ Registradas explicitamente para não ficarem escondidas. As pendências do legad
 bloqueiam sua validação ou geração, mas devem ser resolvidas antes de declarar a migração
 para PostgreSQL como reconciliada.
 
+## Contenção de credenciais legadas (Fase 1)
+
+A credencial de login legada estava em texto puro em 23 arquivos versionados
+(25 ocorrências) e foi **redigida do HEAD**, substituída pelo marcador
+`LEGADO-SEM-SEGURANCA`. O gate `tools/credential_scan.py` impede a reintrodução
+(`python -m unittest test_credential_scan` dentro de `tools/`).
+
+O campo `senha` foi preservado em vez de removido porque
+`apps/web/e2e/legacy-platform.spec.ts` lê a credencial do próprio estado canônico
+para fazer login, e o HTML publicado compara contra o mesmo estado embutido.
+Os scripts Playwright históricos passam a ler `BV_LEGACY_PASSWORD` do ambiente.
+
+### Pendente fora do repositório — só o titular pode executar
+
+Redigir o HEAD **não reduz o risco por si só**. O valor continua conhecido por
+quem já clonou, permanece no histórico Git e foi documentado publicamente no
+README anterior. As ações que efetivamente contêm o incidente:
+
+1. **Rotacionar a senha em todo serviço onde tenha sido reutilizada.** A
+   reutilização é o vetor mais grave, porque o valor era legível e curto.
+2. **Rotacionar a credencial do segundo usuário legado**, de domínio externo —
+   os dois usuários compartilhavam o mesmo valor, então a rotação envolve um
+   terceiro e uma comunicação, não apenas uma alteração de dado.
+3. **Restringir ou desativar o Artifact antigo.** O link privado do artefato é a
+   exposição primária: quem o abre lê o código-fonte e o estado embutido.
+4. **Revisar quem tem acesso** ao repositório, a clones locais e a backups.
+
+### Histórico Git — decisão registrada, não reescrito
+
+A string entra no **commit raiz** (`c980db2`), num repositório de 44 commits.
+Reescrever invalidaria todos os SHAs e os dois PRs já mergeados, exigindo reclone
+de todos os colaboradores — e **não removeria o conhecimento** do valor, apenas o
+registro. Como os colaboradores já o conheciam, a rotação é a mitigação que
+realmente resolve.
+
+Reavaliar a reescrita apenas se o repositório for tornar-se público ou se a
+rotação não for viável. Nesse caso, exige plano próprio com backup, janela de
+reclone e comunicação aos colaboradores — nunca `filter-repo` ou force-push sem
+autorização explícita.
+
 ## Reconciliação da baseline legada
 
 A baseline canônica validada possui 401 animais e 152 medições. O relatório operacional
@@ -57,6 +97,38 @@ O caso BOLINHA é explicitamente ambíguo: dois registros legados apontam pelo n
 mesmo registro 956. A decisão exige evidência externa. PONTA CURTA (497) e GIGANTE (633)
 não fazem mais parte das pendências de produção: ambas têm leitura em `2026-07-22` no
 estado canônico.
+
+## Achados de integridade da baseline (verificados em 2026-09-17)
+
+Verificados programaticamente contra `state_canonical.json` no HEAD. Condicionam o
+modelo de identidade (Fase 3) e a migração (Fase 4); nenhum deles autoriza alteração
+automática de dado.
+
+- **Os 141 sem correspondência no relatório são exatamente os 141 sem brinco.** Os
+  dois conjuntos foram comparados registro a registro e são idênticos. Ausência no
+  relatório significa **apenas** ausência de brinco — não remoção, venda, morte,
+  descarte nem produção zero.
+- **`B2-XXX` não é um brinco.** É um placeholder ilegível usado como identidade de
+  SERRANA, que tem **2 medições ativas** (2026-07-22 e 2026-08-25). Sob a regra do
+  brinco como única identidade, esse registro não tem identidade operacional válida e
+  precisa de decisão humana antes da migração.
+- **Brincos exigem normalização canônica antes de qualquer índice único:** `B2- 008`
+  tem espaço interno e `B1-016VD` mistura formatos.
+- **6 animais sem brinco possuem 6 das 152 medições** (BAIANA, MULATA, SEREIA, Meias
+  Branca, Branquinha, Saia Branca). A migração precisa de regra explícita: são
+  medições legítimas cujo animal não tem identidade operacional.
+- **Os 141 brincos ausentes são `null`, não string vazia.** O contrato e o schema
+  precisam distinguir os dois casos.
+- **Dos 260 brincos, 81 vêm do PDF** (formato `B*`) e **179 são numéricos**, dos quais
+  174 idênticos ao `numero` legado. Confirmado pelo titular em 2026-09-17 que **são
+  brincos físicos reais**, e portanto identidade operacional válida.
+- **Números legados duplicados:** `346` (PONTA FINA / PONTA FINA DO ABREU), `570`
+  (CAMBRAIA / MIMOSA) e `''` (MALHADINHA / SERRANA). Em todos, ao menos um lado tem
+  brinco nulo — o conflito é do `identifier` numérico do schema atual, não do brinco.
+- **O matching por nome existe em dois lugares, não um.** Além do fallback em
+  `apps/api/app/services/animal_matching.py`, o importador legado faz matching
+  **primário** por nome em `import_relatorio_animais.py` (`by_name` antes de
+  `by_number`). A Fase 6 precisa tratar os dois.
 
 ## Scripts Playwright históricos não são uma suíte `unittest`
 
