@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ExtractedLine, OfficialMeasurement, ValidationAlert
-from app.services.animal_matching import find_animal_candidates, resolve_animal_match
+from app.services.animal_matching import match_animal
 from app.services.normalization import NormalizedLine, normalize_date, normalize_line
 from app.services.validation import ValidationContext, validate_line
 from app.vision.contracts import VisionExtraction
@@ -20,6 +20,7 @@ _HISTORY_LIMIT = 5
 
 def _line_to_dict(line: NormalizedLine) -> dict[str, Any]:
     return {
+        "animal_brinco": line.animal_brinco,
         "animal_number": line.animal_number,
         "animal_name": line.animal_name,
         "morning": str(line.morning) if line.morning is not None else None,
@@ -73,6 +74,7 @@ async def persist_extracted_lines(
     persisted: list[ExtractedLine] = []
     for index, vision_line in enumerate(extraction.lines, start=1):
         normalized = normalize_line(
+            raw_animal_brinco=vision_line.animal_brinco,
             raw_animal_number=vision_line.animal_number,
             raw_animal_name=vision_line.animal_name,
             raw_morning=vision_line.morning,
@@ -83,13 +85,11 @@ async def persist_extracted_lines(
             raw_notes=vision_line.notes,
         )
 
-        candidates = await find_animal_candidates(
-            session,
-            farm_id=farm_id,
-            animal_number=normalized.animal_number,
-            animal_name=normalized.animal_name,
+        # Só o brinco casa. Número e nome ficam na linha como evidência
+        # para o revisor, nunca como chave de correspondência.
+        match = await match_animal(
+            session, farm_id=farm_id, brinco=normalized.animal_brinco
         )
-        match = resolve_animal_match(candidates)
 
         history_totals: list[Decimal] = []
         existing_dates: frozenset[date_] = frozenset()

@@ -2,7 +2,11 @@ from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
-from app.services.animal_matching import AnimalMatchResult
+from app.services.animal_matching import (
+    MATCH_BY_BRINCO,
+    MATCH_NONE,
+    AnimalMatchResult,
+)
 from app.services.normalization import NormalizedLine
 from app.services.validation import (
     ALERT_AMBIGUOUS_ANIMAL,
@@ -27,6 +31,7 @@ class _Animal:
 
 def _line(**overrides: object) -> NormalizedLine:
     defaults: dict[str, object] = dict(
+        animal_brinco="497",
         animal_number="497",
         animal_name="PONTA CURTA",
         morning=Decimal("10"),
@@ -43,7 +48,15 @@ def _line(**overrides: object) -> NormalizedLine:
 def _matched_context(**overrides: object) -> ValidationContext:
     animal = _Animal()
     defaults: dict[str, object] = dict(
-        match=AnimalMatchResult(animal=animal, is_ambiguous=False, candidate_count=1),  # type: ignore[arg-type]
+        match=AnimalMatchResult(
+            animal=animal,
+            is_ambiguous=False,
+            candidate_count=1,
+            method=MATCH_BY_BRINCO,
+            brinco_lido="497",
+            brinco_normalizado="497",
+            reason=None,
+        ),  # type: ignore[arg-type]
     )
     defaults.update(overrides)
     return ValidationContext(**defaults)  # type: ignore[arg-type]
@@ -79,7 +92,17 @@ def test_total_mismatch_is_an_explained_alert() -> None:
 
 
 def test_unknown_animal_is_flagged_and_has_no_candidate_id() -> None:
-    context = ValidationContext(match=AnimalMatchResult(animal=None, is_ambiguous=False, candidate_count=0))
+    context = ValidationContext(
+        match=AnimalMatchResult(
+            animal=None,
+            is_ambiguous=False,
+            candidate_count=0,
+            method=MATCH_NONE,
+            brinco_lido="497",
+            brinco_normalizado="497",
+            reason="Nenhum animal cadastrado tem este brinco.",
+        )
+    )
 
     result = validate_line(_line(), context)
 
@@ -88,7 +111,17 @@ def test_unknown_animal_is_flagged_and_has_no_candidate_id() -> None:
 
 
 def test_ambiguous_animal_is_flagged_with_candidate_count() -> None:
-    context = ValidationContext(match=AnimalMatchResult(animal=None, is_ambiguous=True, candidate_count=3))
+    context = ValidationContext(
+        match=AnimalMatchResult(
+            animal=None,
+            is_ambiguous=True,
+            candidate_count=3,
+            method=MATCH_NONE,
+            brinco_lido="497",
+            brinco_normalizado="497",
+            reason="Mais de um animal cadastrado tem este brinco.",
+        )
+    )
 
     result = validate_line(_line(), context)
 
@@ -97,10 +130,30 @@ def test_ambiguous_animal_is_flagged_with_candidate_count() -> None:
     assert alert.details["candidate_count"] == 3
 
 
-def test_missing_animal_identity_is_flagged() -> None:
-    result = validate_line(_line(animal_number=None, animal_name=None), _matched_context())
+def test_missing_brinco_is_flagged() -> None:
+    result = validate_line(_line(animal_brinco=None), _matched_context())
 
     assert result.has_code(ALERT_MISSING_HEADER)
+
+
+def test_name_and_number_do_not_replace_a_missing_brinco() -> None:
+    """Sem brinco não há correspondência automática, por mais que a linha
+    traga número e nome legíveis."""
+    result = validate_line(
+        _line(animal_brinco=None, animal_number="497", animal_name="PONTA CURTA"),
+        _matched_context(),
+    )
+
+    assert result.has_code(ALERT_MISSING_HEADER)
+
+
+def test_readable_brinco_does_not_raise_the_header_alert() -> None:
+    result = validate_line(
+        _line(animal_brinco="497", animal_number=None, animal_name=None),
+        _matched_context(),
+    )
+
+    assert not result.has_code(ALERT_MISSING_HEADER)
 
 
 def test_missing_total_is_flagged_as_a_required_value() -> None:

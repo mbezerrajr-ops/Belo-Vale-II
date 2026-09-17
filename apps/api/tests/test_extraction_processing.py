@@ -28,7 +28,12 @@ def test_persist_extracted_lines_matches_animal_and_flags_a_lot_mismatch() -> No
                 session.add(farm)
                 await session.commit()
 
-                animal = Animal(farm_id=farm.id, identifier="497", name="PONTA CURTA")
+                animal = Animal(
+                    farm_id=farm.id,
+                    identifier="v497",
+                    brinco="497",
+                    name="PONTA CURTA",
+                )
                 session.add(animal)
                 ingestion = Import(farm_id=farm.id, declared_lot="2", declared_measured_on=date(2026, 7, 22))
                 session.add(ingestion)
@@ -50,6 +55,7 @@ def test_persist_extracted_lines_matches_animal_and_flags_a_lot_mismatch() -> No
                     model_name="fake-v1",
                     lines=[
                         VisionLine(
+                            animal_brinco="497",
                             animal_number="497",
                             animal_name="PONTA CURTA",
                             morning="10",
@@ -115,6 +121,7 @@ def test_persist_extracted_lines_flags_unknown_animal_with_no_candidates() -> No
                     model_name="fake-v1",
                     lines=[
                         VisionLine(
+                            animal_brinco="999",
                             animal_number="999",
                             animal_name="DESCONHECIDA",
                             morning="10",

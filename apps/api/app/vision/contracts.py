@@ -6,6 +6,10 @@ from typing import Protocol
 
 @dataclass(frozen=True)
 class VisionLine:
+    #: Brinco lido da ficha. É a única chave de correspondência automática.
+    animal_brinco: str | None
+    #: Número e nome também são lidos e exibidos ao revisor como evidência,
+    #: mas nunca são usados para casar automaticamente com um animal.
     animal_number: str | None
     animal_name: str | None
     morning: str | None

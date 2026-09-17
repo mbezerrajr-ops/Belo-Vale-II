@@ -19,6 +19,7 @@ class FakeVisionProvider:
             header_confidence={"lot": 0.95, "measured_on": 0.95},
             lines=[
                 VisionLine(
+                    animal_brinco="497",
                     animal_number="497",
                     animal_name="PONTA CURTA",
                     morning="10",
@@ -65,6 +66,7 @@ class HttpVisionProvider:
             header_confidence=payload.get("header_confidence", {}),
             lines=[
                 VisionLine(
+                    animal_brinco=line.get("animal_brinco"),
                     animal_number=line.get("animal_number"),
                     animal_name=line.get("animal_name"),
                     morning=line.get("morning"),
