@@ -7,7 +7,7 @@ exige `reviewer`, porque muda o cálculo de custo de toda a fazenda.
 from __future__ import annotations
 
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.farm_clock import farm_today
 from app.core.security import require_minimum_role
 from app.db.models import AuditEvent, Farm, Supply, SupplyDiet, SupplyPrice, User
 from app.db.session import get_db_session
@@ -123,7 +124,7 @@ async def create_supply(
         SupplyPrice(
             supply_id=supply.id,
             price_per_kg=payload.price_per_kg,
-            effective_on=date.today(),
+            effective_on=farm_today(),
             source="manual",
             recorded_by=user.email,
         )
@@ -158,7 +159,7 @@ async def update_supply(
 
     if payload.price_per_kg is not None:
         supply.price_per_kg = payload.price_per_kg
-        effective = payload.effective_on or date.today()
+        effective = payload.effective_on or farm_today()
         # Preço é evento datado: o anterior fica no histórico. Havendo registro
         # para a mesma data, ele é corrigido em vez de duplicado.
         existing = await session.scalar(
@@ -261,3 +262,32 @@ async def set_milk_price(
     )
     await session.commit()
     return payload
+
+
+@router.get("/supplies/{supply_id}/prices")
+async def supply_price_history(
+    supply_id: UUID,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    farm: Annotated[Farm, Depends(resolve_current_farm)],
+    _: Annotated[User, Depends(require_minimum_role("operator"))],
+) -> list[dict[str, Any]]:
+    """Todos os preços do insumo, do mais recente ao mais antigo."""
+    supply = await session.scalar(
+        select(Supply).where(Supply.id == supply_id, Supply.farm_id == farm.id)
+    )
+    if supply is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Insumo não encontrado.")
+    prices = await session.scalars(
+        select(SupplyPrice)
+        .where(SupplyPrice.supply_id == supply.id)
+        .order_by(SupplyPrice.effective_on.desc())
+    )
+    return [
+        {
+            "effective_on": price.effective_on.isoformat(),
+            "price_per_kg": float(price.price_per_kg),
+            "source": price.source,
+            "recorded_by": price.recorded_by,
+        }
+        for price in prices
+    ]

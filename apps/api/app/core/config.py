@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     #: cookie viaja em texto puro. Só desligue para desenvolvimento local em
     #: http://localhost, onde o navegador não enviaria um cookie `Secure`.
     auth_cookie_secure: bool = True
+    #: Mostra a área "Fichas" mesmo com o provedor de OCR falso. Existe para
+    #: demonstração e para o teste E2E do fluxo de foto; em produção é
+    #: recusado, porque o provedor falso inventa leituras.
+    photo_sheets_demo: bool = False
 
     @field_validator("auth_secret")
     @classmethod
@@ -71,6 +75,12 @@ class Settings(BaseSettings):
         # é legítimo em desenvolvimento local, onde não há TLS; em produção é
         # um erro de configuração que entregaria a sessão de qualquer usuário,
         # e falhar na inicialização é melhor do que descobrir depois.
+        if self.photo_sheets_demo:
+            raise ValueError(
+                "photo_sheets_demo must stay disabled in production: the fake OCR "
+                "provider invents readings"
+            )
+
         if self.runtime_role == "api" and not self.auth_cookie_secure:
             raise ValueError(
                 "auth_cookie_secure must stay enabled in production: without it "
@@ -82,3 +92,8 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def photo_sheets_enabled(settings: Settings) -> bool:
+    """Se a área de fichas por foto deve aparecer nesta instalação."""
+    return settings.vision_provider == "http" or settings.photo_sheets_demo
