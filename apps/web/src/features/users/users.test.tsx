@@ -199,3 +199,20 @@ describe("ChangePasswordForm", () => {
     expect(await screen.findByText(/senha atual incorreta/i)).toBeInTheDocument();
   });
 });
+
+describe("UsersPage — carregamento", () => {
+  it("uma falha ao listar não trava a tela: oferece tentar de novo", async () => {
+    const list = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("falha de rede"))
+      .mockResolvedValueOnce({ items: [account()], total: 1 });
+
+    render(<UsersPage token={TOKEN} currentUserId="u-9" onList={list} />);
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /tentar de novo/i }));
+
+    expect(await screen.findByText("joao@belovale")).toBeInTheDocument();
+    expect(list).toHaveBeenCalledTimes(2);
+  });
+});

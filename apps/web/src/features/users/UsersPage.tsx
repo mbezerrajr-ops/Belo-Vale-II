@@ -244,7 +244,13 @@ export function UsersPage({
 
       <h3>Contas existentes</h3>
       {page === null ? (
-        <div className="skeleton" style={{ height: 56 }} />
+        error ? (
+          <button type="button" className="secondary" onClick={() => void reload()}>
+            Tentar de novo
+          </button>
+        ) : (
+          <div className="skeleton" style={{ height: 56 }} />
+        )
       ) : (
         <ul className="user-list">
           {page.items.map((user, index) => (

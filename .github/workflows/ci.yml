@@ -153,9 +153,16 @@ jobs:
       # vez). Sem isto, o primeiro teste do Playwright é quem paga esse custo
       # — e um runner compartilhado pode levar mais que o tempo padrão de
       # asserção, derrubando só o primeiro teste da suíte.
+      #
+      # /api/auth/refresh com um cookie inválido consulta o banco (procura o
+      # token) e devolve 401 sem passar pelo limitador de tentativas de
+      # login — diferente de POST /api/auth/login, que contaria como uma
+      # falha e, somado às falhas propositais dos próprios testes, poderia
+      # acumular até bloquear a origem numa suíte rodada mais de uma vez
+      # seguida contra o mesmo Redis.
       - name: Aquecer a conexão da API com o banco
         run: |
-          curl -s -o /dev/null -X POST http://localhost:8080/api/auth/login             -H "Content-Type: application/json"             -d '{"email":"warmup@example.com","password":"wrong password"}'
+          curl -s -o /dev/null -X POST http://localhost:8080/api/auth/refresh             --cookie "bv_refresh=warmup-nao-e-uma-sessao-real"
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
