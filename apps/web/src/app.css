@@ -304,3 +304,135 @@ form button[type="submit"] {
   color: var(--danger);
   border-color: var(--danger);
 }
+
+/* --- painel do rebanho --- */
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.kpi {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+}
+
+.kpi span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.kpi strong {
+  font-size: 1.15rem;
+  color: var(--green);
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.bars {
+  list-style: none;
+  margin: 10px 0 16px;
+  padding: 0;
+}
+
+.bars li {
+  display: grid;
+  /* No celular o rótulo fica estreito; a barra é o que comunica. */
+  grid-template-columns: minmax(70px, 30%) 1fr auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 7px;
+  font-size: 0.88rem;
+}
+
+.bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  height: 16px;
+  border-radius: 8px;
+  background: #e4ebe7;
+  overflow: hidden;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 8px;
+  background: var(--green);
+}
+
+.bar-value {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Tabelas rolam em vez de espremer colunas no celular. */
+.table-wrap {
+  overflow-x: auto;
+  margin: 10px 0 16px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--white);
+  font-size: 0.88rem;
+}
+
+th,
+td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* --- insumos --- */
+
+.supply-list {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+}
+
+.supply-list > li {
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+}
+
+.supply-list h3 {
+  margin-top: 0;
+}
+
+.price {
+  margin: 0 0 10px;
+  color: var(--green);
+  font-weight: 700;
+}
+
+.diet {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}

@@ -8,7 +8,10 @@ import {
   type AnimalUpdateInput,
   type CurrentUser,
   type Farm,
+  type DashboardFilters,
+  type DashboardSummary,
   type Role,
+  type Supply,
   type UserAccount,
   type UserPage,
   type DecisionRequest,
@@ -327,4 +330,83 @@ export async function changeOwnPassword(
   if (!response.ok) {
     throw new ApiError(response.status, await response.json());
   }
+}
+
+
+// --- Painel do rebanho ---
+
+export async function getDashboard(
+  token: string,
+  filters: DashboardFilters = {},
+): Promise<DashboardSummary> {
+  const params = new URLSearchParams();
+  if (filters.measuredOn) params.set("measured_on", filters.measuredOn);
+  if (filters.lote) params.set("lote", filters.lote);
+  if (filters.situacao) params.set("situacao", filters.situacao);
+
+  const query = params.toString();
+  const response = await fetch(
+    `${API_BASE_URL}/api/dashboard${query ? `?${query}` : ""}`,
+    { headers: authHeaders(token) },
+  );
+  return parseJsonOrThrow<DashboardSummary>(response);
+}
+
+export async function listSupplies(token: string): Promise<Supply[]> {
+  const response = await fetch(`${API_BASE_URL}/api/supplies`, {
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow<Supply[]>(response);
+}
+
+export async function createSupply(
+  token: string,
+  name: string,
+  pricePerKg: number,
+): Promise<Supply> {
+  const response = await fetch(`${API_BASE_URL}/api/supplies`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ name, price_per_kg: pricePerKg }),
+  });
+  return parseJsonOrThrow<Supply>(response);
+}
+
+export async function updateSupplyPrice(
+  token: string,
+  supplyId: string,
+  pricePerKg: number,
+): Promise<Supply> {
+  const response = await fetch(`${API_BASE_URL}/api/supplies/${supplyId}`, {
+    method: "PATCH",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ price_per_kg: pricePerKg }),
+  });
+  return parseJsonOrThrow<Supply>(response);
+}
+
+export async function setSupplyDiet(
+  token: string,
+  supplyId: string,
+  lote: string,
+  kgPerDay: number,
+): Promise<Supply> {
+  const response = await fetch(`${API_BASE_URL}/api/supplies/${supplyId}/diet`, {
+    method: "PUT",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ lote, kg_per_day: kgPerDay }),
+  });
+  return parseJsonOrThrow<Supply>(response);
+}
+
+export async function setMilkPrice(
+  token: string,
+  pricePerLiter: number,
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/farms/current/milk-price`, {
+    method: "PATCH",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ milk_price_per_liter: pricePerLiter }),
+  });
+  await parseJsonOrThrow(response);
 }

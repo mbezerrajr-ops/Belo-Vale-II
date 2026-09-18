@@ -16,6 +16,8 @@ import type {
   UploadResult,
 } from "./api/types";
 import { AnimalDetailPanel } from "./features/animals/AnimalDetailPanel";
+import { HerdDashboard } from "./features/dashboard/HerdDashboard";
+import { SuppliesPage } from "./features/dashboard/SuppliesPage";
 import { AnimalSearchPage } from "./features/animals/AnimalSearchPage";
 import { ChangePasswordForm } from "./features/users/ChangePasswordForm";
 import { UsersPage } from "./features/users/UsersPage";
@@ -153,7 +155,14 @@ interface AuthenticatedAppProps {
 }
 
 /** Áreas do aplicativo. `animais` é a primeira porque é o uso diário. */
-type Area = "animais" | "fichas" | "medicoes" | "contas" | "minha-conta";
+type Area =
+  | "painel"
+  | "animais"
+  | "fichas"
+  | "insumos"
+  | "medicoes"
+  | "contas"
+  | "minha-conta";
 
 const ROLE_LEVEL: Record<string, number> = {
   operator: 0,
@@ -170,7 +179,7 @@ function AuthenticatedApp({
   user,
   onLogout,
 }: AuthenticatedAppProps): JSX.Element {
-  const [area, setArea] = useState<Area>("animais");
+  const [area, setArea] = useState<Area>("painel");
   const [farm, setFarm] = useState<Farm | null>(null);
   const [farmError, setFarmError] = useState<string | null>(null);
   const [openAnimalId, setOpenAnimalId] = useState<string | null>(null);
@@ -240,6 +249,13 @@ function AuthenticatedApp({
       <nav aria-label="Áreas">
         <button
           type="button"
+          aria-current={area === "painel"}
+          onClick={() => setArea("painel")}
+        >
+          Painel
+        </button>
+        <button
+          type="button"
           aria-current={area === "animais"}
           onClick={() => setArea("animais")}
         >
@@ -251,6 +267,13 @@ function AuthenticatedApp({
           onClick={() => setArea("fichas")}
         >
           Fichas
+        </button>
+        <button
+          type="button"
+          aria-current={area === "insumos"}
+          onClick={() => setArea("insumos")}
+        >
+          Insumos
         </button>
         <button
           type="button"
@@ -278,6 +301,16 @@ function AuthenticatedApp({
       </nav>
 
       {farmError && <p role="alert">{farmError}</p>}
+
+      {area === "painel" && <HerdDashboard token={token} />}
+
+      {area === "insumos" && (
+        <SuppliesPage
+          token={token}
+          canEdit={canEdit}
+          milkPrice={farm?.milk_price_per_liter ?? null}
+        />
+      )}
 
       {area === "animais" &&
         (openAnimalId !== null && animal !== null ? (
