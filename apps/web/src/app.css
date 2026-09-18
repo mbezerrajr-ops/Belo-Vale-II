@@ -794,7 +794,9 @@ form h3 {
   }
 }
 
-@media (min-width: 1240px) {
+/* Seis tiles lado a lado só quando cada um cabe um valor em reais inteiro;
+   abaixo disso, três colunas em duas linhas. */
+@media (min-width: 1400px) {
   .kpis {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
