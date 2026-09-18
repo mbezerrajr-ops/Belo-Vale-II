@@ -22,7 +22,20 @@ EXPOSE 8000
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"
 
-CMD ["uv", "run", "--no-sync", "uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+# `--proxy-headers` faz o uvicorn ler X-Forwarded-For. Sem isso, atrás do
+# nginx toda requisição pareceria vir do proxy, e o limite de tentativas de
+# login por origem não distinguiria um atacante do resto da fazenda.
+#
+# `FORWARDED_ALLOW_IPS` decide de quem esse cabeçalho é aceito, e o padrão é
+# restrito de propósito: o compose publica a porta 8000, então a API é
+# alcançável sem passar pelo nginx. Com `*`, qualquer um poderia mandar um
+# X-Forwarded-For forjado direto para a porta 8000 e escapar do limite de
+# login trocando o IP a cada tentativa.
+#
+# A faixa abaixo cobre as redes privadas usadas pelo Docker. Num deploy com
+# proxy externo, ajuste para o IP exato dele.
+ENV FORWARDED_ALLOW_IPS="10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1"
+CMD ["sh", "-c", "uv run --no-sync uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips \"$FORWARDED_ALLOW_IPS\""]
 
 # This target is intentionally separate from runtime: it adds only the locked
 # development dependency group and the test sources needed by pytest.

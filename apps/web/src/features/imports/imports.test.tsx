@@ -136,9 +136,14 @@ describe("UploadForm", () => {
       }),
     }) as unknown as typeof fetch;
 
-    render(<UploadForm token="test-token" />);
+    // A fazenda vem resolvida do servidor; o formulário não a pede mais.
+    render(
+      <UploadForm
+        token="test-token"
+        farmId="11111111-1111-1111-1111-111111111111"
+      />,
+    );
 
-    await user.type(screen.getByLabelText("Fazenda"), "11111111-1111-1111-1111-111111111111");
     const file = new File(["fake"], "sheet.jpg", { type: "image/jpeg" });
     await user.upload(screen.getByLabelText("Foto da ficha"), file);
     await user.click(screen.getByRole("button", { name: "Enviar foto" }));

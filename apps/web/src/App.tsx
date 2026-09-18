@@ -1,12 +1,24 @@
 import { useEffect, useState } from "react";
 
 import {
+  getAnimal,
+  getCurrentFarm,
   getCurrentUser,
   getImportReview,
   logout as endSession,
   refreshSession,
 } from "./api/client";
-import type { CurrentUser, ImportReview, UploadResult } from "./api/types";
+import type {
+  AnimalDetail,
+  CurrentUser,
+  Farm,
+  ImportReview,
+  UploadResult,
+} from "./api/types";
+import { AnimalDetailPanel } from "./features/animals/AnimalDetailPanel";
+import { AnimalSearchPage } from "./features/animals/AnimalSearchPage";
+import { ChangePasswordForm } from "./features/users/ChangePasswordForm";
+import { UsersPage } from "./features/users/UsersPage";
 import { LoginForm } from "./auth/LoginForm";
 import { clearStoredToken, loadStoredToken, storeToken } from "./auth/session";
 import { OfficialMeasurements } from "./features/dashboard/OfficialMeasurements";
@@ -119,7 +131,7 @@ export function App(): JSX.Element {
   if (session.status === "signed-out") {
     return (
       <main>
-        <h1>Belo Vale — Conferência de fichas</h1>
+        <h1>Belo Vale II</h1>
         <LoginForm onLoggedIn={handleLoggedIn} />
       </main>
     );
@@ -140,18 +152,63 @@ interface AuthenticatedAppProps {
   onLogout: () => void;
 }
 
+/** Áreas do aplicativo. `animais` é a primeira porque é o uso diário. */
+type Area = "animais" | "fichas" | "medicoes" | "contas" | "minha-conta";
+
+const ROLE_LEVEL: Record<string, number> = {
+  operator: 0,
+  reviewer: 1,
+  admin: 2,
+};
+
+function atLeast(user: CurrentUser, role: keyof typeof ROLE_LEVEL): boolean {
+  return (ROLE_LEVEL[user.role] ?? -1) >= ROLE_LEVEL[role];
+}
+
 function AuthenticatedApp({
   token,
   user,
   onLogout,
 }: AuthenticatedAppProps): JSX.Element {
-  const [farmId, setFarmId] = useState("");
+  const [area, setArea] = useState<Area>("animais");
+  const [farm, setFarm] = useState<Farm | null>(null);
+  const [farmError, setFarmError] = useState<string | null>(null);
+  const [openAnimalId, setOpenAnimalId] = useState<string | null>(null);
+  const [animal, setAnimal] = useState<AnimalDetail | null>(null);
   const [importId, setImportId] = useState<string | null>(null);
   const [review, setReview] = useState<ImportReview | null>(null);
 
+  const canEdit = atLeast(user, "reviewer");
+  const isAdmin = atLeast(user, "admin");
+
+  // A fazenda vem do servidor. Ninguém digita UUID nesta aplicação.
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentFarm(token)
+      .then((resolved) => {
+        if (!cancelled) setFarm(resolved);
+      })
+      .catch((error: unknown) => {
+        const body = (error as { body?: { detail?: string } })?.body;
+        if (!cancelled) {
+          setFarmError(
+            body?.detail ??
+              "Não foi possível identificar a fazenda. Fale com o administrador.",
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const loadAnimal = async (animalId: string): Promise<void> => {
+    setOpenAnimalId(animalId);
+    setAnimal(await getAnimal(token, animalId));
+  };
+
   const refreshReview = async (id: string): Promise<void> => {
-    const nextReview = await getImportReview(id, token);
-    setReview(nextReview);
+    setReview(await getImportReview(id, token));
   };
 
   const handleUploaded = async (result: UploadResult): Promise<void> => {
@@ -160,10 +217,9 @@ function AuthenticatedApp({
   };
 
   const handleDecided = async (): Promise<void> => {
-    // Approving/rejecting doesn't optimistically patch local state — this
-    // just re-fetches the same source of truth GET /review already reads,
-    // so an approval's supersession side effects, updated line version, and
-    // any new alerts show up exactly as the backend now sees them.
+    // Aprovar/rejeitar não remenda o estado local: relê a mesma fonte que o
+    // GET /review usa, então substituições, versão da linha e alertas novos
+    // aparecem exatamente como o backend passou a enxergar.
     if (importId !== null) {
       await refreshReview(importId);
     }
@@ -172,30 +228,101 @@ function AuthenticatedApp({
   return (
     <main>
       <header>
-        <h1>Belo Vale — Conferência de fichas</h1>
-        <p>
-          {user.email} ({user.role})
+        <h1>Belo Vale II</h1>
+        <p className="who">
+          {user.email}
           <button type="button" onClick={onLogout}>
             Sair
           </button>
         </p>
       </header>
 
-      <label>
-        Fazenda
-        <input value={farmId} onChange={(event) => setFarmId(event.target.value)} />
-      </label>
-
-      <UploadForm token={token} onUploaded={handleUploaded} />
-      {review === null ? null : (
-        <div>
-          <button type="button" onClick={() => refreshReview(review.import_id)}>
-            Atualizar revisão
+      <nav aria-label="Áreas">
+        <button
+          type="button"
+          aria-current={area === "animais"}
+          onClick={() => setArea("animais")}
+        >
+          Animais
+        </button>
+        <button
+          type="button"
+          aria-current={area === "fichas"}
+          onClick={() => setArea("fichas")}
+        >
+          Fichas
+        </button>
+        <button
+          type="button"
+          aria-current={area === "medicoes"}
+          onClick={() => setArea("medicoes")}
+        >
+          Medições
+        </button>
+        {isAdmin && (
+          <button
+            type="button"
+            aria-current={area === "contas"}
+            onClick={() => setArea("contas")}
+          >
+            Contas
           </button>
-          <ReviewWorkspace review={review} token={token} onDecided={handleDecided} />
-        </div>
+        )}
+        <button
+          type="button"
+          aria-current={area === "minha-conta"}
+          onClick={() => setArea("minha-conta")}
+        >
+          Minha conta
+        </button>
+      </nav>
+
+      {farmError && <p role="alert">{farmError}</p>}
+
+      {area === "animais" &&
+        (openAnimalId !== null && animal !== null ? (
+          <>
+            <button type="button" onClick={() => setOpenAnimalId(null)}>
+              Voltar à busca
+            </button>
+            <AnimalDetailPanel
+              token={token}
+              animal={animal}
+              canEdit={canEdit}
+              onChanged={() => void loadAnimal(animal.id)}
+            />
+          </>
+        ) : (
+          <AnimalSearchPage
+            token={token}
+            canEdit={canEdit}
+            onOpen={(animalId) => void loadAnimal(animalId)}
+          />
+        ))}
+
+      {area === "fichas" && farm !== null && (
+        <>
+          <UploadForm token={token} farmId={farm.id} onUploaded={handleUploaded} />
+          {review !== null && (
+            <div>
+              <button type="button" onClick={() => refreshReview(review.import_id)}>
+                Atualizar revisão
+              </button>
+              <ReviewWorkspace review={review} token={token} onDecided={handleDecided} />
+            </div>
+          )}
+        </>
       )}
-      {farmId === "" ? null : <OfficialMeasurements farmId={farmId} token={token} />}
+
+      {area === "medicoes" && farm !== null && (
+        <OfficialMeasurements farmId={farm.id} token={token} />
+      )}
+
+      {area === "contas" && isAdmin && (
+        <UsersPage token={token} currentUserId={user.id} />
+      )}
+
+      {area === "minha-conta" && <ChangePasswordForm token={token} />}
     </main>
   );
 }
