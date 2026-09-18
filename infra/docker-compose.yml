@@ -13,6 +13,9 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY in the server environment}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY in the server environment}
       AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in the server environment}
+      # Mostra a área "Fichas" com o OCR falso. Só para demonstração e para o
+      # E2E do fluxo de foto; a API recusa subir com isto em produção.
+      PHOTO_SHEETS_DEMO: ${PHOTO_SHEETS_DEMO:-false}
     depends_on:
       db:
         condition: service_healthy
@@ -101,7 +104,10 @@ services:
     networks: [ingestion_private]
 
   minio:
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    # O Docker Hub deixou de servir as imagens gratuitas da MinIO; o espelho
+    # oficial é o quay.io. Fixada pelo digest: a mesma versão de antes, e uma
+    # troca no registro não passa despercebida.
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z@sha256:a1ea29fa28355559ef137d71fc570e508a214ec84ff8083e39bc5428980b015e
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY in the server environment}
