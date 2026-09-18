@@ -5,6 +5,8 @@ import { ApiError, type UploadResult } from "../../api/types";
 
 interface UploadFormProps {
   token: string;
+  /** Resolvida no servidor por quem renderiza; o usuário nunca digita isto. */
+  farmId: string;
   onUploaded?: (result: UploadResult) => void;
 }
 
@@ -16,8 +18,7 @@ type UploadState =
   | { status: "reprocessing" }
   | { status: "error"; message: string };
 
-export function UploadForm({ token, onUploaded }: UploadFormProps): JSX.Element {
-  const [farmId, setFarmId] = useState("");
+export function UploadForm({ token, farmId, onUploaded }: UploadFormProps): JSX.Element {
   const [file, setFile] = useState<File | null>(null);
   const [declaredLot, setDeclaredLot] = useState("");
   const [declaredPeriod, setDeclaredPeriod] = useState("");
@@ -64,14 +65,6 @@ export function UploadForm({ token, onUploaded }: UploadFormProps): JSX.Element 
 
   return (
     <form onSubmit={handleSubmit}>
-      <label>
-        Fazenda
-        <input
-          value={farmId}
-          onChange={(event) => setFarmId(event.target.value)}
-          required
-        />
-      </label>
       <label>
         Lote declarado
         <input value={declaredLot} onChange={(event) => setDeclaredLot(event.target.value)} />

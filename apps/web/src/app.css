@@ -1,0 +1,306 @@
+/*
+ * Estilo mínimo para uso no celular, no curral.
+ *
+ * Prioridades: alvos de toque grandes (mão suja, luva), contraste alto (sol),
+ * e nenhuma dependência externa — a página tem que abrir com sinal ruim.
+ */
+
+:root {
+  --ink: #18342b;
+  --muted: #5e6f68;
+  --green: #285e4a;
+  --line: #cbd7d1;
+  --bg: #f8f7f4;
+  --white: #fff;
+  --danger: #9c382e;
+  --warn-bg: #fff1d8;
+  /* Alvo de toque confortável mesmo com a mão ocupada. */
+  --touch: 48px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 12px 16px 64px;
+}
+
+h1 {
+  font-size: 1.35rem;
+  margin: 0;
+}
+
+h2 {
+  font-size: 1.2rem;
+  margin: 20px 0 10px;
+}
+
+h3 {
+  font-size: 1.02rem;
+  margin: 18px 0 8px;
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--green);
+}
+
+.who {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+nav {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 10px 0;
+  /* A barra rola no celular sem cortar o último item. */
+  scrollbar-width: thin;
+}
+
+nav button {
+  flex: 0 0 auto;
+  background: var(--white);
+  border: 1px solid var(--line);
+}
+
+nav button[aria-current="true"] {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--white);
+  font-weight: 600;
+}
+
+button {
+  min-height: var(--touch);
+  padding: 10px 16px;
+  border: 1px solid var(--green);
+  border-radius: 8px;
+  background: var(--green);
+  color: var(--white);
+  font: inherit;
+  font-size: 0.97rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+label {
+  display: block;
+  margin-top: 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+input,
+select {
+  width: 100%;
+  min-height: var(--touch);
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  font: inherit;
+  /* 17px evita o zoom automático do iOS ao focar o campo. */
+  font-size: 17px;
+}
+
+form {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+}
+
+form button[type="submit"] {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.notice {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #e9f2ed;
+  color: var(--green);
+}
+
+[role="alert"] {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fbe8e5;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.warning {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--warn-bg);
+}
+
+/* --- busca de animais --- */
+
+.search-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.search-row label {
+  grid-column: 1 / -1;
+  margin-bottom: -4px;
+}
+
+.search-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.search-shortcuts button {
+  background: var(--white);
+  color: var(--green);
+}
+
+.animal-list,
+.user-list,
+.lot-history {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+}
+
+.animal-list li {
+  margin-bottom: 8px;
+}
+
+.animal-list button {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  width: 100%;
+  text-align: left;
+  background: var(--white);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.animal-list strong {
+  color: var(--green);
+}
+
+.animal-list small {
+  color: var(--muted);
+}
+
+.count {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+/* --- ficha do animal --- */
+
+.animal-detail .brinco {
+  margin: 2px 0 12px;
+  color: var(--muted);
+}
+
+.animal-fields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+  margin: 0 0 14px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--white);
+  border: 1px solid var(--line);
+}
+
+.animal-fields dt {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.animal-fields dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.actions button {
+  flex: 1 1 160px;
+}
+
+.lot-history li,
+.user-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+}
+
+.user-list small,
+.lot-history span {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.user-list em {
+  color: var(--danger);
+  font-size: 0.86rem;
+}
+
+.user-list button {
+  margin-left: auto;
+  background: var(--white);
+  color: var(--danger);
+  border-color: var(--danger);
+}
