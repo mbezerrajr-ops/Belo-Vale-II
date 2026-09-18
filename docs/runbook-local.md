@@ -167,6 +167,20 @@ criados no passo 4.
 Para chamadas diretas à API (sem passar pelo proxy do nginx):
 `http://localhost:8000`.
 
+## 6.1. Uso diário
+
+- **Produção** (qualquer conta): escolha a data e o lote de ordenha, digite os
+  litros de cada vaca. Cada valor é salvo ao sair do campo; Enter passa para a
+  próxima. Quem entra como operador abre direto nesta área.
+- **Corrigir ou anular** um valor já lançado: revisor ou administrador, sempre
+  com motivo. A versão anterior continua no banco (`superseded` ou `voided`).
+- **Dar baixa** (venda, morte, descarte, doação): revisor ou administrador, na
+  ficha do animal. Encerra o lote na data e tira o animal do painel; a
+  produção já lançada fica. "Desfazer baixa" traz o animal de volta sem lote.
+- **Funcionário esqueceu a senha**: em Contas, "Redefinir senha" gera uma
+  senha provisória mostrada uma única vez, válida por 72 h. Quem entra com ela
+  só consegue escolher uma senha nova.
+
 ## 7. Rodar os testes de backend
 
 O alvo oficial usa PostgreSQL real, aplica migrations e roda pytest em uma
@@ -253,6 +267,27 @@ são atingidas pelo primeiro `DELETE` — mas o `DELETE FROM animals` falharia,
 porque `official_measurements.animal_id` é `ON DELETE RESTRICT`. Isso é
 proposital: um rollback só é automático enquanto a baseline for a única origem
 daqueles animais.
+
+### Rodar a suíte fora do Docker (desenvolvimento)
+
+Com um PostgreSQL e um Redis descartáveis — nunca o banco com dados reais,
+porque os testes apagam as tabelas:
+
+```bash
+docker run -d --name bv2-test-pg-b -e POSTGRES_USER=ingestion -e POSTGRES_DB=ingestion \
+  -e POSTGRES_PASSWORD=<senha-local> -p 127.0.0.1:55435:5432 postgres:17-alpine
+docker run -d --name bv2-redis -p 127.0.0.1:56379:6379 --restart unless-stopped redis:7-alpine
+
+cd apps/api
+export POSTGRES_URL="postgresql+asyncpg://ingestion:<senha-local>@127.0.0.1:55435/ingestion"
+export REDIS_URL="redis://127.0.0.1:56379/15"
+uv run --frozen alembic upgrade head
+uv run --frozen pytest -q
+```
+
+Sem `REDIS_URL`, os testes do limitador de login contra Redis são pulados e
+o limitador da aplicação roda só em memória. O CI (`.github/workflows/ci.yml`)
+roda esta mesma suíte contra PostgreSQL e Redis reais em todo push e PR.
 
 ## 8. Rodar os testes de frontend
 
