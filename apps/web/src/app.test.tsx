@@ -36,6 +36,7 @@ beforeEach(() => {
   });
   api.getDashboard.mockReturnValue(new Promise(() => {}));
   api.refreshSession.mockResolvedValue(null);
+  api.getFeatures.mockResolvedValue({ photo_sheets: false });
 });
 
 afterEach(() => {
@@ -67,6 +68,25 @@ describe("App", () => {
       "aria-current",
       "true",
     );
+  });
+
+  it("esconde Fichas quando não há OCR real", async () => {
+    signedIn({ role: "admin", email: "dono@belovale" });
+
+    render(<App />);
+
+    await screen.findByRole("button", { name: /produção/i });
+    await waitFor(() => expect(api.getFeatures).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: /fichas/i })).not.toBeInTheDocument();
+  });
+
+  it("mostra Fichas quando a instalação tem OCR", async () => {
+    signedIn({ role: "admin", email: "dono@belovale" });
+    api.getFeatures.mockResolvedValue({ photo_sheets: true });
+
+    render(<App />);
+
+    expect(await screen.findByRole("button", { name: /fichas/i })).toBeInTheDocument();
   });
 
   it("senha provisória leva direto à troca, sem acesso ao resto", async () => {

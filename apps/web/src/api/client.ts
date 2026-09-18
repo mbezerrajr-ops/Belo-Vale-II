@@ -12,6 +12,9 @@ import {
   type DashboardFilters,
   type DashboardSummary,
   type ExitReason,
+  type Features,
+  type ProductionHistoryEntry,
+  type SupplyPrice,
   type ImportMode,
   type ImportPreview,
   type ImportRecord,
@@ -573,4 +576,34 @@ export async function listImports(token: string): Promise<ImportRecord[]> {
     headers: authHeaders(token),
   });
   return parseJsonOrThrow<ImportRecord[]>(response);
+}
+
+// --- Histórico e consulta ---
+
+/** Todas as leituras do animal, inclusive as substituídas e anuladas. */
+export async function getAnimalProduction(
+  token: string,
+  animalId: string,
+): Promise<ProductionHistoryEntry[]> {
+  const response = await fetch(`${API_BASE_URL}/api/animals/${animalId}/production`, {
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow<ProductionHistoryEntry[]>(response);
+}
+
+export async function getSupplyPrices(
+  token: string,
+  supplyId: string,
+): Promise<SupplyPrice[]> {
+  const response = await fetch(`${API_BASE_URL}/api/supplies/${supplyId}/prices`, {
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow<SupplyPrice[]>(response);
+}
+
+export async function getFeatures(token: string): Promise<Features> {
+  const response = await fetch(`${API_BASE_URL}/api/features`, {
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow<Features>(response);
 }

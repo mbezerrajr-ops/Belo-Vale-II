@@ -4,6 +4,7 @@ import {
   getAnimal,
   getCurrentFarm,
   getCurrentUser,
+  getFeatures,
   getImportReview,
   logout as endSession,
   refreshSession,
@@ -274,6 +275,21 @@ function AuthenticatedApp({
   const [importId, setImportId] = useState<string | null>(null);
   const [review, setReview] = useState<ImportReview | null>(null);
 
+  // "Fichas" só aparece com OCR real: com o provedor falso, a leitura seria
+  // inventada. Na dúvida (falha ao consultar), fica escondida.
+  const [photoSheets, setPhotoSheets] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    getFeatures(token)
+      .then((features) => {
+        if (!cancelled) setPhotoSheets(Boolean(features?.photo_sheets));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
   const canEdit = atLeast(user, "reviewer");
   const isAdmin = atLeast(user, "admin");
 
@@ -325,7 +341,7 @@ function AuthenticatedApp({
     "painel",
     "producao",
     "animais",
-    "fichas",
+    ...(photoSheets ? (["fichas"] as Area[]) : []),
     "insumos",
     "medicoes",
     ...(isAdmin ? (["contas"] as Area[]) : []),

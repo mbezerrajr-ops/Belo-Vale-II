@@ -178,9 +178,8 @@ export function UsersPage({
           autoComplete="new-password"
         />
         <p className="hint">
-          A senha precisa ter pelo menos 8 caracteres. Quanto mais longa, mais
-          segura: uma frase com duas ou três palavras é fácil de lembrar e
-          difícil de adivinhar.
+          Senha inicial, com pelo menos 8 caracteres. A pessoa escolhe a própria
+          senha no primeiro acesso — esta serve só para entrar a primeira vez.
         </p>
         <label htmlFor="user-role">Função</label>
         <select

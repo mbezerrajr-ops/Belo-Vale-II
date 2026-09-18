@@ -14,6 +14,14 @@ import { ChangePasswordForm } from "./users/ChangePasswordForm";
 import { UsersPage } from "./users/UsersPage";
 import type { AnimalDetail, UserAccount } from "../api/types";
 
+// A ficha carrega o histórico de produção sozinha. Estes testes tratam de
+// outras partes da ficha: o histórico fica "carregando" e não atualiza a
+// tela depois que o teste termina.
+vi.mock("../api/client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/client")>()),
+  getAnimalProduction: () => new Promise(() => {}),
+}));
+
 const TOKEN = "token-de-teste";
 
 function account(overrides: Partial<UserAccount> = {}): UserAccount {

@@ -14,6 +14,14 @@ import { AnimalDetailPanel } from "./AnimalDetailPanel";
 import { AnimalSearchPage } from "./AnimalSearchPage";
 import type { AnimalDetail, AnimalPage } from "../../api/types";
 
+// A ficha carrega o histórico de produção sozinha. Estes testes tratam de
+// outras partes da ficha: o histórico fica "carregando" e não atualiza a
+// tela depois que o teste termina.
+vi.mock("../../api/client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../api/client")>()),
+  getAnimalProduction: () => new Promise(() => {}),
+}));
+
 const TOKEN = "token-de-teste";
 
 function animal(overrides: Partial<AnimalDetail> = {}): AnimalDetail {
