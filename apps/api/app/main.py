@@ -8,6 +8,7 @@ from app.routers.auth import router as auth_router
 from app.routers.imports import router as imports_router
 from app.routers.measurements import router as measurements_router
 from app.routers.registry import router as registry_router
+from app.routers.users import router as users_router
 from app.routers.reviews import router as reviews_router
 from app.services.approval import (
     ConcurrentReviewError,
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(reviews_router)
     app.include_router(measurements_router)
     app.include_router(registry_router)
+    app.include_router(users_router)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
