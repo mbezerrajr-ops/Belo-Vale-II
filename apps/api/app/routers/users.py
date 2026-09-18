@@ -14,6 +14,7 @@ Duas proteções acompanham o CRUD e valem tanto quanto ele:
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
@@ -22,16 +23,22 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.password_policy import PasswordPolicyError, validate_password
+from app.core.temporary_password import (
+    TEMPORARY_PASSWORD_TTL,
+    generate_temporary_password,
+)
 from app.core.security import (
-    get_current_user,
+    get_authenticated_user,
     hash_password,
     require_minimum_role,
     verify_password,
 )
 from app.db.models import AuditEvent, User
 from app.db.session import get_db_session
+from app.services.refresh_tokens import revoke_all_for_user
 from app.schemas.users import (
     PasswordChange,
+    PasswordResetRead,
     UserCreate,
     UserPage,
     UserRead,
@@ -178,12 +185,21 @@ async def update_user(
 async def change_own_password(
     payload: PasswordChange,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(get_authenticated_user)],
 ) -> Response:
-    """Trocar a própria senha não exige papel elevado."""
+    """Trocar a própria senha não exige papel elevado.
+
+    É também a saída de quem entrou com senha provisória, por isso aceita uma
+    conta que ainda precisa trocar a senha.
+    """
     if not verify_password(payload.current_password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Senha atual incorreta."
+        )
+    if payload.new_password == payload.current_password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="A nova senha precisa ser diferente da atual.",
         )
     try:
         validate_password(payload.new_password, email=user.email)
@@ -191,6 +207,8 @@ async def change_own_password(
         raise _policy_error(error) from error
 
     user.password_hash = hash_password(payload.new_password)
+    user.must_change_password = False
+    user.password_expires_at = None
     # A auditoria registra a troca, nunca o valor.
     _audit(
         session,
@@ -200,3 +218,45 @@ async def change_own_password(
     )
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{user_id}/password-reset", response_model=PasswordResetRead)
+async def reset_password(
+    user_id: UUID,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    admin: Annotated[User, Depends(require_minimum_role("admin"))],
+) -> PasswordResetRead:
+    """Gera uma senha provisória para quem esqueceu a sua.
+
+    A senha é gerada aqui, não escolhida pelo administrador, expira sozinha e
+    só serve para escolher outra. As sessões abertas da conta caem: quem pede
+    a redefinição pode estar justamente perdendo o controle dela.
+    """
+    user = await session.scalar(select(User).where(User.id == user_id))
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Conta não encontrada."
+        )
+    if user.id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Para a sua própria senha, use \"Trocar senha\".",
+        )
+
+    temporary = generate_temporary_password()
+    expires_at = datetime.now(timezone.utc) + TEMPORARY_PASSWORD_TTL
+    user.password_hash = hash_password(temporary)
+    user.must_change_password = True
+    user.password_expires_at = expires_at
+    # A auditoria registra quem redefiniu e até quando vale, nunca o valor.
+    _audit(
+        session,
+        actor=admin.email,
+        action="user_password_reset",
+        entity_id=user.id,
+        new={"expires_at": expires_at.isoformat()},
+    )
+    # Por último: a revogação faz o commit, e senha, auditoria e sessões
+    # derrubadas entram juntos — nunca uma senha trocada sem registro.
+    await revoke_all_for_user(session, user_id=user.id, reason="password_reset")
+    return PasswordResetRead(temporary_password=temporary, expires_at=expires_at)

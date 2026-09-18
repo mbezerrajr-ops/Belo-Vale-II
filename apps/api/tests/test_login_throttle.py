@@ -274,6 +274,19 @@ class TestWiring:
 
         app.dependency_overrides[get_db_session] = override_session
         email = f"ninguem-{uuid.uuid4().hex}@belovale"
+        # O TestClient se apresenta sempre como a mesma origem; sem limpar,
+        # execuções anteriores deixariam essa origem bloqueada.
+        origin_key = "bv2:login:origin:testclient"
+        account_key = f"bv2:login:account:{email}"
+
+        async def forget():
+            throttle = RedisLoginThrottle.from_url(url)
+            try:
+                await throttle.client.delete(origin_key, account_key)
+            finally:
+                await throttle.aclose()
+
+        run(forget())
         try:
             with TestClient(app) as client:
                 assert isinstance(app.state.login_throttle, ResilientLoginThrottle)
@@ -287,11 +300,11 @@ class TestWiring:
         async def inspect():
             throttle = RedisLoginThrottle.from_url(url)
             try:
-                key = f"bv2:login:account:{email}"
-                count = await throttle.client.zcard(key)
-                await throttle.client.delete(key)
+                return await throttle.client.zcard(account_key)
             finally:
                 await throttle.aclose()
-            return count
 
-        assert run(inspect()) == 1
+        try:
+            assert run(inspect()) == 1
+        finally:
+            run(forget())

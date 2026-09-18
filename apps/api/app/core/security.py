@@ -152,11 +152,16 @@ def _unauthorized() -> HTTPException:
     )
 
 
-async def get_current_user(
+async def get_authenticated_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> User:
+    """Conta autenticada, mesmo que ainda precise trocar a senha provisória.
+
+    Só as rotas de "quem sou eu" e de troca de senha usam esta dependência;
+    todo o resto passa por :func:`get_current_user`.
+    """
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise _unauthorized()
     try:
@@ -168,6 +173,23 @@ async def get_current_user(
     )
     if user is None:
         raise _unauthorized()
+    return user
+
+
+async def get_current_user(
+    user: Annotated[User, Depends(get_authenticated_user)],
+) -> User:
+    """Conta autenticada e liberada para usar o sistema.
+
+    Depois de uma redefinição feita pelo administrador, a senha provisória já
+    passou por outras mãos; até o dono da conta escolher uma nova, ela só
+    serve para isso.
+    """
+    if user.must_change_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Troque a senha provisória antes de continuar.",
+        )
     return user
 
 

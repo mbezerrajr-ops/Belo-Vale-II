@@ -18,6 +18,8 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
+    #: Verdadeiro depois de uma redefinição: a tela leva direto à troca.
+    must_change_password: bool = False
 
 
 class CurrentUserResponse(BaseModel):
@@ -26,3 +28,4 @@ class CurrentUserResponse(BaseModel):
     id: str
     email: str
     role: str
+    must_change_password: bool = False

@@ -45,9 +45,21 @@ class UserRead(BaseModel):
     email: str
     role: str
     is_active: bool
+    #: Senha redefinida e ainda não trocada pelo dono da conta. O nome evita
+    #: a palavra "password" de propósito: há um teste que garante que ela
+    #: nunca aparece nesta resposta, como proteção contra vazar o hash.
+    reset_pending: bool = Field(default=False, validation_alias="must_change_password")
     created_at: datetime
 
 
 class UserPage(BaseModel):
     items: list[UserRead]
     total: int
+
+
+class PasswordResetRead(BaseModel):
+    """Resposta da redefinição. É o único lugar onde a senha provisória
+    aparece: ela não é gravada em texto nem na auditoria."""
+
+    temporary_password: str
+    expires_at: datetime
