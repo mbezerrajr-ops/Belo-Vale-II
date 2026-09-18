@@ -37,6 +37,7 @@ beforeEach(() => {
   api.getDashboard.mockReturnValue(new Promise(() => {}));
   api.refreshSession.mockResolvedValue(null);
   api.getFeatures.mockResolvedValue({ photo_sheets: false });
+  api.listProposals.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -68,6 +69,16 @@ describe("App", () => {
       "aria-current",
       "true",
     );
+  });
+
+  it("mostra quantas propostas esperam revisão", async () => {
+    signedIn({ role: "reviewer", email: "revisor@belovale" });
+    api.listProposals.mockResolvedValue([{ id: "p-1" }, { id: "p-2" }] as never);
+
+    render(<App />);
+
+    expect(await screen.findByLabelText("2 pendentes")).toBeInTheDocument();
+    expect(api.listProposals).toHaveBeenCalledWith("token-de-teste", "pending");
   });
 
   it("esconde Fichas quando não há OCR real", async () => {

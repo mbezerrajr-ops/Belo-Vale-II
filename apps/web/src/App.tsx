@@ -6,6 +6,7 @@ import {
   getCurrentUser,
   getFeatures,
   getImportReview,
+  listProposals,
   logout as endSession,
   refreshSession,
 } from "./api/client";
@@ -26,6 +27,7 @@ import { SuppliesPage } from "./features/dashboard/SuppliesPage";
 import { ReviewWorkspace } from "./features/imports/ReviewWorkspace";
 import { UploadForm } from "./features/imports/UploadForm";
 import { ProductionPage } from "./features/production/ProductionPage";
+import { ReviewInbox } from "./features/review/ReviewInbox";
 import { ChangePasswordForm } from "./features/users/ChangePasswordForm";
 import { UsersPage } from "./features/users/UsersPage";
 import { Cows, Hills, Icons, LogoMark, type IconName } from "./ui/Brand";
@@ -228,6 +230,7 @@ interface AuthenticatedAppProps {
 type Area =
   | "painel"
   | "producao"
+  | "revisao"
   | "animais"
   | "fichas"
   | "insumos"
@@ -238,6 +241,7 @@ type Area =
 const AREA_LABEL: Record<Area, string> = {
   painel: "Painel",
   producao: "Produção",
+  revisao: "Revisão",
   animais: "Animais",
   fichas: "Fichas",
   insumos: "Insumos",
@@ -290,6 +294,19 @@ function AuthenticatedApp({
     };
   }, [token]);
 
+  // Quantas propostas esperam revisão: aparece na navegação para ninguém
+  // precisar abrir a caixa para saber se há algo nela.
+  const [pendingReview, setPendingReview] = useState(0);
+  const refreshPending = (): void => {
+    void Promise.resolve(listProposals(token, "pending"))
+      .then((items) => setPendingReview(Array.isArray(items) ? items.length : 0))
+      .catch(() => undefined);
+  };
+  useEffect(() => {
+    refreshPending();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   const canEdit = atLeast(user, "reviewer");
   const isAdmin = atLeast(user, "admin");
 
@@ -340,6 +357,7 @@ function AuthenticatedApp({
   const areas: Area[] = [
     "painel",
     "producao",
+    "revisao",
     "animais",
     ...(photoSheets ? (["fichas"] as Area[]) : []),
     "insumos",
@@ -388,6 +406,11 @@ function AuthenticatedApp({
             >
               <Icon />
               {AREA_LABEL[name]}
+              {name === "revisao" && pendingReview > 0 && (
+                <span className="nav-badge" aria-label={`${pendingReview} pendentes`}>
+                  {pendingReview}
+                </span>
+              )}
             </button>
           );
         })}
@@ -399,6 +422,10 @@ function AuthenticatedApp({
         {area === "painel" && <HerdDashboard token={token} />}
 
         {area === "producao" && <ProductionPage token={token} canCorrect={canEdit} />}
+
+        {area === "revisao" && (
+          <ReviewInbox token={token} canDecide={canEdit} onChanged={refreshPending} />
+        )}
 
         {area === "insumos" && (
           <SuppliesPage

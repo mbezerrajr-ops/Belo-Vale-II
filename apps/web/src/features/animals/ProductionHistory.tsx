@@ -42,6 +42,7 @@ const ORIGIN: Record<Provenance, string> = {
   file_import: "Importada",
   legacy_baseline: "Sistema antigo",
   ocr_review: "Ficha por foto",
+  proposal_review: "Leitura revisada",
 };
 
 const OLD_STATUS: Record<string, string> = {

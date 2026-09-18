@@ -72,6 +72,13 @@ export const Icons = {
       <path d="M7 13h10" />
     </svg>
   ),
+  revisao: (): JSX.Element => (
+    <svg {...ICON_PROPS}>
+      <path d="M4 5h16v14H4z" />
+      <path d="M4 13h4l2 3h4l2-3h4" />
+      <path d="M9 8.5l2 2 4-4" />
+    </svg>
+  ),
   animais: (): JSX.Element => (
     <svg {...ICON_PROPS}>
       <path d="M5 8c-2-2-4-1-4 1 1 1 3 1 4 1M19 8c2-2 4-1 4 1-1 1-3 1-4 1" />

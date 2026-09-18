@@ -18,6 +18,7 @@ sem brinco podem passar a receber matching automático.
 from __future__ import annotations
 
 from datetime import date, timedelta
+from decimal import Decimal
 from typing import Any, Mapping
 from uuid import UUID, uuid4
 
@@ -50,6 +51,21 @@ UPDATABLE_FIELDS = frozenset(
 )
 
 
+def _jsonable(values: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """Datas e números do cadastro em forma que o JSON da auditoria aceita.
+
+    Sem isto, editar o último parto (uma data) derrubava a gravação da
+    auditoria e, com ela, a edição inteira.
+    """
+    if values is None:
+        return None
+    return {
+        key: value.isoformat() if isinstance(value, date) else
+        float(value) if isinstance(value, Decimal) else value
+        for key, value in values.items()
+    }
+
+
 def _audit(
     session: AsyncSession,
     *,
@@ -67,8 +83,8 @@ def _audit(
             action=action,
             entity_type="animal",
             entity_id=entity_id,
-            previous_value=dict(previous) if previous is not None else None,
-            new_value=dict(new) if new is not None else None,
+            previous_value=_jsonable(previous),
+            new_value=_jsonable(new),
         )
     )
 

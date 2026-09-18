@@ -342,7 +342,8 @@ class OfficialMeasurement(TimestampedModel, Base):
             name="ck_official_measurements_status",
         ),
         CheckConstraint(
-            "provenance IN ('ocr_review', 'legacy_baseline', 'manual_entry', 'file_import')",
+            "provenance IN ('ocr_review', 'legacy_baseline', 'manual_entry', "
+            "'file_import', 'proposal_review')",
             name="ck_official_measurements_provenance",
         ),
         # Toda medição ativa continua obrigada a ter proveniência rastreável e
@@ -366,6 +367,10 @@ class OfficialMeasurement(TimestampedModel, Base):
             " OR"
             " (provenance = 'file_import'"
             "  AND production_import_id IS NOT NULL"
+            "  AND reviewed_by IS NOT NULL AND length(btrim(reviewed_by)) > 0)"
+            " OR"
+            " (provenance = 'proposal_review'"
+            "  AND event_proposal_id IS NOT NULL"
             "  AND reviewed_by IS NOT NULL AND length(btrim(reviewed_by)) > 0)"
             ")",
             name="ck_official_measurements_active_review_provenance",
@@ -411,6 +416,10 @@ class OfficialMeasurement(TimestampedModel, Base):
     #: Importação de arquivo que criou esta leitura, quando é `file_import`.
     production_import_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("production_imports.id", ondelete="RESTRICT")
+    )
+    #: Proposta aprovada que criou esta leitura, quando é `proposal_review`.
+    event_proposal_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("event_proposals.id", ondelete="RESTRICT")
     )
 
 
@@ -463,6 +472,110 @@ class ProductionImport(TimestampedModel, Base):
         ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
     summary: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+
+
+class EventProposalSource(TimestampedModel, Base):
+    """Um conteúdo lido por um leitor (foto, áudio, texto) e a saída bruta dele.
+
+    Imutável (trigger no banco): é a prova do que foi lido.
+    """
+
+    __tablename__ = "event_proposal_sources"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('photo', 'audio', 'text')", name="ck_event_proposal_sources_kind"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()")
+    )
+    farm_id: Mapped[UUID] = mapped_column(ForeignKey("farms.id", ondelete="RESTRICT"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    extractor_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    extractor_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    reference_date: Mapped[date | None] = mapped_column(Date)
+    raw_output: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    created_by_user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+
+
+class EventProposal(TimestampedModel, Base):
+    """Um evento lido, esperando decisão humana.
+
+    `raw_fields` é o que o leitor entregou e nunca muda. `payload` é a
+    interpretação inicial; `applied_payload` e `applied_animal_id` são o que a
+    pessoa aprovou. Decidida, a proposta fica imutável (trigger no banco).
+    """
+
+    __tablename__ = "event_proposals"
+    __table_args__ = (
+        CheckConstraint(
+            "event_type IN ('production', 'calving', 'dry_off', 'exit', 'lot_change', 'note')",
+            name="ck_event_proposals_event_type",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'approved', 'rejected')", name="ck_event_proposals_status"
+        ),
+        CheckConstraint(
+            "status = 'pending' OR (decided_by_user_id IS NOT NULL AND decided_at IS NOT NULL)",
+            name="ck_event_proposals_decided",
+        ),
+        CheckConstraint(
+            "status <> 'rejected' OR "
+            "(decision_reason IS NOT NULL AND length(btrim(decision_reason)) >= 3)",
+            name="ck_event_proposals_rejection_reason",
+        ),
+        CheckConstraint(
+            "status <> 'approved' OR "
+            "(applied_animal_id IS NOT NULL AND applied_payload IS NOT NULL)",
+            name="ck_event_proposals_applied",
+        ),
+        Index("ix_event_proposals_inbox", "farm_id", "status", "created_at"),
+        Index("ix_event_proposals_source", "source_id", "position"),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()")
+    )
+    source_id: Mapped[UUID] = mapped_column(
+        ForeignKey("event_proposal_sources.id", ondelete="RESTRICT"), nullable=False
+    )
+    farm_id: Mapped[UUID] = mapped_column(ForeignKey("farms.id", ondelete="RESTRICT"), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    event_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    brinco_lido: Mapped[str | None] = mapped_column(String(64))
+    nome_lido: Mapped[str | None] = mapped_column(String(255))
+    candidate_animal_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("animals.id", ondelete="RESTRICT")
+    )
+    raw_fields: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    evidence: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
+    )
+    confidence: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
+    )
+    alerts: Mapped[list[Any]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="pending", server_default=text("'pending'")
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"))
+    decided_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT")
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    decision_reason: Mapped[str | None] = mapped_column(Text)
+    applied_animal_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("animals.id", ondelete="RESTRICT")
+    )
+    applied_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
 
 class Supply(TimestampedModel, Base):

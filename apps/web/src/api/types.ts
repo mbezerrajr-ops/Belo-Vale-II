@@ -420,7 +420,12 @@ export interface ImportRecord {
 
 export type MeasurementStatus = "active" | "superseded" | "voided";
 
-export type Provenance = "manual_entry" | "file_import" | "legacy_baseline" | "ocr_review";
+export type Provenance =
+  | "manual_entry"
+  | "file_import"
+  | "legacy_baseline"
+  | "ocr_review"
+  | "proposal_review";
 
 export interface ProductionHistoryEntry {
   id: string;
@@ -450,4 +455,65 @@ export interface SupplyPrice {
 export interface Features {
   /** Leitura de fichas por foto: só com OCR real (ou demonstração). */
   photo_sheets: boolean;
+}
+
+// --- Propostas de eventos (caixa de revisão) ---
+
+export type EventType = "production" | "calving" | "dry_off" | "exit" | "lot_change" | "note";
+
+export type ProposalStatus = "pending" | "approved" | "rejected";
+
+export interface AnimalSummary {
+  id: string;
+  brinco: string | null;
+  name: string | null;
+  situacao: string | null;
+  lote_atual: string | null;
+  grupo_manejo: string | null;
+  exited_on: string | null;
+}
+
+export interface ProposalAlert {
+  code: string;
+  message: string;
+  field?: string;
+}
+
+export interface Proposal {
+  id: string;
+  source: {
+    id: string;
+    kind: "photo" | "audio" | "text";
+    label: string;
+    reference_date: string | null;
+    extractor_name: string;
+    created_at: string;
+  };
+  position: number;
+  event_type: EventType;
+  brinco_lido: string | null;
+  nome_lido: string | null;
+  /** Encontrado pelo brinco. Nunca pelo nome. */
+  candidate: AnimalSummary | null;
+  /** Só sugestões, pelo nome lido: quem revisa escolhe. */
+  name_suggestions: AnimalSummary[];
+  payload: Record<string, string | number | null>;
+  raw_fields: Record<string, string | null>;
+  evidence: { text?: string; [key: string]: unknown };
+  confidence: Record<string, number>;
+  alerts: ProposalAlert[];
+  status: ProposalStatus;
+  version: number;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_reason: string | null;
+  applied_payload: Record<string, string | number | null> | null;
+  result: Record<string, unknown> | null;
+}
+
+export interface ApproveProposalInput {
+  expected_version: number;
+  animal_id: string;
+  payload: Record<string, string | number | null>;
+  replace_reason: string | null;
 }
