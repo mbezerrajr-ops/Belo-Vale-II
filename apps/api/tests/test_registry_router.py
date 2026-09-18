@@ -88,6 +88,9 @@ def db():
             ("DELETE FROM extracted_lines", {}),
             ("DELETE FROM extraction_runs", {}),
             ("DELETE FROM image_assets", {}),
+            ("DELETE FROM supply_diets", {}),
+            ("DELETE FROM supply_prices", {}),
+            ("DELETE FROM supplies", {}),
             ("DELETE FROM animal_lot_assignments", {}),
             ("DELETE FROM animals", {}),
             ("DELETE FROM baseline_imports", {}),
@@ -391,3 +394,183 @@ class TestUpdateAnimalEndpoint:
         )
 
         assert response.status_code in (400, 422)
+
+
+class TestDashboardEndpoint:
+    def test_operator_reads_the_dashboard(self, api, db) -> None:
+        _farm(db)
+        token = _user(db, "operador@belovale", "operator")
+
+        response = api.get("/api/dashboard", headers=_auth(token))
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total_animals"] == 0
+        assert body["lots"] == []
+
+    def test_dashboard_requires_authentication(self, api, db) -> None:
+        _farm(db)
+        assert api.get("/api/dashboard").status_code in (401, 403)
+
+    def test_dashboard_reflects_supplies_and_animals(self, api, db) -> None:
+        farm_id = _farm(db)
+        reviewer = _user(db, "revisor@belovale", "reviewer")
+
+        api.patch(
+            "/api/farms/current/milk-price",
+            headers=_auth(reviewer),
+            json={"milk_price_per_liter": 2.5},
+        )
+        supply = api.post(
+            "/api/supplies",
+            headers=_auth(reviewer),
+            json={"name": "Silagem", "price_per_kg": 0.5},
+        ).json()
+        api.put(
+            f"/api/supplies/{supply['id']}/diet",
+            headers=_auth(reviewer),
+            json={"lote": "LOTE 1", "kg_per_day": 100},
+        )
+        api.post(
+            "/api/animals",
+            headers=_auth(reviewer),
+            json={"brinco": "700", "name": "AURORA", "lote": "LOTE 1"},
+        )
+
+        body = api.get("/api/dashboard", headers=_auth(reviewer)).json()
+
+        assert body["milk_price"] == 2.5
+        lot = next(l for l in body["lots"] if l["lote"] == "LOTE 1")
+        assert lot["feed_cost"] == 50.0
+        assert lot["animals"] == 1
+        assert lot["cost_per_animal"] == 50.0
+
+
+class TestSuppliesEndpoints:
+    def test_reviewer_creates_a_supply(self, api, db) -> None:
+        _farm(db)
+        token = _user(db, "revisor@belovale", "reviewer")
+
+        response = api.post(
+            "/api/supplies",
+            headers=_auth(token),
+            json={"name": "Concentrado", "price_per_kg": 2.12},
+        )
+
+        assert response.status_code == 201
+        assert response.json()["name"] == "Concentrado"
+
+    def test_operator_cannot_create_a_supply(self, api, db) -> None:
+        _farm(db)
+        token = _user(db, "operador@belovale", "operator")
+
+        response = api.post(
+            "/api/supplies",
+            headers=_auth(token),
+            json={"name": "Milho", "price_per_kg": 1.0},
+        )
+
+        assert response.status_code == 403
+
+    def test_operator_can_read_supplies(self, api, db) -> None:
+        _farm(db)
+        reviewer = _user(db, "revisor@belovale", "reviewer")
+        api.post(
+            "/api/supplies",
+            headers=_auth(reviewer),
+            json={"name": "Silagem", "price_per_kg": 0.35},
+        )
+        operator = _user(db, "operador@belovale", "operator")
+
+        response = api.get("/api/supplies", headers=_auth(operator))
+
+        assert response.status_code == 200
+        assert [s["name"] for s in response.json()] == ["Silagem"]
+
+    def test_duplicate_supply_name_is_rejected(self, api, db) -> None:
+        _farm(db)
+        token = _user(db, "revisor@belovale", "reviewer")
+        api.post(
+            "/api/supplies",
+            headers=_auth(token),
+            json={"name": "Silagem", "price_per_kg": 0.35},
+        )
+
+        response = api.post(
+            "/api/supplies",
+            headers=_auth(token),
+            json={"name": "Silagem", "price_per_kg": 0.40},
+        )
+
+        assert response.status_code == 409
+
+    def test_price_change_keeps_the_previous_in_history(self, api, db) -> None:
+        _farm(db)
+        token = _user(db, "revisor@belovale", "reviewer")
+        supply = api.post(
+            "/api/supplies",
+            headers=_auth(token),
+            json={"name": "Silagem", "price_per_kg": 0.35},
+        ).json()
+
+        api.patch(
+            f"/api/supplies/{supply['id']}",
+            headers=_auth(token),
+            json={"price_per_kg": 0.42, "effective_on": "2026-09-18"},
+        )
+
+        prices = db(
+            [
+                (
+                    "SELECT price_per_kg FROM supply_prices "
+                    "WHERE supply_id = CAST(:id AS uuid) ORDER BY effective_on",
+                    {"id": supply["id"]},
+                )
+            ]
+        )[0]
+        assert len(prices) == 2
+
+    def test_setting_the_diet_twice_updates_instead_of_duplicating(
+        self, api, db
+    ) -> None:
+        _farm(db)
+        token = _user(db, "revisor@belovale", "reviewer")
+        supply = api.post(
+            "/api/supplies",
+            headers=_auth(token),
+            json={"name": "Silagem", "price_per_kg": 0.35},
+        ).json()
+
+        api.put(
+            f"/api/supplies/{supply['id']}/diet",
+            headers=_auth(token),
+            json={"lote": "LOTE 1", "kg_per_day": 100},
+        )
+        response = api.put(
+            f"/api/supplies/{supply['id']}/diet",
+            headers=_auth(token),
+            json={"lote": "LOTE 1", "kg_per_day": 120},
+        )
+
+        diets = response.json()["diets"]
+        assert diets == [{"lote": "LOTE 1", "kg_per_day": 120.0}]
+
+    def test_milk_price_change_is_audited(self, api, db) -> None:
+        farm_id = _farm(db)
+        token = _user(db, "revisor@belovale", "reviewer")
+
+        api.patch(
+            "/api/farms/current/milk-price",
+            headers=_auth(token),
+            json={"milk_price_per_liter": 3.15},
+        )
+
+        actions = db(
+            [
+                (
+                    "SELECT action FROM audit_events WHERE entity_id = CAST(:id AS uuid)",
+                    {"id": farm_id},
+                )
+            ]
+        )[0]
+        assert "milk_price_changed" in actions
