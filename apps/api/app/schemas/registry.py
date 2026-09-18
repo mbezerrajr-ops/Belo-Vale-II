@@ -1,0 +1,113 @@
+"""Contratos HTTP do cadastro mestre.
+
+Nenhum payload aceita `farm_id`: a fazenda é resolvida no servidor, conforme a
+decisão de operação monofazenda. Campos extras enviados pelo cliente são
+ignorados em vez de aceitos silenciosamente como identidade.
+"""
+
+from __future__ import annotations
+
+from datetime import date
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class FarmCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    code: str | None = Field(default=None, max_length=64)
+
+
+class FarmRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    code: str | None = None
+
+
+class AnimalCreate(BaseModel):
+    #: Nulo é válido: um animal pode ser cadastrado antes de ganhar brinco.
+    brinco: str | None = Field(default=None, max_length=64)
+    name: str | None = Field(default=None, max_length=255)
+    numero_legado: str | None = Field(default=None, max_length=64)
+    situacao: str | None = Field(default=None, max_length=32)
+    status: str | None = Field(default=None, max_length=32)
+    ultimo_parto: date | None = None
+    nascimento: date | None = None
+    peso: float | None = Field(default=None, ge=0)
+    observacoes: str | None = None
+    lote: str | None = Field(default=None, max_length=64)
+    lote_valid_from: date | None = None
+
+
+class AnimalUpdate(BaseModel):
+    """Só campos descritivos. Brinco e lote têm endpoints próprios, porque
+    mudam identidade e histórico."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, max_length=255)
+    numero_legado: str | None = Field(default=None, max_length=64)
+    situacao: str | None = Field(default=None, max_length=32)
+    status: str | None = Field(default=None, max_length=32)
+    ultimo_parto: date | None = None
+    nascimento: date | None = None
+    peso: float | None = Field(default=None, ge=0)
+    observacoes: str | None = None
+
+
+class BrincoLink(BaseModel):
+    brinco: str = Field(min_length=1, max_length=64)
+    evidence: str = Field(
+        min_length=1,
+        description=(
+            "Justificativa da vinculação. Muda a identidade operacional do "
+            "animal, então fica registrada na auditoria."
+        ),
+    )
+
+
+class LotAssign(BaseModel):
+    lote: str = Field(min_length=1, max_length=64)
+    valid_from: date
+
+
+class LotAssignmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    lote: str
+    valid_from: date
+    valid_to: date | None
+    source: str
+    reviewed_by: str | None
+
+
+class AnimalRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    farm_id: UUID
+    brinco: str | None
+    brinco_origem: str | None
+    legacy_id: str | None
+    numero_legado: str | None
+    name: str | None
+    situacao: str | None
+    status: str | None
+    ultimo_parto: date | None
+    nascimento: date | None
+    peso: float | None
+    observacoes: str | None
+    lote_atual: str | None = None
+
+
+class AnimalDetail(AnimalRead):
+    historico_lotes: list[LotAssignmentRead] = []
+
+
+class AnimalPage(BaseModel):
+    items: list[AnimalRead]
+    total: int
+    limit: int
+    offset: int
