@@ -11,6 +11,10 @@ import {
   type LotKind,
   type DashboardFilters,
   type DashboardSummary,
+  type ExitReason,
+  type PasswordReset,
+  type ProductionSheet,
+  type Reading,
   type Role,
   type Supply,
   type UserAccount,
@@ -206,6 +210,7 @@ export async function searchAnimals(
   if (search.brinco) params.set("brinco", search.brinco);
   if (search.name) params.set("name", search.name);
   if (search.semBrinco) params.set("sem_brinco", "true");
+  if (search.rebanho) params.set("rebanho", search.rebanho);
   params.set("limit", String(search.limit ?? 25));
   params.set("offset", String(search.offset ?? 0));
 
@@ -411,4 +416,109 @@ export async function setMilkPrice(
     body: JSON.stringify({ milk_price_per_liter: pricePerLiter }),
   });
   await parseJsonOrThrow(response);
+}
+
+// --- Baixa de animal ---
+
+export async function registerExit(
+  token: string,
+  animalId: string,
+  exitedOn: string,
+  reason: ExitReason,
+  notes: string | null,
+): Promise<Animal> {
+  const response = await fetch(`${API_BASE_URL}/api/animals/${animalId}/exit`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ exited_on: exitedOn, reason, notes }),
+  });
+  return parseJsonOrThrow<Animal>(response);
+}
+
+export async function undoExit(
+  token: string,
+  animalId: string,
+  reason: string,
+): Promise<Animal> {
+  const response = await fetch(`${API_BASE_URL}/api/animals/${animalId}/exit/undo`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ reason }),
+  });
+  return parseJsonOrThrow<Animal>(response);
+}
+
+// --- Redefinição de senha ---
+
+export async function resetUserPassword(
+  token: string,
+  userId: string,
+): Promise<PasswordReset> {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}/password-reset`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow<PasswordReset>(response);
+}
+
+// --- Lançamento de produção ---
+
+export async function getProductionSheet(
+  token: string,
+  measuredOn: string,
+  lote: string | null,
+): Promise<ProductionSheet> {
+  const params = new URLSearchParams({ measured_on: measuredOn });
+  if (lote) params.set("lote", lote);
+  const response = await fetch(`${API_BASE_URL}/api/production/sheet?${params}`, {
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow<ProductionSheet>(response);
+}
+
+/** 201 cria; 200 é o mesmo valor reenviado (retry); 409 é outro valor. */
+export async function enterReading(
+  token: string,
+  animalId: string,
+  measuredOn: string,
+  producao: number,
+): Promise<Reading> {
+  const response = await fetch(`${API_BASE_URL}/api/production`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ animal_id: animalId, measured_on: measuredOn, producao }),
+  });
+  return parseJsonOrThrow<Reading>(response);
+}
+
+export async function correctReading(
+  token: string,
+  measurementId: string,
+  producao: number,
+  reason: string,
+): Promise<Reading> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/production/${measurementId}/correction`,
+    {
+      method: "POST",
+      headers: jsonHeaders(token),
+      body: JSON.stringify({ producao, reason }),
+    },
+  );
+  return parseJsonOrThrow<Reading>(response);
+}
+
+export async function voidReading(
+  token: string,
+  measurementId: string,
+  reason: string,
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/production/${measurementId}/void`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ reason }),
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, await response.json());
+  }
 }

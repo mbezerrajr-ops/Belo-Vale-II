@@ -1,7 +1,14 @@
 import { useState, type CSSProperties } from "react";
 
-import { assignLot, linkBrinco, updateAnimal } from "../../api/client";
-import type { Animal, AnimalDetail, AnimalUpdateInput } from "../../api/types";
+import { assignLot, linkBrinco, registerExit, undoExit, updateAnimal } from "../../api/client";
+import {
+  EXIT_REASON_LABEL,
+  type Animal,
+  type AnimalDetail,
+  type AnimalUpdateInput,
+  type ExitReason,
+} from "../../api/types";
+import { brDate, localToday } from "../../ui/dates";
 
 /**
  * Ficha do animal.
@@ -29,6 +36,15 @@ type UpdateFn = (
   changes: AnimalUpdateInput,
 ) => Promise<Animal>;
 
+type ExitFn = (
+  token: string,
+  animalId: string,
+  exitedOn: string,
+  reason: ExitReason,
+  notes: string | null,
+) => Promise<Animal>;
+type UndoExitFn = (token: string, animalId: string, reason: string) => Promise<Animal>;
+
 interface Props {
   token: string;
   animal: AnimalDetail;
@@ -37,6 +53,9 @@ interface Props {
   onLinkBrinco?: LinkFn;
   onAssignLot?: AssignFn;
   onUpdate?: UpdateFn;
+  onExit?: ExitFn;
+  onUndoExit?: UndoExitFn;
+  today?: string;
 }
 
 function errorMessage(error: unknown): string {
@@ -44,15 +63,7 @@ function errorMessage(error: unknown): string {
   return body?.detail ?? "Não foi possível completar a ação. Tente novamente.";
 }
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function br(iso: string | null): string {
-  if (!iso) return "—";
-  const [year, month, day] = iso.split("-");
-  return `${day}/${month}/${year}`;
-}
+const br = brDate;
 
 export function AnimalDetailPanel({
   token,
@@ -62,15 +73,25 @@ export function AnimalDetailPanel({
   onLinkBrinco = linkBrinco,
   onAssignLot = assignLot,
   onUpdate = updateAnimal,
+  onExit = registerExit,
+  onUndoExit = undoExit,
+  today = localToday(),
 }: Props): JSX.Element {
-  const [panel, setPanel] = useState<"none" | "brinco" | "lote" | "cadastro">("none");
+  const [panel, setPanel] = useState<
+    "none" | "brinco" | "lote" | "cadastro" | "baixa" | "desfazer"
+  >("none");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [brinco, setBrinco] = useState("");
   const [evidence, setEvidence] = useState("");
   const [lote, setLote] = useState("");
-  const [validFrom, setValidFrom] = useState(today());
+  const [validFrom, setValidFrom] = useState(today);
+  const [exitedOn, setExitedOn] = useState(today);
+  const [exitReason, setExitReason] = useState<ExitReason>("venda");
+  const [exitNotes, setExitNotes] = useState("");
+  const [undoReason, setUndoReason] = useState("");
+  const exited = Boolean(animal.exited_on);
   const [name, setName] = useState(animal.name ?? "");
   const [situacao, setSituacao] = useState(animal.situacao ?? "");
   const [ultimoParto, setUltimoParto] = useState(animal.ultimo_parto ?? "");
@@ -108,6 +129,20 @@ export function AnimalDetailPanel({
       return;
     }
     void guard(() => onAssignLot(token, animal.id, lote.trim(), validFrom));
+  }
+
+  function submitExit(): void {
+    void guard(() =>
+      onExit(token, animal.id, exitedOn, exitReason, exitNotes.trim() || null),
+    );
+  }
+
+  function submitUndo(): void {
+    if (undoReason.trim().length < 3) {
+      setError("Explique em poucas palavras por que desfazer a baixa.");
+      return;
+    }
+    void guard(() => onUndoExit(token, animal.id, undoReason.trim()));
   }
 
   function submitCadastro(): void {
@@ -165,13 +200,32 @@ export function AnimalDetailPanel({
         </div>
       </dl>
 
-      {!animal.brinco && (
+      {exited && (
+        <div className="exit-banner">
+          <strong>
+            Baixa em {br(animal.exited_on ?? null)} —{" "}
+            {animal.exit_reason ? EXIT_REASON_LABEL[animal.exit_reason] : "motivo não informado"}
+          </strong>
+          {animal.exit_notes && <span>{animal.exit_notes}</span>}
+          <small>Fora do rebanho: não entra no painel nem recebe produção.</small>
+        </div>
+      )}
+
+      {!animal.brinco && !exited && (
         <p className="warning">
           Este animal não recebe medição automática enquanto não tiver brinco.
         </p>
       )}
 
-      {canEdit && (
+      {canEdit && exited && (
+        <div className="actions">
+          <button type="button" className="secondary" onClick={() => setPanel("desfazer")}>
+            Desfazer baixa
+          </button>
+        </div>
+      )}
+
+      {canEdit && !exited && (
         <div className="actions">
           <button type="button" onClick={() => setPanel("brinco")}>
             {animal.brinco ? "Trocar brinco" : "Vincular brinco"}
@@ -181,6 +235,9 @@ export function AnimalDetailPanel({
           </button>
           <button type="button" className="secondary" onClick={() => setPanel("cadastro")}>
             Editar cadastro
+          </button>
+          <button type="button" className="secondary danger" onClick={() => setPanel("baixa")}>
+            Dar baixa
           </button>
         </div>
       )}
@@ -249,6 +306,77 @@ export function AnimalDetailPanel({
           </p>
           <button type="submit" disabled={busy}>
             Confirmar lote
+          </button>
+        </form>
+      )}
+
+      {panel === "baixa" && canEdit && !exited && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            submitExit();
+          }}
+        >
+          <h3>Dar baixa</h3>
+          <label htmlFor="exit-reason">Motivo da baixa</label>
+          <select
+            id="exit-reason"
+            value={exitReason}
+            onChange={(event) => setExitReason(event.target.value as ExitReason)}
+          >
+            {(Object.keys(EXIT_REASON_LABEL) as ExitReason[]).map((reason) => (
+              <option key={reason} value={reason}>
+                {EXIT_REASON_LABEL[reason]}
+              </option>
+            ))}
+          </select>
+          <label htmlFor="exit-date">Data</label>
+          <input
+            id="exit-date"
+            type="date"
+            value={exitedOn}
+            max={today}
+            onChange={(event) => setExitedOn(event.target.value)}
+          />
+          <label htmlFor="exit-notes">Observação (opcional)</label>
+          <input
+            id="exit-notes"
+            value={exitNotes}
+            onChange={(event) => setExitNotes(event.target.value)}
+            placeholder="Ex.: vendida para a fazenda vizinha"
+            autoComplete="off"
+          />
+          <p className="hint">
+            O animal sai do lote e do painel nesta data. A produção já lançada fica
+            guardada, e a baixa pode ser desfeita se foi engano.
+          </p>
+          <button type="submit" disabled={busy}>
+            Confirmar baixa
+          </button>
+        </form>
+      )}
+
+      {panel === "desfazer" && canEdit && exited && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            submitUndo();
+          }}
+        >
+          <h3>Desfazer baixa</h3>
+          <label htmlFor="undo-reason">Por que desfazer?</label>
+          <input
+            id="undo-reason"
+            value={undoReason}
+            onChange={(event) => setUndoReason(event.target.value)}
+            placeholder="Ex.: baixa lançada na vaca errada"
+            autoComplete="off"
+          />
+          <p className="hint">
+            O animal volta ao rebanho sem lote: coloque-o no lote certo em seguida.
+          </p>
+          <button type="submit" disabled={busy}>
+            Confirmar e trazer de volta
           </button>
         </form>
       )}

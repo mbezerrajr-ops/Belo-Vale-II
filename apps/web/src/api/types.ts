@@ -59,12 +59,16 @@ export interface LoginResult {
   access_token: string;
   token_type: string;
   expires_in: number;
+  /** Verdadeiro depois de uma redefinição feita pelo administrador. */
+  must_change_password?: boolean;
 }
 
 export interface CurrentUser {
   id: string;
   email: string;
   role: string;
+  /** Enquanto verdadeiro, a conta só alcança a troca de senha. */
+  must_change_password?: boolean;
 }
 
 export interface MeasurementRecord {
@@ -135,7 +139,21 @@ export interface Animal {
   lote_atual: string | null;
   /** Área ou categoria em que o animal está (BEZERREIRO, ENGORDA…). */
   grupo_manejo: string | null;
+  /** Baixa. Nulos enquanto o animal está no rebanho. */
+  exited_on?: string | null;
+  exit_reason?: ExitReason | null;
+  exit_notes?: string | null;
 }
+
+export type ExitReason = "venda" | "morte" | "descarte" | "doacao" | "outro";
+
+export const EXIT_REASON_LABEL: Record<ExitReason, string> = {
+  venda: "Venda",
+  morte: "Morte",
+  descarte: "Descarte",
+  doacao: "Doação",
+  outro: "Outro motivo",
+};
 
 export interface AnimalDetail extends Animal {
   historico_lotes: LotAssignment[];
@@ -152,6 +170,8 @@ export interface AnimalSearch {
   brinco?: string;
   name?: string;
   semBrinco?: boolean;
+  /** Padrão do servidor: só quem está no rebanho. */
+  rebanho?: "ativos" | "baixados" | "todos";
   limit?: number;
   offset?: number;
 }
@@ -185,7 +205,15 @@ export interface UserAccount {
   email: string;
   role: string;
   is_active: boolean;
+  /** Senha redefinida e ainda não trocada pelo dono da conta. */
+  reset_pending?: boolean;
   created_at: string;
+}
+
+export interface PasswordReset {
+  /** Aparece só nesta resposta: o servidor não guarda o valor. */
+  temporary_password: string;
+  expires_at: string;
 }
 
 export interface UserPage {
@@ -267,4 +295,41 @@ export interface Supply {
   price_per_kg: number;
   legacy_id: string | null;
   diets: SupplyDiet[];
+}
+
+// --- Lançamento de produção ---
+
+export interface Reading {
+  id: string;
+  animal_id: string;
+  measured_on: string;
+  producao: number | null;
+  provenance: string;
+  entered_by: string | null;
+  supersedes: string | null;
+  created_at: string;
+}
+
+export interface SheetItem {
+  animal_id: string;
+  brinco: string | null;
+  name: string | null;
+  situacao: string | null;
+  producao: number | null;
+  measurement_id: string | null;
+  provenance: string | null;
+}
+
+export interface ProductionSheet {
+  measured_on: string;
+  /** Nulo quando a chamada pediu só a lista de lotes. */
+  lote: string | null;
+  lotes: string[];
+  items: SheetItem[];
+}
+
+/** Corpo do 409: já existe outro valor lançado para a vaca nesta data. */
+export interface ReadingConflict {
+  message: string;
+  existing: Reading;
 }

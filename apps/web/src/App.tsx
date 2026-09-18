@@ -24,6 +24,7 @@ import { OfficialMeasurements } from "./features/dashboard/OfficialMeasurements"
 import { SuppliesPage } from "./features/dashboard/SuppliesPage";
 import { ReviewWorkspace } from "./features/imports/ReviewWorkspace";
 import { UploadForm } from "./features/imports/UploadForm";
+import { ProductionPage } from "./features/production/ProductionPage";
 import { ChangePasswordForm } from "./features/users/ChangePasswordForm";
 import { UsersPage } from "./features/users/UsersPage";
 import { Cows, Hills, Icons, LogoMark, type IconName } from "./ui/Brand";
@@ -134,6 +135,45 @@ export function App(): JSX.Element {
     );
   }
 
+  // Senha provisória: até escolher uma nova, a conta só alcança a troca.
+  // O servidor já barra o resto; esconder evita uma tela cheia de erros.
+  if (session.status === "signed-in" && session.user.must_change_password) {
+    const { token } = session;
+    return (
+      <main className="shell forced-password">
+        <header className="topbar">
+          <span className="wordmark">
+            <LogoMark />
+            <span>
+              <strong>Belo Vale II</strong>
+              <small>Gestão do rebanho leiteiro</small>
+            </span>
+          </span>
+          <div className="who">
+            <button type="button" className="link-btn" onClick={handleLogout}>
+              <Icons.logout /> Sair
+            </button>
+          </div>
+        </header>
+        <section className="forced-password-card">
+          <h2>Escolha uma senha nova</h2>
+          <p className="muted">
+            Sua senha foi redefinida pelo administrador. Use a senha provisória que
+            você recebeu como "senha atual" e escolha uma senha só sua para continuar.
+          </p>
+          <ChangePasswordForm
+            token={token}
+            onChanged={() => {
+              void getCurrentUser(token).then((user) =>
+                setSession({ status: "signed-in", token, user }),
+              );
+            }}
+          />
+        </section>
+      </main>
+    );
+  }
+
   if (session.status === "signed-out") {
     return (
       <main className="login">
@@ -186,6 +226,7 @@ interface AuthenticatedAppProps {
 /** Áreas do aplicativo. `painel` abre primeiro: é a visão do dia. */
 type Area =
   | "painel"
+  | "producao"
   | "animais"
   | "fichas"
   | "insumos"
@@ -195,6 +236,7 @@ type Area =
 
 const AREA_LABEL: Record<Area, string> = {
   painel: "Painel",
+  producao: "Produção",
   animais: "Animais",
   fichas: "Fichas",
   insumos: "Insumos",
@@ -222,7 +264,9 @@ function AuthenticatedApp({
   user,
   onLogout,
 }: AuthenticatedAppProps): JSX.Element {
-  const [area, setArea] = useState<Area>("painel");
+  // Quem lança o leite abre direto no lançamento; quem acompanha a fazenda
+  // abre no painel.
+  const [area, setArea] = useState<Area>(atLeast(user, "reviewer") ? "painel" : "producao");
   const [farm, setFarm] = useState<Farm | null>(null);
   const [farmError, setFarmError] = useState<string | null>(null);
   const [openAnimalId, setOpenAnimalId] = useState<string | null>(null);
@@ -279,6 +323,7 @@ function AuthenticatedApp({
 
   const areas: Area[] = [
     "painel",
+    "producao",
     "animais",
     "fichas",
     "insumos",
@@ -336,6 +381,8 @@ function AuthenticatedApp({
 
       <div className="area" key={area}>
         {area === "painel" && <HerdDashboard token={token} />}
+
+        {area === "producao" && <ProductionPage token={token} canCorrect={canEdit} />}
 
         {area === "insumos" && (
           <SuppliesPage

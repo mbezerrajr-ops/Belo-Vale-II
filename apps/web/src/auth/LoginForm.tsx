@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 
 import { login } from "../api/client";
-import type { LoginResult } from "../api/types";
+import { ApiError, type LoginResult } from "../api/types";
 
 interface LoginFormProps {
   onLoggedIn: (result: LoginResult) => void;
@@ -9,10 +9,30 @@ interface LoginFormProps {
 
 type LoginState = "idle" | "submitting" | "error";
 
+const GENERIC_ERROR = "E-mail ou senha inválidos.";
+
+/**
+ * Mensagem para quem tentou entrar.
+ *
+ * Credencial errada recebe sempre a mesma frase: o backend não distingue
+ * e-mail desconhecido de senha errada, e a tela também não. As outras
+ * respostas — bloqueio por excesso de tentativas, senha provisória vencida —
+ * não revelam nada a quem está chutando e dizem ao usuário o que fazer.
+ */
+function loginError(error: unknown): string {
+  if (!(error instanceof ApiError)) return GENERIC_ERROR;
+  const detail = (error.body as { detail?: unknown }).detail;
+  if (typeof detail !== "string") return GENERIC_ERROR;
+  if (error.status === 429) return detail;
+  if (error.status === 401 && detail.includes("provisória")) return detail;
+  return GENERIC_ERROR;
+}
+
 export function LoginForm({ onLoggedIn }: LoginFormProps): JSX.Element {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [state, setState] = useState<LoginState>("idle");
+  const [message, setMessage] = useState(GENERIC_ERROR);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
@@ -20,9 +40,8 @@ export function LoginForm({ onLoggedIn }: LoginFormProps): JSX.Element {
     try {
       const result = await login(email, password);
       onLoggedIn(result);
-    } catch {
-      // O backend devolve o mesmo 401 para e-mail desconhecido e senha errada,
-      // então a interface não distingue — e não deve.
+    } catch (error) {
+      setMessage(loginError(error));
       setState("error");
     }
   };
@@ -53,7 +72,7 @@ export function LoginForm({ onLoggedIn }: LoginFormProps): JSX.Element {
       <button type="submit" disabled={state === "submitting"}>
         {state === "submitting" ? "Entrando…" : "Entrar"}
       </button>
-      {state === "error" ? <p role="alert">E-mail ou senha inválidos.</p> : null}
+      {state === "error" ? <p role="alert">{message}</p> : null}
     </form>
   );
 }
