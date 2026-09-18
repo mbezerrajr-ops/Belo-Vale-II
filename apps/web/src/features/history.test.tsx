@@ -141,6 +141,18 @@ describe("Produção na ficha do animal", () => {
     await waitFor(() => expect(onVoid).toHaveBeenCalledWith(TOKEN, "m-3", "vaca errada"));
   });
 
+  it("leitura aprovada na caixa de revisão aparece com a origem legível", async () => {
+    renderDetail({
+      onLoadProduction: vi
+        .fn()
+        .mockResolvedValue([entry({ provenance: "proposal_review", responsible: "maria@belovale" })]),
+    });
+
+    const table = await screen.findByRole("table", { name: /leituras de produção/i });
+    expect(table).toHaveTextContent("Leitura revisada");
+    expect(table).not.toHaveTextContent("proposal_review");
+  });
+
   it("operador consulta, mas não corrige", async () => {
     renderDetail({ canEdit: false });
 

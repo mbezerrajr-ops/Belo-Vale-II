@@ -2394,3 +2394,193 @@ tbody tr:hover td {
 .price-history small {
   color: var(--muted);
 }
+
+/* ---------- caixa de revisão ---------- */
+
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.review-inbox {
+  display: grid;
+  gap: 14px;
+}
+
+.review-inbox > p {
+  margin: 0;
+}
+
+.proposal-group {
+  display: grid;
+  gap: 10px;
+}
+
+.proposal-group h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 6px 0 0;
+}
+
+.proposal-group h3 small {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.proposal-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  animation: rise var(--dur) var(--ease-out) both;
+}
+
+.proposal-card p {
+  margin: 0;
+}
+
+.proposal-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.proposal-evidence {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--line-strong);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--surface-2);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.proposal-evidence small {
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.proposal-animal-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.proposal-animal {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.proposal-animal small {
+  color: var(--muted);
+}
+
+.proposal-missing {
+  flex-basis: 100%;
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.proposal-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  flex-basis: 100%;
+}
+
+.proposal-search label {
+  margin: 0;
+}
+
+.proposal-search input {
+  width: 9rem;
+  margin: 0;
+}
+
+.suggestion {
+  font-size: 0.88rem;
+}
+
+.proposal-fields {
+  display: grid;
+  gap: 8px 12px;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.proposal-fields label {
+  margin: 0 0 2px;
+}
+
+.proposal-fields input,
+.proposal-fields select,
+.proposal-fields textarea {
+  margin: 0;
+  width: 100%;
+}
+
+.proposal-alerts {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 8px 12px 8px 26px;
+  border-radius: var(--radius-sm);
+  background: var(--warn-soft);
+  font-size: 0.88rem;
+}
+
+.decided-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.decided-item {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.decided-item .pill {
+  justify-self: start;
+}
+
+.decided-item small {
+  color: var(--ink-2);
+}
+
+button.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+}

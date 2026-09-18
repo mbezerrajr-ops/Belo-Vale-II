@@ -11,7 +11,10 @@ import {
   type LotKind,
   type DashboardFilters,
   type DashboardSummary,
+  type ApproveProposalInput,
   type ExitReason,
+  type Proposal,
+  type ProposalStatus,
   type Features,
   type ProductionHistoryEntry,
   type SupplyPrice,
@@ -606,4 +609,44 @@ export async function getFeatures(token: string): Promise<Features> {
     headers: authHeaders(token),
   });
   return parseJsonOrThrow<Features>(response);
+}
+
+// --- Propostas de eventos (caixa de revisão) ---
+
+export async function listProposals(
+  token: string,
+  status: ProposalStatus = "pending",
+): Promise<Proposal[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/proposals?${new URLSearchParams({ status })}`,
+    { headers: authHeaders(token) },
+  );
+  return parseJsonOrThrow<Proposal[]>(response);
+}
+
+export async function approveProposal(
+  token: string,
+  proposalId: string,
+  input: ApproveProposalInput,
+): Promise<{ id: string; status: string; result: Record<string, unknown> }> {
+  const response = await fetch(`${API_BASE_URL}/api/proposals/${proposalId}/approve`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify(input),
+  });
+  return parseJsonOrThrow(response);
+}
+
+export async function rejectProposal(
+  token: string,
+  proposalId: string,
+  expectedVersion: number,
+  reason: string,
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/proposals/${proposalId}/reject`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ expected_version: expectedVersion, reason }),
+  });
+  await parseJsonOrThrow(response);
 }
