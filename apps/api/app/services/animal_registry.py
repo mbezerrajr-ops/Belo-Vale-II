@@ -165,7 +165,7 @@ async def create_animal(
                 animal_id=animal.id,
                 lote=lote,
                 kind=classify_lot(lote) or KIND_DIET,
-                valid_from=lote_valid_from or date.today(),
+                valid_from=lote_valid_from or farm_today(),
                 valid_to=None,
                 source="manual",
                 reviewed_by=actor,

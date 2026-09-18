@@ -115,3 +115,62 @@ jobs:
         run: npx vitest run
       - name: Tipos e build de produção
         run: npm run build
+
+  e2e:
+    name: E2E (pilha Docker completa + Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # Segredos descartáveis, gerados no próprio runner: nenhum valor sai
+      # daqui nem vem do repositório.
+      - name: Ambiente do E2E
+        run: |
+          PG="$(openssl rand -hex 24)"
+          {
+            echo "COMPOSE_PROJECT_NAME=belo-vale-e2e"
+            echo "POSTGRES_PASSWORD=${PG}"
+            echo "POSTGRES_URL=postgresql+asyncpg://ingestion:${PG}@db:5432/ingestion"
+            echo "MINIO_ACCESS_KEY=e2e$(openssl rand -hex 6)"
+            echo "MINIO_SECRET_KEY=$(openssl rand -hex 24)"
+            echo "AUTH_SECRET=$(openssl rand -hex 32)"
+            echo "PHOTO_SHEETS_DEMO=true"
+          } > infra/.env.e2e
+      # O worker não tem verificação de saúde (é um processo Celery, sem porta
+      # HTTP), e algumas versões do Compose recusam `--wait` nesse caso. Por
+      # isso: sobe tudo, espera só quem tem verificação (api e web, com db,
+      # redis e minio por dependência) e confere o worker à parte.
+      - name: Subir a pilha
+        run: |
+          docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml up -d --build
+          docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml up -d --wait --wait-timeout 180 api web
+          test -n "$(docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml ps --status running -q worker)"
+      - name: Migrations
+        run: docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml exec -T api uv run --no-sync alembic upgrade head
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Dependências e navegador
+        working-directory: apps/web
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Playwright
+        working-directory: apps/web
+        env:
+          E2E_BASE_URL: http://localhost:8080
+        run: npx playwright test
+      - name: Relatório em caso de falha
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            apps/web/test-results
+            apps/web/playwright-report
+          retention-days: 7
+      - name: Logs da pilha em caso de falha
+        if: failure()
+        run: docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml logs --no-color --tail 200

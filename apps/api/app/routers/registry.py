@@ -7,7 +7,8 @@ autorização de domínio delegada ao navegador.
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from dataclasses import asdict
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -44,6 +45,7 @@ from app.services.animal_registry import (
     update_animal,
 )
 from app.services.brinco import normalize_brinco
+from app.services.production_history import animal_production_history
 from app.services.lot_kind import KIND_DIET, KIND_MANAGEMENT
 
 router = APIRouter(prefix="/api", tags=["registry"])
@@ -351,3 +353,18 @@ async def undo_exit_endpoint(
         await session.rollback()
         raise _conflict(error) from error
     return await _read_model(session, animal)
+
+
+@router.get("/animals/{animal_id}/production")
+async def animal_production(
+    animal_id: UUID,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    farm: Annotated[Farm, Depends(resolve_current_farm)],
+    _: Annotated[User, Depends(require_minimum_role("operator"))],
+) -> list[dict[str, Any]]:
+    """Todas as leituras do animal, inclusive as substituídas e anuladas."""
+    await _load_or_404(session, animal_id, farm.id)
+    return [
+        asdict(entry)
+        for entry in await animal_production_history(session, animal_id=animal_id)
+    ]

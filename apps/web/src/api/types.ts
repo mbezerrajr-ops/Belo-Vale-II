@@ -415,3 +415,39 @@ export interface ImportRecord {
   /** O mesmo arquivo já tinha sido importado nesta data e modo. */
   already_imported: boolean;
 }
+
+// --- Histórico e consulta ---
+
+export type MeasurementStatus = "active" | "superseded" | "voided";
+
+export type Provenance = "manual_entry" | "file_import" | "legacy_baseline" | "ocr_review";
+
+export interface ProductionHistoryEntry {
+  id: string;
+  measured_on: string;
+  producao: number | null;
+  status: MeasurementStatus;
+  provenance: Provenance;
+  /** Quem lançou, importou ou aprovou. */
+  responsible: string | null;
+  created_at: string;
+  /** Leitura que esta substituiu, quando é uma correção ou substituição. */
+  supersedes: string | null;
+  /** Arquivo de origem, para leituras importadas. */
+  source: string | null;
+  /** Motivo da correção, anulação ou substituição. */
+  reason: string | null;
+  lote_observado: string | null;
+}
+
+export interface SupplyPrice {
+  effective_on: string;
+  price_per_kg: number;
+  source: string;
+  recorded_by: string | null;
+}
+
+export interface Features {
+  /** Leitura de fichas por foto: só com OCR real (ou demonstração). */
+  photo_sheets: boolean;
+}

@@ -9,6 +9,8 @@ import {
   type ExitReason,
 } from "../../api/types";
 import { brDate, localToday } from "../../ui/dates";
+import { ProductionHistory } from "./ProductionHistory";
+import type { ProductionHistoryEntry, Reading } from "../../api/types";
 
 /**
  * Ficha do animal.
@@ -56,6 +58,15 @@ interface Props {
   onExit?: ExitFn;
   onUndoExit?: UndoExitFn;
   today?: string;
+  /** Injetáveis para teste; por padrão, o cliente da API. */
+  onLoadProduction?: (token: string, animalId: string) => Promise<ProductionHistoryEntry[]>;
+  onCorrect?: (
+    token: string,
+    measurementId: string,
+    producao: number,
+    reason: string,
+  ) => Promise<Reading>;
+  onVoid?: (token: string, measurementId: string, reason: string) => Promise<void>;
 }
 
 function errorMessage(error: unknown): string {
@@ -76,6 +87,9 @@ export function AnimalDetailPanel({
   onExit = registerExit,
   onUndoExit = undoExit,
   today = localToday(),
+  onLoadProduction,
+  onCorrect,
+  onVoid,
 }: Props): JSX.Element {
   const [panel, setPanel] = useState<
     "none" | "brinco" | "lote" | "cadastro" | "baixa" | "desfazer"
@@ -421,6 +435,15 @@ export function AnimalDetailPanel({
           </button>
         </form>
       )}
+
+      <ProductionHistory
+        token={token}
+        animalId={animal.id}
+        canEdit={canEdit}
+        onLoad={onLoadProduction}
+        onCorrect={onCorrect}
+        onVoid={onVoid}
+      />
 
       <h3>Histórico de lotes e grupos</h3>
       {animal.historico_lotes.length === 0 ? (

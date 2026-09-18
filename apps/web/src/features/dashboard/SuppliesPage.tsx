@@ -2,11 +2,13 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 import {
   createSupply,
+  getSupplyPrices,
   listSupplies,
   setMilkPrice,
   updateSupplyPrice,
 } from "../../api/client";
-import type { Supply } from "../../api/types";
+import type { Supply, SupplyPrice } from "../../api/types";
+import { brDate } from "../../ui/dates";
 import { BarList, fmt } from "../../ui/charts";
 
 /**
@@ -29,6 +31,7 @@ interface Props {
   ) => Promise<Supply>;
   onCreate?: (token: string, name: string, pricePerKg: number) => Promise<Supply>;
   onSetMilkPrice?: (token: string, pricePerLiter: number) => Promise<void>;
+  onLoadPrices?: (token: string, supplyId: string) => Promise<SupplyPrice[]>;
 }
 
 const precise = new Intl.NumberFormat("pt-BR", {
@@ -51,6 +54,7 @@ export function SuppliesPage({
   onUpdatePrice = updateSupplyPrice,
   onCreate = createSupply,
   onSetMilkPrice = setMilkPrice,
+  onLoadPrices = getSupplyPrices,
 }: Props): JSX.Element {
   const [supplies, setSupplies] = useState<Supply[] | null>(null);
   const [prices, setPrices] = useState<Record<string, string>>({});
@@ -59,6 +63,22 @@ export function SuppliesPage({
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [milk, setMilk] = useState(milkPrice === null ? "" : String(milkPrice));
+  // Histórico aberto por insumo. Carregado só quando pedido.
+  const [history, setHistory] = useState<Record<string, SupplyPrice[]>>({});
+
+  async function toggleHistory(supplyId: string): Promise<void> {
+    if (history[supplyId]) {
+      const { [supplyId]: _closed, ...rest } = history;
+      setHistory(rest);
+      return;
+    }
+    try {
+      const prices = await onLoadPrices(token, supplyId);
+      setHistory((current) => ({ ...current, [supplyId]: prices }));
+    } catch (caught) {
+      setError(errorMessage(caught));
+    }
+  }
 
   async function reload(): Promise<void> {
     try {
@@ -131,6 +151,29 @@ export function SuppliesPage({
                 <h3>{item.name}</h3>
                 <p className="price">{precise.format(item.price_per_kg)} / kg</p>
               </div>
+              <button
+                type="button"
+                className="link-btn"
+                aria-expanded={Boolean(history[item.id])}
+                onClick={() => void toggleHistory(item.id)}
+              >
+                Histórico de preço
+              </button>
+              {history[item.id] && (
+                <ul className="price-history" aria-label={`Preços de ${item.name}`}>
+                  {history[item.id].map((price) => (
+                    <li key={price.effective_on}>
+                      <span>desde {brDate(price.effective_on)}</span>
+                      <strong>{precise.format(price.price_per_kg)} / kg</strong>
+                      <small>
+                        {price.source === "legacy_baseline"
+                          ? "sistema antigo"
+                          : `registrado por ${price.recorded_by ?? "—"}`}
+                      </small>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
               {item.diets.length === 0 ? (
                 <p className="chart-empty">Sem dieta cadastrada para este insumo.</p>

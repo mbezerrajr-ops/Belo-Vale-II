@@ -4,110 +4,92 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 
 import {
-  E2E_ADMIN_EMAIL,
-  E2E_ADMIN_PASSWORD,
   E2E_ANIMAL_NAME,
   ensureAdminExists,
-  ensureFarmAndAnimal,
+  ensurePhotoSheetAnimal,
+  loginAsAdmin,
+  openArea,
 } from "./seed";
 import { uniqueFixtureCopy } from "./testFiles";
 
+// Fluxo de ficha por foto, de ponta a ponta: upload, worker real (Celery sobre
+// Redis), provedor de OCR falso, revisão, aprovação e leitura oficial.
+//
+// A área "Fichas" só aparece com OCR real; aqui ela está visível porque o
+// ambiente E2E liga PHOTO_SHEETS_DEMO de propósito (infra/.env.e2e).
+
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE_SHEET = path.join(currentDir, "fixtures", "sheet.jpg");
-// A distinct image (different bytes/hash) so the duplicate-upload test's own
-// *first* upload doesn't collide with FIXTURE_SHEET already used elsewhere.
+// Outra imagem (outros bytes): o primeiro envio do teste de duplicidade não
+// colide com a FIXTURE_SHEET já usada.
 const FIXTURE_SHEET_2 = path.join(currentDir, "fixtures", "sheet2.jpg");
 
-test.describe("photo-to-official-measurement", () => {
-  let farmId: string;
-
+test.describe("ficha por foto até a medição oficial", () => {
   test.beforeAll(() => {
     ensureAdminExists();
-    ({ farmId } = ensureFarmAndAnimal());
+    ensurePhotoSheetAnimal();
   });
 
-  test("upload, worker extraction, review, approval, and dashboard visibility", async ({
-    page,
-  }) => {
-    // 1-2. App loads, user logs in for real against POST /api/auth/login.
-    await page.goto("/");
-    await page.getByLabel("E-mail").fill(E2E_ADMIN_EMAIL);
-    await page.getByLabel("Senha").fill(E2E_ADMIN_PASSWORD);
-    await page.getByRole("button", { name: "Entrar" }).click();
-    await expect(page.getByText(E2E_ADMIN_EMAIL)).toBeVisible();
+  test("envio, leitura pelo worker, revisão, aprovação e medição oficial", async ({ page }) => {
+    await loginAsAdmin(page);
+    await openArea(page, "Fichas");
 
-    // 3-4. Upload a real image; the API creates the import.
-    // Two "Fazenda" fields exist on this page (the dashboard filter, then
-    // the upload form) — this is the upload form's own field.
-    await page.getByLabel("Fazenda").nth(1).fill(farmId);
-    // A fresh, uniquely-suffixed copy: Postgres/MinIO persist across E2E
-    // runs, so reusing the exact same bytes would hit real duplicate-image
-    // protection from a previous run instead of exercising a fresh upload.
+    // Uma cópia com sufixo único: Postgres e MinIO persistem entre execuções,
+    // e os mesmos bytes cairiam na proteção contra foto duplicada.
     await page.getByLabel("Foto da ficha").setInputFiles(uniqueFixtureCopy(FIXTURE_SHEET));
     await page.getByRole("button", { name: "Enviar foto" }).click();
     await expect(page.getByText(/Importação enviada/i)).toBeVisible();
 
-    // 5-8. The worker (real Celery, real Redis, FakeVisionProvider adapter)
-    // processes the upload asynchronously; poll the real state via the UI's
-    // own refresh action instead of a fixed sleep.
-    const lineLocator = page.getByRole("article", { name: /Linha 1/i });
+    // O worker processa de forma assíncrona: a tela é atualizada pela própria
+    // ação de "Atualizar revisão", sem espera fixa.
+    const line = page.getByRole("article", { name: /Linha 1/i });
     await expect(async () => {
       await page.getByRole("button", { name: "Atualizar revisão" }).click();
-      await expect(lineLocator).toBeVisible();
-    }).toPass({ timeout: 30_000, intervals: [500, 1000, 2000] });
+      await expect(line).toBeVisible();
+    }).toPass({ timeout: 45_000, intervals: [500, 1000, 2000] });
 
-    // The extracted, normalized data is shown next to the review controls.
-    await expect(lineLocator.getByText("18")).toBeVisible();
-    await expect(lineLocator).toContainText(E2E_ANIMAL_NAME, { ignoreCase: true });
+    await expect(line.getByText("18")).toBeVisible();
+    await expect(line).toContainText(E2E_ANIMAL_NAME, { ignoreCase: true });
 
-    // 9-10. Approve. FakeVisionProvider always returns the same animal+date,
-    // so a persistent environment may already have an active measurement
-    // from an earlier run of this very suite — the UI must require a reason
-    // in that case, and approve directly otherwise. Either way the backend
-    // decides this, never the frontend.
-    await lineLocator.getByRole("button", { name: "Aprovar" }).click();
-    const replacementReason = lineLocator.getByLabel(/motivo da substituição/i);
+    // O OCR falso devolve sempre o mesmo animal e data: uma execução anterior
+    // pode já ter criado essa medição, e aí o backend exige motivo.
+    await line.getByRole("button", { name: "Aprovar" }).click();
+    const replacementReason = line.getByLabel(/motivo da substituição/i);
     if (await replacementReason.isVisible()) {
       await replacementReason.fill("E2E: confirmando substituição de execução anterior");
     }
-    await lineLocator.getByRole("button", { name: "Confirmar aprovação" }).click();
+    await line.getByRole("button", { name: "Confirmar aprovação" }).click();
 
-    // 11. The approved measurement becomes visible through the read-only
-    // dashboard endpoint, not just the review screen that created it.
-    await page.getByLabel("Fazenda").first().fill(farmId);
-    const dashboard = page.getByRole("region", { name: "Medições oficiais" });
+    // A medição aprovada aparece na leitura oficial, não só na tela de revisão.
+    await openArea(page, "Medições");
+    const official = page.getByRole("region", { name: "Medições oficiais" });
     await expect(async () => {
-      await dashboard.getByRole("button", { name: "Atualizar", exact: true }).click();
-      await expect(dashboard.getByText(/18 L/)).toBeVisible();
-    }).toPass({ timeout: 10_000, intervals: [500, 1000] });
+      await official.getByRole("button", { name: "Atualizar", exact: true }).click();
+      await expect(official).toContainText("18,0 L");
+    }).toPass({ timeout: 15_000, intervals: [500, 1000] });
+    await expect(official).toContainText(E2E_ANIMAL_NAME);
   });
 
-  test("uploading the same photo twice is rejected as a duplicate, with a controlled reprocess path", async ({
-    page,
-  }) => {
-    await page.goto("/");
-    await page.getByLabel("E-mail").fill(E2E_ADMIN_EMAIL);
-    await page.getByLabel("Senha").fill(E2E_ADMIN_PASSWORD);
-    await page.getByRole("button", { name: "Entrar" }).click();
-    await expect(page.getByText(E2E_ADMIN_EMAIL)).toBeVisible();
+  test("a mesma foto enviada duas vezes é recusada, com reprocessamento deliberado", async ({ page }) => {
+    await loginAsAdmin(page);
+    await openArea(page, "Fichas");
 
     const uniqueSheet = uniqueFixtureCopy(FIXTURE_SHEET_2);
-
-    await page.getByLabel("Fazenda").nth(1).fill(farmId);
     await page.getByLabel("Foto da ficha").setInputFiles(uniqueSheet);
     await page.getByRole("button", { name: "Enviar foto" }).click();
     await expect(page.getByText(/Importação enviada/i)).toBeVisible();
 
-    // Same bytes, same farm: the backend must recognize this by content
-    // hash and refuse to silently create a second import.
+    // Mesmos bytes: o backend reconhece pelo hash e não cria outra importação.
     await page.getByLabel("Foto da ficha").setInputFiles(uniqueSheet);
     await page.getByRole("button", { name: "Enviar foto" }).click();
     await expect(page.getByText(/já foi enviada anteriormente/i)).toBeVisible();
 
-    // Reprocessing is a distinct, deliberate action — not an automatic
-    // consequence of the duplicate upload — and targets the *original*
-    // import rather than creating an unrelated new one.
-    await page.getByRole("button", { name: "Reprocessar mesmo assim" }).click();
-    await expect(page.getByText(/Importação enviada/i)).toBeVisible();
+    // Reprocessar é uma ação separada e deliberada, sobre a importação original.
+    // Se a leitura da primeira foto ainda estiver rodando no worker, a API
+    // recusa e a tela pede para tentar de novo — como faria uma pessoa.
+    await expect(async () => {
+      await page.getByRole("button", { name: "Reprocessar mesmo assim" }).click();
+      await expect(page.getByText(/Importação enviada/i)).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 45_000, intervals: [1_000, 2_000, 3_000] });
   });
 });

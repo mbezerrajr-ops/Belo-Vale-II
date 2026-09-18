@@ -308,9 +308,23 @@ npm run build          # build de produção real
 
 ## 9. Rodar o Playwright (E2E real)
 
-Pré-requisito: ambiente Docker no ar (passos 1–5 já feitos, incluindo
-usuário admin, fazenda e animal — o próprio teste garante isso de forma
-idempotente via `docker compose exec`, então rodar mais de uma vez é seguro).
+O E2E sobe uma pilha própria (projeto `belo-vale-e2e`, volumes separados do
+ambiente local) e roda no navegador real contra ela. O CI faz exatamente
+isto em todo push e PR (job `e2e`).
+
+1. Crie `infra/.env.e2e` a partir de `infra/.env.example`, com valores
+   descartáveis, `COMPOSE_PROJECT_NAME=belo-vale-e2e` e
+   `PHOTO_SHEETS_DEMO=true` (mostra a área "Fichas" com o OCR falso, que o
+   teste de foto usa). O arquivo é ignorado pelo git.
+2. Suba a pilha e aplique as migrations:
+
+```bash
+docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml up -d --build --wait
+docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml exec -T api \
+  uv run --no-sync alembic upgrade head
+```
+
+3. Rode os testes:
 
 ```bash
 cd apps/web
@@ -318,10 +332,15 @@ npx playwright install chromium               # só na primeira vez
 E2E_BASE_URL=http://localhost:8080 npx playwright test
 ```
 
-O Playwright usa o compose real (`infra/docker-compose.yml` +
-`infra/.env.e2e`, hardcoded em `e2e/seed.ts`) para popular usuário/fazenda/
-animal via `docker compose exec`. Se você usa um arquivo de env diferente de
-`infra/.env.e2e`, ajuste `ENV_FILE` em `apps/web/e2e/seed.ts`.
+O `e2e/seed.ts` cria o administrador, a fazenda e o animal do OCR falso de
+forma idempotente, e cada execução cria contas e vacas próprias: rodar de
+novo não esbarra na rodada anterior.
+
+Para derrubar e apagar os dados do E2E:
+
+```bash
+docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml down -v
+```
 
 ## 10. Derrubar o ambiente
 

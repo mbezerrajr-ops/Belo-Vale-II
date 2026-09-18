@@ -6,7 +6,7 @@
  * revisor, com motivo; a vaca fora do arquivo mantém a leitura dela.
  */
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ImportPanel } from "./ImportPanel";
@@ -108,7 +108,8 @@ const FILE = new File(["Número;Nome;Produção\n389;ÁGATA;21,5\n"], "coleta.cs
 function setup(props: Partial<Parameters<typeof ImportPanel>[0]> = {}) {
   const onPreview = vi.fn().mockResolvedValue(preview());
   const onCommit = vi.fn().mockResolvedValue(record());
-  const onList = vi.fn().mockResolvedValue([]);
+  // Histórico "carregando": só o teste do histórico o faz responder.
+  const onList = vi.fn(() => new Promise<never>(() => {}));
   const onImported = vi.fn();
   render(
     <ImportPanel
@@ -128,7 +129,10 @@ function setup(props: Partial<Parameters<typeof ImportPanel>[0]> = {}) {
 async function choose(): Promise<void> {
   fireEvent.change(screen.getByLabelText(/data da coleta/i), { target: { value: DAY } });
   fireEvent.change(screen.getByLabelText(/arquivo/i), { target: { files: [FILE] } });
-  fireEvent.click(screen.getByRole("button", { name: /ver prévia/i }));
+  // A prévia responde de forma assíncrona: o act espera a tela assentar.
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /ver prévia/i }));
+  });
 }
 
 afterEach(() => {
@@ -160,7 +164,9 @@ describe("ImportPanel", () => {
     expect(screen.queryByLabelText(/substituir/i)).not.toBeInTheDocument();
     expect(screen.getByText(/peça a um revisor/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /importar 1 leitura/i }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /importar 1 leitura/i }));
+    });
 
     await waitFor(() =>
       expect(onCommit).toHaveBeenCalledWith(TOKEN, FILE, DAY, "new_only", null),
@@ -188,7 +194,9 @@ describe("ImportPanel", () => {
     fireEvent.change(screen.getByLabelText(/motivo/i), {
       target: { value: "dados de 25/08 normalizados" },
     });
-    fireEvent.click(confirm);
+    await act(async () => {
+      fireEvent.click(confirm);
+    });
 
     await waitFor(() =>
       expect(onCommit).toHaveBeenCalledWith(
@@ -206,7 +214,9 @@ describe("ImportPanel", () => {
 
     await choose();
     await screen.findByRole("table", { name: /prévia/i });
-    fireEvent.click(screen.getByRole("button", { name: /importar 1 leitura/i }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /importar 1 leitura/i }));
+    });
 
     expect(await screen.findByText(/já tinha sido importado/i)).toBeInTheDocument();
   });

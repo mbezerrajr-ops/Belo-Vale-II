@@ -104,6 +104,10 @@ async def create_user(
         password_hash=hash_password(payload.password),
         role=payload.role,
         is_active=True,
+        # Decisão do titular: a senha digitada pelo administrador passou por
+        # duas mãos, então a pessoa escolhe a própria no primeiro acesso. Não
+        # expira: demorar a entrar não é motivo para travar a conta.
+        must_change_password=True,
     )
     session.add(user)
     await session.flush()
