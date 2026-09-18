@@ -5,6 +5,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    LargeBinary,
     CheckConstraint,
     Boolean,
     Date,
@@ -341,7 +342,7 @@ class OfficialMeasurement(TimestampedModel, Base):
             name="ck_official_measurements_status",
         ),
         CheckConstraint(
-            "provenance IN ('ocr_review', 'legacy_baseline', 'manual_entry')",
+            "provenance IN ('ocr_review', 'legacy_baseline', 'manual_entry', 'file_import')",
             name="ck_official_measurements_provenance",
         ),
         # Toda medição ativa continua obrigada a ter proveniência rastreável e
@@ -361,6 +362,10 @@ class OfficialMeasurement(TimestampedModel, Base):
             " OR"
             " (provenance = 'manual_entry'"
             "  AND entered_by_user_id IS NOT NULL"
+            "  AND reviewed_by IS NOT NULL AND length(btrim(reviewed_by)) > 0)"
+            " OR"
+            " (provenance = 'file_import'"
+            "  AND production_import_id IS NOT NULL"
             "  AND reviewed_by IS NOT NULL AND length(btrim(reviewed_by)) > 0)"
             ")",
             name="ck_official_measurements_active_review_provenance",
@@ -403,6 +408,61 @@ class OfficialMeasurement(TimestampedModel, Base):
     supersedes_measurement_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("official_measurements.id", ondelete="RESTRICT")
     )
+    #: Importação de arquivo que criou esta leitura, quando é `file_import`.
+    production_import_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("production_imports.id", ondelete="RESTRICT")
+    )
+
+
+class ProductionImport(TimestampedModel, Base):
+    """Um arquivo de coleta de leite enviado ao sistema.
+
+    Imutável depois de gravado (trigger no banco): guarda o próprio arquivo,
+    quem enviou, em que modo e o resumo do que foi feito. Cada leitura criada
+    pela importação aponta para cá.
+    """
+
+    __tablename__ = "production_imports"
+    __table_args__ = (
+        CheckConstraint(
+            "file_format IN ('csv', 'xlsx', 'pdf')", name="ck_production_imports_format"
+        ),
+        CheckConstraint(
+            "mode IN ('new_only', 'replace')", name="ck_production_imports_mode"
+        ),
+        CheckConstraint(
+            "mode <> 'replace' OR (reason IS NOT NULL AND length(btrim(reason)) >= 3)",
+            name="ck_production_imports_replace_reason",
+        ),
+        CheckConstraint(
+            "byte_size > 0 AND byte_size <= 5242880", name="ck_production_imports_size"
+        ),
+        Index(
+            "uq_production_imports_same_file",
+            "farm_id",
+            "measured_on",
+            "sha256",
+            "mode",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()")
+    )
+    farm_id: Mapped[UUID] = mapped_column(ForeignKey("farms.id", ondelete="RESTRICT"), nullable=False)
+    measured_on: Mapped[date] = mapped_column(Date, nullable=False)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_format: Mapped[str] = mapped_column(String(8), nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, deferred=True)
+    mode: Mapped[str] = mapped_column(String(16), nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text)
+    imported_by_user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    summary: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
 
 class Supply(TimestampedModel, Base):
