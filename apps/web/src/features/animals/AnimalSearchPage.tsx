@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 import { createAnimal, searchAnimals } from "../../api/client";
 import type { Animal, AnimalPage, AnimalSearch } from "../../api/types";
+import { Icons } from "../../ui/Brand";
 
 /**
  * Busca de animais.
@@ -96,6 +97,7 @@ export function AnimalSearchPage({
   return (
     <section className="animals">
       <h2>Animais</h2>
+      <p className="muted">Digite o brinco ou o nome e abra a ficha do animal.</p>
 
       <div className="search-row">
         <label htmlFor="animal-term">Brinco ou nome</label>
@@ -111,7 +113,7 @@ export function AnimalSearchPage({
           autoComplete="off"
         />
         <button type="button" onClick={handleSearch} disabled={busy}>
-          Buscar
+          <Icons.search /> Buscar
         </button>
       </div>
 
@@ -169,20 +171,35 @@ export function AnimalSearchPage({
       )}
 
       {error && <p role="alert">{error}</p>}
-      {busy && <p>Buscando…</p>}
+      {busy && (
+        <>
+          <div className="skeleton" style={{ height: 64, margin: "12px 0" }} />
+          <div className="skeleton" style={{ height: 64 }} />
+        </>
+      )}
 
       {result && !busy && (
         <>
           {result.items.length === 0 ? (
-            <p>Nenhum animal encontrado para essa busca.</p>
+            <p className="chart-empty">Nenhum animal encontrado para essa busca.</p>
           ) : (
             <ul className="animal-list">
-              {result.items.map((item) => (
-                <li key={item.id}>
+              {result.items.map((item, index) => (
+                <li key={item.id} style={{ "--i": index } as CSSProperties}>
                   <button type="button" onClick={() => onOpen(item.id)}>
-                    <strong>{item.brinco ?? "sem brinco"}</strong>
-                    <span>{item.name ?? "sem nome"}</span>
-                    <small>{item.lote_atual ?? "sem lote"}</small>
+                    <span className={item.brinco ? "tag" : "tag none"}>
+                      {item.brinco ?? "sem brinco"}
+                    </span>
+                    <span className="name">
+                      {item.name ?? "sem nome"}
+                      <small>
+                        {item.lote_atual ?? "sem lote"}
+                        {item.situacao ? ` · ${item.situacao}` : ""}
+                      </small>
+                    </span>
+                    <span className="chev" aria-hidden="true">
+                      <Icons.chevron />
+                    </span>
                   </button>
                 </li>
               ))}

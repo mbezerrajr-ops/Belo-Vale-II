@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 import {
   createSupply,
@@ -7,6 +7,7 @@ import {
   updateSupplyPrice,
 } from "../../api/client";
 import type { Supply } from "../../api/types";
+import { BarList, fmt } from "../../ui/charts";
 
 /**
  * Insumos e dieta.
@@ -30,7 +31,7 @@ interface Props {
   onSetMilkPrice?: (token: string, pricePerLiter: number) => Promise<void>;
 }
 
-const currency = new Intl.NumberFormat("pt-BR", {
+const precise = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
   minimumFractionDigits: 2,
@@ -88,7 +89,7 @@ export function SuppliesPage({
   return (
     <section className="supplies">
       <h2>Insumos e dieta</h2>
-      <p className="hint">
+      <p className="muted">
         O preço de cada insumo, multiplicado pela dieta do lote, é o custo
         diário que aparece no painel.
       </p>
@@ -109,6 +110,7 @@ export function SuppliesPage({
             type="number"
             step="0.01"
             min="0"
+            inputMode="decimal"
             value={milk}
             onChange={(event) => setMilk(event.target.value)}
           />
@@ -120,32 +122,53 @@ export function SuppliesPage({
       )}
 
       {supplies === null ? (
-        <p>Carregando…</p>
+        <div className="skeleton skeleton-card" />
       ) : (
         <ul className="supply-list">
-          {supplies.map((item) => (
-            <li key={item.id}>
-              <h3>{item.name}</h3>
-              <p className="price">{currency.format(item.price_per_kg)} / kg</p>
+          {supplies.map((item, index) => (
+            <li key={item.id} style={{ "--i": index } as CSSProperties}>
+              <div className="row-between">
+                <h3>{item.name}</h3>
+                <p className="price">{precise.format(item.price_per_kg)} / kg</p>
+              </div>
 
-              <table className="diet">
-                <thead>
-                  <tr>
-                    <th>Lote</th>
-                    <th>kg/dia</th>
-                    <th>Custo/dia</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {item.diets.map((diet) => (
-                    <tr key={diet.lote}>
-                      <td>{diet.lote}</td>
-                      <td>{diet.kg_per_day}</td>
-                      <td>{currency.format(diet.kg_per_day * item.price_per_kg)}</td>
+              {item.diets.length === 0 ? (
+                <p className="chart-empty">Sem dieta cadastrada para este insumo.</p>
+              ) : (
+                <BarList
+                  data={item.diets.map((diet) => ({
+                    label: diet.lote,
+                    value: diet.kg_per_day * item.price_per_kg,
+                    series: 1,
+                  }))}
+                  format={fmt.brl}
+                  tip={(d) => {
+                    const diet = item.diets.find((entry) => entry.lote === d.label);
+                    return `${d.label}: ${diet?.kg_per_day ?? 0} kg/dia · ${fmt.brl(d.value)}/dia`;
+                  }}
+                />
+              )}
+
+              <div className="table-wrap">
+                <table className="diet">
+                  <thead>
+                    <tr>
+                      <th>Lote</th>
+                      <th className="num">kg/dia</th>
+                      <th className="num">Custo/dia</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {item.diets.map((diet) => (
+                      <tr key={diet.lote}>
+                        <td>{diet.lote}</td>
+                        <td className="num">{diet.kg_per_day}</td>
+                        <td className="num">{fmt.brl(diet.kg_per_day * item.price_per_kg)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               {canEdit && (
                 <form
@@ -164,6 +187,7 @@ export function SuppliesPage({
                     type="number"
                     step="0.00001"
                     min="0"
+                    inputMode="decimal"
                     value={prices[item.id] ?? ""}
                     onChange={(event) =>
                       setPrices((current) => ({
@@ -175,10 +199,7 @@ export function SuppliesPage({
                   <p className="hint">
                     O preço anterior fica no histórico, com a data em que valia.
                   </p>
-                  <button
-                    type="submit"
-                    disabled={busy || !prices[item.id]}
-                  >
+                  <button type="submit" disabled={busy || !prices[item.id]}>
                     Salvar preço
                   </button>
                 </form>
@@ -209,6 +230,7 @@ export function SuppliesPage({
             type="number"
             step="0.00001"
             min="0"
+            inputMode="decimal"
             value={newPrice}
             onChange={(event) => setNewPrice(event.target.value)}
           />

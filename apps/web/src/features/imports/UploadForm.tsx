@@ -65,40 +65,50 @@ export function UploadForm({ token, farmId, onUploaded }: UploadFormProps): JSX.
 
   return (
     <form onSubmit={handleSubmit}>
-      <label>
-        Lote declarado
-        <input value={declaredLot} onChange={(event) => setDeclaredLot(event.target.value)} />
-      </label>
-      <label>
-        Data declarada
-        <input
-          value={declaredPeriod}
-          onChange={(event) => setDeclaredPeriod(event.target.value)}
-          placeholder="dd/mm/aaaa"
-        />
-      </label>
-      <label>
-        Foto da ficha
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/heic"
-          onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-        />
-        {/* Not `required`: some environments (jsdom included) report a
-            populated file input as constraint-invalid, blocking native
-            submission. The JS guard in handleSubmit enforces this instead. */}
-      </label>
+      <h3>Enviar ficha</h3>
+      <label htmlFor="upload-lot">Lote declarado</label>
+      <input
+        id="upload-lot"
+        value={declaredLot}
+        onChange={(event) => setDeclaredLot(event.target.value)}
+        autoComplete="off"
+      />
+      <label htmlFor="upload-period">Data declarada</label>
+      <input
+        id="upload-period"
+        value={declaredPeriod}
+        onChange={(event) => setDeclaredPeriod(event.target.value)}
+        placeholder="dd/mm/aaaa"
+        inputMode="numeric"
+        autoComplete="off"
+      />
+      <label htmlFor="upload-file">Foto da ficha</label>
+      <input
+        id="upload-file"
+        type="file"
+        accept="image/jpeg,image/png,image/heic"
+        onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+      />
+      {/* Sem `required`: alguns ambientes (jsdom incluído) tratam um input de
+          arquivo preenchido como inválido, bloqueando o submit nativo. A
+          guarda em handleSubmit faz esse papel. */}
+      <p className="hint">
+        {file ? `Selecionada: ${file.name}` : "JPEG, PNG ou HEIC, até 15 MB."}
+      </p>
       <button type="submit" disabled={state.status === "uploading"}>
-        Enviar foto
+        {state.status === "uploading" ? "Enviando…" : "Enviar foto"}
       </button>
 
-      {state.status === "queued" ? <p role="status">Importação enviada: {state.result.status}</p> : null}
+      {state.status === "queued" ? (
+        <p role="status">Importação enviada: {state.result.status}</p>
+      ) : null}
       {state.status === "error" ? <p role="alert">{state.message}</p> : null}
       {state.status !== "duplicate" && state.status !== "reprocessing" ? null : (
-        <div role="alert">
+        <div role="alert" className="replacement-warning">
           <p>Esta foto já foi enviada anteriormente.</p>
           <button
             type="button"
+            className="btn-ghost"
             onClick={handleReprocess}
             disabled={state.status === "reprocessing"}
           >

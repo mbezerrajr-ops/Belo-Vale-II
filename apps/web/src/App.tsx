@@ -15,17 +15,18 @@ import type {
   ImportReview,
   UploadResult,
 } from "./api/types";
-import { AnimalDetailPanel } from "./features/animals/AnimalDetailPanel";
-import { HerdDashboard } from "./features/dashboard/HerdDashboard";
-import { SuppliesPage } from "./features/dashboard/SuppliesPage";
-import { AnimalSearchPage } from "./features/animals/AnimalSearchPage";
-import { ChangePasswordForm } from "./features/users/ChangePasswordForm";
-import { UsersPage } from "./features/users/UsersPage";
 import { LoginForm } from "./auth/LoginForm";
 import { clearStoredToken, loadStoredToken, storeToken } from "./auth/session";
+import { AnimalDetailPanel } from "./features/animals/AnimalDetailPanel";
+import { AnimalSearchPage } from "./features/animals/AnimalSearchPage";
+import { HerdDashboard } from "./features/dashboard/HerdDashboard";
 import { OfficialMeasurements } from "./features/dashboard/OfficialMeasurements";
+import { SuppliesPage } from "./features/dashboard/SuppliesPage";
 import { ReviewWorkspace } from "./features/imports/ReviewWorkspace";
 import { UploadForm } from "./features/imports/UploadForm";
+import { ChangePasswordForm } from "./features/users/ChangePasswordForm";
+import { UsersPage } from "./features/users/UsersPage";
+import { Cows, Hills, Icons, LogoMark, type IconName } from "./ui/Brand";
 
 type SessionState =
   | { status: "checking" }
@@ -102,7 +103,6 @@ export function App(): JSX.Element {
             // Falha de rede não desloga: a próxima tentativa resolve.
           });
       },
-      // Bem antes dos 15 minutos do token, com folga para uma falha de rede.
       10 * 60 * 1000,
     );
 
@@ -127,14 +127,43 @@ export function App(): JSX.Element {
   };
 
   if (session.status === "checking") {
-    return <p>Carregando…</p>;
+    return (
+      <main className="shell">
+        <div className="skeleton skeleton-card" aria-label="Carregando" />
+      </main>
+    );
   }
 
   if (session.status === "signed-out") {
     return (
-      <main>
-        <h1>Belo Vale II</h1>
-        <LoginForm onLoggedIn={handleLoggedIn} />
+      <main className="login">
+        <section className="login-hero">
+          <div className="sky" aria-hidden="true">
+            <div className="sun" />
+            <div className="hills">
+              <Hills />
+            </div>
+            <div className="cows">
+              <Cows />
+            </div>
+          </div>
+          <div className="login-brand">
+            <span className="wordmark">
+              <LogoMark size={52} />
+              <span>
+                <strong>Belo Vale II</strong>
+                <small>Gestão do rebanho leiteiro</small>
+              </span>
+            </span>
+            <p>
+              Produção, cadastro e custos da fazenda no seu bolso — do curral ao
+              escritório.
+            </p>
+          </div>
+        </section>
+        <section className="login-panel">
+          <LoginForm onLoggedIn={handleLoggedIn} />
+        </section>
       </main>
     );
   }
@@ -154,7 +183,7 @@ interface AuthenticatedAppProps {
   onLogout: () => void;
 }
 
-/** Áreas do aplicativo. `animais` é a primeira porque é o uso diário. */
+/** Áreas do aplicativo. `painel` abre primeiro: é a visão do dia. */
 type Area =
   | "painel"
   | "animais"
@@ -164,6 +193,16 @@ type Area =
   | "contas"
   | "minha-conta";
 
+const AREA_LABEL: Record<Area, string> = {
+  painel: "Painel",
+  animais: "Animais",
+  fichas: "Fichas",
+  insumos: "Insumos",
+  medicoes: "Medições",
+  contas: "Contas",
+  "minha-conta": "Minha conta",
+};
+
 const ROLE_LEVEL: Record<string, number> = {
   operator: 0,
   reviewer: 1,
@@ -172,6 +211,10 @@ const ROLE_LEVEL: Record<string, number> = {
 
 function atLeast(user: CurrentUser, role: keyof typeof ROLE_LEVEL): boolean {
   return (ROLE_LEVEL[user.role] ?? -1) >= ROLE_LEVEL[role];
+}
+
+function initials(email: string): string {
+  return email.slice(0, 2);
 }
 
 function AuthenticatedApp({
@@ -234,128 +277,138 @@ function AuthenticatedApp({
     }
   };
 
-  return (
-    <main>
-      <header>
-        <h1>Belo Vale II</h1>
-        <p className="who">
-          {user.email}
-          <button type="button" onClick={onLogout}>
-            Sair
-          </button>
-        </p>
-      </header>
+  const areas: Area[] = [
+    "painel",
+    "animais",
+    "fichas",
+    "insumos",
+    "medicoes",
+    ...(isAdmin ? (["contas"] as Area[]) : []),
+    "minha-conta",
+  ];
 
-      <nav aria-label="Áreas">
-        <button
-          type="button"
-          aria-current={area === "painel"}
-          onClick={() => setArea("painel")}
-        >
-          Painel
-        </button>
-        <button
-          type="button"
-          aria-current={area === "animais"}
-          onClick={() => setArea("animais")}
-        >
-          Animais
-        </button>
-        <button
-          type="button"
-          aria-current={area === "fichas"}
-          onClick={() => setArea("fichas")}
-        >
-          Fichas
-        </button>
-        <button
-          type="button"
-          aria-current={area === "insumos"}
-          onClick={() => setArea("insumos")}
-        >
-          Insumos
-        </button>
-        <button
-          type="button"
-          aria-current={area === "medicoes"}
-          onClick={() => setArea("medicoes")}
-        >
-          Medições
-        </button>
-        {isAdmin && (
+  return (
+    <main className="shell">
+      <header className="topbar">
+        <span className="wordmark">
+          <LogoMark />
+          <span>
+            <strong>Belo Vale II</strong>
+            <small>Gestão do rebanho leiteiro</small>
+          </span>
+        </span>
+        <div className="who">
           <button
             type="button"
-            aria-current={area === "contas"}
-            onClick={() => setArea("contas")}
+            className="avatar"
+            aria-label="Minha conta"
+            aria-current={area === "minha-conta"}
+            onClick={() => setArea("minha-conta")}
           >
-            Contas
+            {initials(user.email)}
           </button>
-        )}
-        <button
-          type="button"
-          aria-current={area === "minha-conta"}
-          onClick={() => setArea("minha-conta")}
-        >
-          Minha conta
-        </button>
+          <span className="email">{user.email}</span>
+          <button type="button" className="link-btn" onClick={onLogout}>
+            <Icons.logout /> Sair
+          </button>
+        </div>
+      </header>
+
+      <nav className="areanav" aria-label="Áreas">
+        {areas.map((name) => {
+          const Icon = Icons[name as IconName];
+          return (
+            <button
+              key={name}
+              type="button"
+              className={name === "minha-conta" ? "nav-secondary" : undefined}
+              aria-current={area === name}
+              onClick={() => setArea(name)}
+            >
+              <Icon />
+              {AREA_LABEL[name]}
+            </button>
+          );
+        })}
       </nav>
 
       {farmError && <p role="alert">{farmError}</p>}
 
-      {area === "painel" && <HerdDashboard token={token} />}
+      <div className="area" key={area}>
+        {area === "painel" && <HerdDashboard token={token} />}
 
-      {area === "insumos" && (
-        <SuppliesPage
-          token={token}
-          canEdit={canEdit}
-          milkPrice={farm?.milk_price_per_liter ?? null}
-        />
-      )}
-
-      {area === "animais" &&
-        (openAnimalId !== null && animal !== null ? (
-          <>
-            <button type="button" onClick={() => setOpenAnimalId(null)}>
-              Voltar à busca
-            </button>
-            <AnimalDetailPanel
-              token={token}
-              animal={animal}
-              canEdit={canEdit}
-              onChanged={() => void loadAnimal(animal.id)}
-            />
-          </>
-        ) : (
-          <AnimalSearchPage
+        {area === "insumos" && (
+          <SuppliesPage
             token={token}
             canEdit={canEdit}
-            onOpen={(animalId) => void loadAnimal(animalId)}
+            milkPrice={farm?.milk_price_per_liter ?? null}
           />
-        ))}
+        )}
 
-      {area === "fichas" && farm !== null && (
-        <>
-          <UploadForm token={token} farmId={farm.id} onUploaded={handleUploaded} />
-          {review !== null && (
-            <div>
-              <button type="button" onClick={() => refreshReview(review.import_id)}>
-                Atualizar revisão
+        {area === "animais" &&
+          (openAnimalId !== null && animal !== null ? (
+            <>
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => setOpenAnimalId(null)}
+              >
+                <Icons.back /> Voltar à busca
               </button>
-              <ReviewWorkspace review={review} token={token} onDecided={handleDecided} />
-            </div>
-          )}
-        </>
-      )}
+              <AnimalDetailPanel
+                token={token}
+                animal={animal}
+                canEdit={canEdit}
+                onChanged={() => void loadAnimal(animal.id)}
+              />
+            </>
+          ) : (
+            <AnimalSearchPage
+              token={token}
+              canEdit={canEdit}
+              onOpen={(animalId) => void loadAnimal(animalId)}
+            />
+          ))}
 
-      {area === "medicoes" && farm !== null && (
-        <OfficialMeasurements farmId={farm.id} token={token} />
-      )}
+        {area === "fichas" && farm !== null && (
+          <>
+            <h2>Fichas de medição</h2>
+            <p className="muted">
+              Envie a foto da ficha. O sistema lê as linhas e deixa cada uma para
+              conferência antes de virar medição oficial.
+            </p>
+            <UploadForm token={token} farmId={farm.id} onUploaded={handleUploaded} />
+            {review !== null && (
+              <div>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => refreshReview(review.import_id)}
+                >
+                  Atualizar revisão
+                </button>
+                <ReviewWorkspace review={review} token={token} onDecided={handleDecided} />
+              </div>
+            )}
+          </>
+        )}
 
-      {area === "contas" && isAdmin && (
-        <UsersPage token={token} currentUserId={user.id} />
-      )}
+        {area === "medicoes" && farm !== null && (
+          <OfficialMeasurements farmId={farm.id} token={token} />
+        )}
 
-      {area === "minha-conta" && <ChangePasswordForm token={token} />}
+        {area === "contas" && isAdmin && (
+          <UsersPage token={token} currentUserId={user.id} />
+        )}
+
+        {area === "minha-conta" && (
+          <>
+            <h2>Minha conta</h2>
+            <p className="muted">{user.email}</p>
+            <ChangePasswordForm token={token} />
+          </>
+        )}
+      </div>
     </main>
   );
 }

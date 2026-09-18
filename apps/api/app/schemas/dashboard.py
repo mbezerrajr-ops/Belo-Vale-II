@@ -43,11 +43,20 @@ class ProducerRead(BaseModel):
     production: float
 
 
+class ProductionPointRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    measured_on: date
+    liters: float
+    animals: int
+
+
 class DashboardRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     measured_on: date | None
     available_dates: list[date]
+    production_by_date: list[ProductionPointRead]
     milk_price: float | None
     total_animals: int
     animals_without_lot: int

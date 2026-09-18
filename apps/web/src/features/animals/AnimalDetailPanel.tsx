@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 import { assignLot, linkBrinco, updateAnimal } from "../../api/client";
 import type { Animal, AnimalDetail, AnimalUpdateInput } from "../../api/types";
@@ -46,6 +46,12 @@ function errorMessage(error: unknown): string {
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function br(iso: string | null): string {
+  if (!iso) return "—";
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year}`;
 }
 
 export function AnimalDetailPanel({
@@ -115,33 +121,44 @@ export function AnimalDetailPanel({
 
   return (
     <section className="animal-detail">
-      <header>
-        <h2>{animal.name ?? "Animal sem nome"}</h2>
-        <p className="brinco">
-          {animal.brinco ? (
-            <>
-              Brinco <strong>{animal.brinco}</strong>
-            </>
-          ) : (
-            <>
-              <strong>Sem brinco</strong>
-              {animal.brinco_origem && (
-                <> — leitura ilegível registrada: {animal.brinco_origem}</>
-              )}
-            </>
-          )}
-        </p>
+      <header className="detail-head">
+        <div>
+          <h2>{animal.name ?? "Animal sem nome"}</h2>
+          <p className="brinco">
+            {animal.brinco ? (
+              <>
+                Brinco <strong>{animal.brinco}</strong>
+              </>
+            ) : (
+              <>
+                <strong>Sem brinco</strong>
+                {animal.brinco_origem && (
+                  <> — leitura ilegível registrada: {animal.brinco_origem}</>
+                )}
+              </>
+            )}
+          </p>
+        </div>
+        {animal.brinco && <span className="tag">{animal.brinco}</span>}
       </header>
 
       <dl className="animal-fields">
-        <dt>Lote atual</dt>
-        <dd>{animal.lote_atual ?? "sem lote"}</dd>
-        <dt>Situação</dt>
-        <dd>{animal.situacao ?? "—"}</dd>
-        <dt>Último parto</dt>
-        <dd>{animal.ultimo_parto ?? "—"}</dd>
-        <dt>Número legado</dt>
-        <dd>{animal.numero_legado ?? "—"}</dd>
+        <div>
+          <dt>Lote atual</dt>
+          <dd>{animal.lote_atual ?? "sem lote"}</dd>
+        </div>
+        <div>
+          <dt>Situação</dt>
+          <dd>{animal.situacao ?? "—"}</dd>
+        </div>
+        <div>
+          <dt>Último parto</dt>
+          <dd>{br(animal.ultimo_parto)}</dd>
+        </div>
+        <div>
+          <dt>Número legado</dt>
+          <dd>{animal.numero_legado ?? "—"}</dd>
+        </div>
       </dl>
 
       {!animal.brinco && (
@@ -158,7 +175,7 @@ export function AnimalDetailPanel({
           <button type="button" onClick={() => setPanel("lote")}>
             Mudar de lote
           </button>
-          <button type="button" onClick={() => setPanel("cadastro")}>
+          <button type="button" className="secondary" onClick={() => setPanel("cadastro")}>
             Editar cadastro
           </button>
         </div>
@@ -272,14 +289,21 @@ export function AnimalDetailPanel({
 
       <h3>Histórico de lotes</h3>
       {animal.historico_lotes.length === 0 ? (
-        <p>Sem registro de lotação.</p>
+        <p className="chart-empty">Sem registro de lotação.</p>
       ) : (
         <ul className="lot-history">
-          {animal.historico_lotes.map((entry) => (
-            <li key={`${entry.lote}-${entry.valid_from}`}>
+          {animal.historico_lotes.map((entry, index) => (
+            <li
+              key={`${entry.lote}-${entry.valid_from}`}
+              style={{ "--i": index } as CSSProperties}
+            >
+              <span
+                className={`timeline-dot${entry.valid_to ? " past" : ""}`}
+                aria-hidden="true"
+              />
               <strong>{entry.lote}</strong>
               <span>
-                {entry.valid_from} — {entry.valid_to ?? "atual"}
+                {br(entry.valid_from)} — {entry.valid_to ? br(entry.valid_to) : "atual"}
               </span>
             </li>
           ))}

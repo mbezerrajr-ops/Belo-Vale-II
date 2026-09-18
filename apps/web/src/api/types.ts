@@ -215,9 +215,16 @@ export interface Producer {
   production: number;
 }
 
+export interface ProductionPoint {
+  measured_on: string;
+  liters: number;
+  animals: number;
+}
+
 export interface DashboardSummary {
   measured_on: string | null;
   available_dates: string[];
+  production_by_date: ProductionPoint[];
   milk_price: number | null;
   total_animals: number;
   animals_without_lot: number;
