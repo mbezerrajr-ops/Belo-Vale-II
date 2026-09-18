@@ -35,6 +35,13 @@ SYNTHETIC_TEST_VALUES = frozenset(
         "errado",  # testes/shot_platform.py, login inválido proposital
         "senha123",  # testes/shot_platform{2,3}.py, usuário de teste do fluxo
         "SEGREDO",  # tests/test_baseline_snapshot.py, prova que o parser não lê senhas
+        # tests/test_user_accounts.py: senhas sintéticas do CRUD de contas.
+        "bezerra no pasto",  # senha forte de exemplo
+        "capim elefante molhado",  # senha forte de exemplo
+        "chute errado",  # tentativa inválida, no teste de força bruta
+        "senha errada aqui",  # tentativa inválida
+        "errada demais",  # senha atual incorreta, na troca de senha
+        "123456",  # senha fraca, recusada pela política
     }
 )
 
