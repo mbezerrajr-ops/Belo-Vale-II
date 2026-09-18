@@ -180,14 +180,11 @@ Playwright TypeScript `apps/web/e2e/legacy-platform.spec.ts`.
   trocar a stack de build/teste no meio de uma integração — ver instrução
   explícita da Task 8 de não fazer upgrade major só para zerar o audit.
 
-## Duas seções "Fazenda" na tela principal
+## Duas seções "Fazenda" na tela principal — resolvido
 
-O formulário de upload (`UploadForm`) e o filtro do dashboard
-(`OfficialMeasurements`) têm cada um seu próprio campo "Fazenda"
-independente, em vez de compartilhar um único valor. Funciona, mas exige
-digitar o mesmo ID duas vezes. Não corrigido nesta task por não ser um
-redesenho justificado pelo escopo (Task 8 pede explicitamente para não
-redesenhar a UI) — seria uma melhoria de UX pontual para uma task futura.
+O upload e o dashboard pediam, cada um, o UUID da fazenda digitado à mão.
+A fazenda agora vem de `GET /api/farms/current`, resolvida no servidor, e
+nenhuma tela pede isso ao usuário.
 
 ## `HttpVisionProvider` sem integração externa real comprovada
 
@@ -208,8 +205,9 @@ verificações a cada push/PR. Fora do escopo desta task.
 ## Segurança para exposição pública: o que falta
 
 A aplicação será acessada pelo celular via internet pública, por dono e
-funcionários. Isso já está atendido por política de senha, limite de tentativas
-de login e gestão de contas com RBAC. Continuam em aberto, e **todos importam
+funcionários. Já estão atendidos: política de senha, limite de tentativas de
+login, gestão de contas com RBAC, sessão renovável em cookie `HttpOnly` e os
+cabeçalhos de segurança do navegador. Continuam em aberto, e **todos importam
 antes de expor a aplicação**:
 
 - **Limite de login é por processo.** O contador vive na memória da API; com
@@ -217,21 +215,11 @@ antes de expor a aplicação**:
   projeto é o lugar natural para isso.
 - **HTTPS não é obrigatório em lugar nenhum.** Sem TLS, senha e token viajam
   em texto puro. Precisa de certificado, redirecionamento e HSTS.
-- **Sem cabeçalhos de segurança** (CSP, `X-Content-Type-Options`,
-  `Referrer-Policy`).
-- **Origem do cliente depende de configuração.** O limite usa
-  `request.client.host`; atrás de proxy reverso o uvicorn precisa rodar com
-  `--proxy-headers`, senão todas as requisições parecem vir do proxy.
 - **Sem recuperação de senha.** Se um funcionário esquecer a senha, só um
   administrador consegue resolver — e não há fluxo para isso além de criar
   outra conta.
 
-## Cadastro mestre: API pronta, tela ainda não
+## Cadastro mestre — resolvido
 
-O CRUD de fazendas e animais existe na API, com RBAC e auditoria — não é mais
-necessário `INSERT` via `psql`. Ver a seção 5 do runbook.
-
-O que **falta**: não há tela no frontend para essas operações. Cadastrar um
-animal, vincular um brinco ou mudar um animal de lote exige, hoje, chamar a
-API diretamente. Para quem opera a fazenda, isso ainda não está usável.
-
+API e telas existem: buscar animal, ver ficha, vincular brinco, mudar de lote,
+cadastrar animal e gerenciar contas. Ver a seção 5 do runbook.

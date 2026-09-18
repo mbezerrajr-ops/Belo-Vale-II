@@ -98,8 +98,13 @@ O bootstrap se recusa a rodar se já existir qualquer usuário no banco.
 
 ## 5. Cadastrar fazenda e animal (cadastro mestre)
 
-Pela API. A fazenda é resolvida no servidor: nenhum endpoint aceita `farm_id`
-do cliente.
+Pela interface, em **Animais** — buscar, ver ficha, vincular brinco, mudar de
+lote e cadastrar. Contas de funcionários ficam em **Contas**, visível apenas
+para administradores. A fazenda é resolvida no servidor: nenhuma tela pede o
+`farm_id`, e nenhum endpoint o aceita do cliente.
+
+Os comandos abaixo continuam válidos para automação e para a primeira fazenda,
+que precisa existir antes do primeiro login funcionar.
 
 Crie a fazenda (exige **admin**) e confira qual está em uso:
 
