@@ -231,8 +231,13 @@ async def build_dashboard(
         point.animals += 1
     production_by_date = [by_date[day] for day in sorted(by_date)]
 
+    # Animal com baixa (vendido, morto, descartado) não é mais rebanho.
     animals = list(
-        await session.scalars(select(Animal).where(Animal.farm_id == farm_id))
+        await session.scalars(
+            select(Animal).where(
+                Animal.farm_id == farm_id, Animal.exited_on.is_(None)
+            )
+        )
     )
     # Lote de ordenha e grupo de manejo são coisas diferentes: só o primeiro
     # tem dieta e custo. Misturá-los faria a fazenda "ter" lotes sem dieta.

@@ -1,4 +1,5 @@
 import secrets
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -13,7 +14,12 @@ from app.services.refresh_tokens import (
     revoke_refresh_token,
     rotate_refresh_token,
 )
-from app.core.security import create_access_token, get_current_user, hash_password, verify_password
+from app.core.security import (
+    create_access_token,
+    get_authenticated_user,
+    hash_password,
+    verify_password,
+)
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas.auth import CurrentUserResponse, LoginRequest, TokenResponse
@@ -68,7 +74,7 @@ async def login(
     # um forjar a origem e escapar do limite.
     origin = request.client.host if request.client else "desconhecida"
 
-    retry_after = throttle.check(email, origin)
+    retry_after = await throttle.check(email, origin)
     if retry_after is not None:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -85,14 +91,28 @@ async def login(
     if user is None or not user.is_active or not password_is_valid:
         # A mesma resposta para conta inexistente, inativa e senha errada:
         # distinguir revelaria quais e-mails existem no sistema.
-        throttle.record_failure(email, origin)
+        await throttle.record_failure(email, origin)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    throttle.record_success(email, origin)
+    # Senha provisória vencida. Só chega aqui quem acertou a senha, então
+    # dizer "expirou" não ajuda quem está chutando.
+    if (
+        user.password_expires_at is not None
+        and user.password_expires_at <= datetime.now(timezone.utc)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=(
+                "A senha provisória expirou. Peça ao administrador uma nova."
+            ),
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    await throttle.record_success(email, origin)
     try:
         token = create_access_token(
             user.id, settings.auth_secret, settings.auth_token_ttl_seconds
@@ -109,15 +129,19 @@ async def login(
     return TokenResponse(
         access_token=token,
         expires_in=settings.auth_token_ttl_seconds,
+        must_change_password=bool(user.must_change_password),
     )
 
 
 @router.get("/me", response_model=CurrentUserResponse)
 async def current_user(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(get_authenticated_user)],
 ) -> CurrentUserResponse:
     return CurrentUserResponse(
-        id=str(user.id), email=user.email, role=user.role
+        id=str(user.id),
+        email=user.email,
+        role=user.role,
+        must_change_password=bool(user.must_change_password),
     )
 
 
@@ -165,8 +189,11 @@ async def refresh(
         ) from exc
 
     _set_refresh_cookie(response, raw_next, settings)
+    owner = await session.get(User, record.user_id)
     return TokenResponse(
-        access_token=access_token, expires_in=settings.auth_token_ttl_seconds
+        access_token=access_token,
+        expires_in=settings.auth_token_ttl_seconds,
+        must_change_password=bool(owner and owner.must_change_password),
     )
 
 

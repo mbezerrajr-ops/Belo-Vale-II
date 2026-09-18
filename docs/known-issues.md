@@ -194,13 +194,14 @@ credenciais no frontend, timeout, parsing do formato esperado); nunca
 executado contra um provedor de visão/OCR real, por não haver credencial
 disponível ou autorizada neste ambiente.
 
-## Sem CI configurado
+## CI — resolvido, com um limite
 
-Todos os comandos deste projeto (`pytest`, `vitest`, `tsc`, `npm run build`,
-`docker compose`, `playwright`) foram rodados manualmente e estão
-documentados e verificados em `docs/runbook-local.md`, mas não existe um
-pipeline de CI (GitHub Actions ou equivalente) automatizando essas
-verificações a cada push/PR. Fora do escopo desta task.
+`.github/workflows/ci.yml` roda em todo push e PR: varredura de credenciais,
+contrato da baseline, suíte do backend contra PostgreSQL e Redis reais (com
+ida e volta da migration mais recente), vitest, tipos e build do frontend.
+
+Fica de fora o Playwright E2E, que precisa do Docker Compose inteiro (API,
+worker, MinIO, nginx). Continua sendo rodado à mão, conforme o runbook.
 
 ## Segurança para exposição pública: o que falta
 
@@ -210,14 +211,42 @@ login, gestão de contas com RBAC, sessão renovável em cookie `HttpOnly` e os
 cabeçalhos de segurança do navegador. Continuam em aberto, e **todos importam
 antes de expor a aplicação**:
 
-- **Limite de login é por processo.** O contador vive na memória da API; com
-  mais de uma réplica, cada uma conta em separado. O Redis que já existe no
-  projeto é o lugar natural para isso.
 - **HTTPS não é obrigatório em lugar nenhum.** Sem TLS, senha e token viajam
-  em texto puro. Precisa de certificado, redirecionamento e HSTS.
-- **Sem recuperação de senha.** Se um funcionário esquecer a senha, só um
-  administrador consegue resolver — e não há fluxo para isso além de criar
-  outra conta.
+  em texto puro. Precisa de certificado, redirecionamento e HSTS. Fica para a
+  fase de deploy, que só será planejada com a estruturação completa.
+
+Resolvidos nesta etapa:
+
+- **Limite de login no Redis.** Compartilhado entre réplicas e preservado
+  quando a API reinicia. Com o Redis fora do ar, o limite continua valendo na
+  memória do processo (nem tranca a fazenda, nem libera força bruta).
+- **Redefinição de senha pelo administrador**, com senha provisória que
+  expira em 72 h e só serve para escolher outra. Não há recuperação por
+  e-mail: exigiria um provedor de envio, e a fazenda tem sempre um
+  administrador por perto.
+
+Decisão pendente, registrada para não passar despercebida: a conta criada
+pelo administrador já nasce com a senha que ele digitou, sem troca
+obrigatória no primeiro acesso. É o mesmo risco que a redefinição trata (uma
+senha que passou por mais de uma mão). Aplicar a troca obrigatória também na
+criação é uma linha no endpoint, mas muda o fluxo do dono e ficou para ele
+decidir.
+
+## Uso diário — decisões registradas
+
+- **Lançamento manual de produção** usa a proveniência `manual_entry`. O
+  trigger do banco exige que o responsável gravado seja uma conta existente,
+  com o mesmo rigor da revisão de OCR e da baseline.
+- **Teto de 80 L por vaca por dia** no lançamento. Acima disso é quase certo
+  erro de digitação (a maior produção da baseline é 37,5 L). Zero é aceito:
+  leite descartado em tratamento.
+- **"Hoje" é o dia da fazenda** (UTC−3 fixo, `app/core/farm_clock.py`), não o
+  do servidor. Datas futuras são recusadas no lançamento e na baixa.
+- **Desfazer baixa não reabre lote.** Reabrir sozinho afirmaria uma lotação
+  que ninguém confirmou; o animal volta sem lote e quem desfaz decide onde
+  ele está.
+- **Painel e folha de coleta ignoram animais com baixa.** A produção que eles
+  deram antes da saída continua no banco e na série histórica.
 
 ## Cadastro mestre — resolvido
 

@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.core.config import Settings, get_settings
-from app.core.login_throttle import LoginThrottle, get_login_throttle
+from app.core.login_throttle import InMemoryLoginThrottle, get_login_throttle
 from app.core.security import create_access_token, hash_password
 from app.db.session import get_db_session
 from app.main import create_app
@@ -70,7 +70,7 @@ def api():
     app.dependency_overrides[get_db_session] = override_session
     # Instância própria por teste: o contador é global do processo, então sem
     # isolar um teste herdaria o bloqueio provocado por outro.
-    throttle = LoginThrottle()
+    throttle = InMemoryLoginThrottle()
     app.dependency_overrides[get_login_throttle] = lambda: throttle
     with TestClient(app) as client:
         yield client

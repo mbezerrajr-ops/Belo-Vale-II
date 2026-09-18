@@ -1743,3 +1743,276 @@ tbody tr:hover td {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* ---------- lançamento de produção ---------- */
+
+.prod-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 4px 0 18px;
+}
+
+.prod-controls label {
+  margin: 0;
+}
+
+.prod-controls input[type="date"] {
+  width: auto;
+  min-width: 11rem;
+}
+
+.prod-controls .search-shortcuts {
+  margin: 0;
+}
+
+.prod-summary {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.prod-summary > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.prod-summary strong {
+  font-family: var(--font-display);
+  font-size: 1.9rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.prod-summary span {
+  color: var(--ink-2);
+  font-size: 0.92rem;
+}
+
+.prod-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.prod-progress i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--series-1);
+  transition: width var(--dur) var(--ease-out);
+}
+
+.prod-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.prod-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto 1.6rem;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  animation: rise var(--dur) var(--ease-out) both;
+  animation-delay: calc(min(var(--i, 0), 12) * 25ms);
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+
+.prod-row .name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.prod-row .name small {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.prod-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.prod-input input {
+  width: 5.6rem;
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.prod-input .unit {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.prod-state {
+  display: flex;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.prod-state .ok {
+  color: var(--good);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.prod-row.is-saved {
+  border-color: color-mix(in srgb, var(--good) 35%, var(--line));
+}
+
+.prod-row.is-invalid,
+.prod-row.is-error,
+.prod-row.is-offline {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.prod-row.is-locked {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.row-msg,
+.row-retry,
+.row-void,
+.row-fix {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.row-msg {
+  font-size: 0.88rem;
+  color: var(--ink-2);
+}
+
+.row-retry {
+  justify-self: start;
+}
+
+.row-void {
+  justify-self: end;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.row-fix {
+  display: grid;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line-strong);
+}
+
+.row-fix label {
+  margin: 0;
+}
+
+.row-fix input {
+  margin: 0;
+}
+
+.row-fix-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---------- senha provisória ---------- */
+
+.confirm-box,
+.temp-password {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  margin: 12px 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.confirm-box p,
+.temp-password p {
+  margin: 0;
+}
+
+.temp-password {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.temp-password code {
+  justify-self: start;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  user-select: all;
+}
+
+.user-list em.pending {
+  color: var(--warn);
+}
+
+.user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.forced-password-card {
+  max-width: 34rem;
+  margin: 12px auto 0;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  animation: rise var(--dur) var(--ease-out) both;
+}
+
+/* ---------- baixa de animal ---------- */
+
+.exit-banner {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  border: 1px solid var(--line-strong);
+  border-left: 4px solid var(--muted);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.exit-banner small {
+  color: var(--muted);
+}
+
+.actions button.danger {
+  color: var(--danger);
+}

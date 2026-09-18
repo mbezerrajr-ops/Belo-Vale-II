@@ -1,15 +1,19 @@
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
+from app.core.login_throttle import build_login_throttle, close_login_throttle
 from app.routers.auth import router as auth_router
 from app.routers.imports import router as imports_router
 from app.routers.measurements import router as measurements_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.registry import router as registry_router
 from app.routers.users import router as users_router
+from app.routers.production import router as production_router
 from app.routers.reviews import router as reviews_router
 from app.services.approval import (
     ConcurrentReviewError,
@@ -42,10 +46,22 @@ def _configure_logging() -> None:
     app_logger.propagate = False
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # O limitador de login abre um cliente Redis assíncrono, que pertence ao
+    # event loop da aplicação: nasce e morre com ela.
+    throttle = build_login_throttle(get_settings().redis_url)
+    app.state.login_throttle = throttle
+    try:
+        yield
+    finally:
+        await close_login_throttle(throttle)
+
+
 def create_app() -> FastAPI:
     _configure_logging()
     get_settings()
-    app = FastAPI(title="Belo Vale Ingestion API")
+    app = FastAPI(title="Belo Vale Ingestion API", lifespan=_lifespan)
     app.include_router(auth_router)
     app.include_router(imports_router)
     app.include_router(reviews_router)
@@ -53,6 +69,7 @@ def create_app() -> FastAPI:
     app.include_router(registry_router)
     app.include_router(users_router)
     app.include_router(dashboard_router)
+    app.include_router(production_router)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

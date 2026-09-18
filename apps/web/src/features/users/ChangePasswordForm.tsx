@@ -13,6 +13,8 @@ type ChangeFn = (
 interface Props {
   token: string;
   onChange?: ChangeFn;
+  /** Chamado depois de uma troca bem-sucedida. */
+  onChanged?: () => void;
 }
 
 function errorMessage(error: unknown): string {
@@ -23,6 +25,7 @@ function errorMessage(error: unknown): string {
 export function ChangePasswordForm({
   token,
   onChange = changeOwnPassword,
+  onChanged,
 }: Props): JSX.Element {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -39,6 +42,7 @@ export function ChangePasswordForm({
       setDone(true);
       setCurrent("");
       setNext("");
+      onChanged?.();
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {

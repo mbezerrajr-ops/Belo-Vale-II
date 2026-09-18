@@ -24,7 +24,8 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Animal, AnimalLotAssignment, AuditEvent
+from app.core.farm_clock import farm_today
+from app.db.models import Animal, AnimalLotAssignment, AuditEvent, OfficialMeasurement
 from app.services.brinco import normalize_brinco
 from app.services.lot_kind import KIND_DIET, classify_lot
 
@@ -193,6 +194,15 @@ async def update_animal(
         )
 
     animal = await _load_animal(session, animal_id=animal_id, farm_id=farm_id)
+    if (
+        animal.exited_on is not None
+        and "status" in changes
+        and changes["status"] != animal.status
+    ):
+        raise AnimalRegistryError(
+            "Este animal teve baixa. Para trazê-lo de volta ao rebanho, "
+            "desfaça a baixa informando o motivo."
+        )
 
     previous: dict[str, Any] = {}
     applied: dict[str, Any] = {}
@@ -293,6 +303,11 @@ async def assign_lot(
         raise AnimalRegistryError("Informe o lote.")
 
     animal = await _load_animal(session, animal_id=animal_id, farm_id=farm_id)
+    if animal.exited_on is not None:
+        raise AnimalRegistryError(
+            f"Este animal teve baixa em {animal.exited_on:%d/%m/%Y} e não pode "
+            "mudar de lote."
+        )
     lote = lote.strip()
     kind = kind or classify_lot(lote) or KIND_DIET
 
@@ -362,3 +377,132 @@ async def lot_history(
             .order_by(AnimalLotAssignment.valid_from)
         )
     )
+
+
+#: `status` legado. A plataforma antiga só conhecia estes dois valores.
+STATUS_ACTIVE = "Ativo"
+STATUS_INACTIVE = "Inativo"
+
+
+async def register_exit(
+    session: AsyncSession,
+    *,
+    animal_id: UUID,
+    farm_id: UUID,
+    actor: str,
+    exited_on: date,
+    reason: str,
+    notes: str | None = None,
+) -> Animal:
+    """Tira o animal do rebanho: venda, morte, descarte, doação.
+
+    Encerra as lotações vigentes no dia da baixa e nunca apaga produção. Uma
+    leitura depois da data da baixa significa que uma das duas datas está
+    errada, e o sistema não escolhe qual: recusa e diz o porquê.
+    """
+    if exited_on > farm_today():
+        raise AnimalRegistryError("A data da baixa não pode ser no futuro.")
+
+    animal = await _load_animal(session, animal_id=animal_id, farm_id=farm_id)
+    if animal.exited_on is not None:
+        raise AnimalRegistryError(
+            f"Este animal já teve baixa em {animal.exited_on:%d/%m/%Y}."
+        )
+
+    later = await session.scalar(
+        select(OfficialMeasurement.measured_on)
+        .where(
+            OfficialMeasurement.animal_id == animal.id,
+            OfficialMeasurement.status == "active",
+            OfficialMeasurement.measured_on > exited_on,
+        )
+        .order_by(OfficialMeasurement.measured_on.desc())
+        .limit(1)
+    )
+    if later is not None:
+        raise AnimalRegistryError(
+            f"Há produção lançada em {later:%d/%m/%Y}, depois da data da baixa. "
+            "Confira a data da baixa ou corrija o lançamento antes."
+        )
+
+    open_lots = list(
+        await session.scalars(
+            select(AnimalLotAssignment).where(
+                AnimalLotAssignment.animal_id == animal.id,
+                AnimalLotAssignment.valid_to.is_(None),
+            )
+        )
+    )
+    for assignment in open_lots:
+        if assignment.valid_from > exited_on:
+            raise AnimalRegistryError(
+                f"O animal entrou em {assignment.lote} em "
+                f"{assignment.valid_from:%d/%m/%Y}, depois da data da baixa."
+            )
+        assignment.valid_to = exited_on
+
+    previous = {
+        "status": animal.status,
+        "lotes": [a.lote for a in open_lots],
+    }
+    animal.exited_on = exited_on
+    animal.exit_reason = reason
+    animal.exit_notes = notes.strip() if notes and notes.strip() else None
+    animal.status = STATUS_INACTIVE
+
+    _audit(
+        session,
+        farm_id=farm_id,
+        actor=actor,
+        action="animal_exited",
+        entity_id=animal.id,
+        previous=previous,
+        new={
+            "exited_on": exited_on.isoformat(),
+            "reason": reason,
+            "notes": animal.exit_notes,
+        },
+    )
+    await session.commit()
+    return animal
+
+
+async def undo_exit(
+    session: AsyncSession,
+    *,
+    animal_id: UUID,
+    farm_id: UUID,
+    actor: str,
+    reason: str,
+) -> Animal:
+    """Desfaz uma baixa registrada por engano.
+
+    Não reabre as lotações encerradas: o animal volta ao rebanho sem lote, e
+    quem desfaz decide onde ele está hoje. Reabrir sozinho afirmaria uma
+    lotação que ninguém confirmou.
+    """
+    animal = await _load_animal(session, animal_id=animal_id, farm_id=farm_id)
+    if animal.exited_on is None:
+        raise AnimalRegistryError("Este animal não tem baixa para desfazer.")
+
+    previous = {
+        "exited_on": animal.exited_on.isoformat(),
+        "exit_reason": animal.exit_reason,
+        "exit_notes": animal.exit_notes,
+    }
+    animal.exited_on = None
+    animal.exit_reason = None
+    animal.exit_notes = None
+    animal.status = STATUS_ACTIVE
+
+    _audit(
+        session,
+        farm_id=farm_id,
+        actor=actor,
+        action="animal_exit_undone",
+        entity_id=animal.id,
+        previous=previous,
+        new={"reason": reason},
+    )
+    await session.commit()
+    return animal

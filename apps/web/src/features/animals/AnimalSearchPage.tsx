@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from "react";
 
 import { createAnimal, searchAnimals } from "../../api/client";
-import type { Animal, AnimalPage, AnimalSearch } from "../../api/types";
+import { EXIT_REASON_LABEL, type Animal, type AnimalPage, type AnimalSearch } from "../../api/types";
 import { Icons } from "../../ui/Brand";
 
 /**
@@ -124,6 +124,13 @@ export function AnimalSearchPage({
         <button type="button" onClick={() => void run({})} disabled={busy}>
           Todos
         </button>
+        <button
+          type="button"
+          onClick={() => void run({ rebanho: "baixados" })}
+          disabled={busy}
+        >
+          Baixados
+        </button>
         {canEdit && (
           <button type="button" onClick={() => setCreating((open) => !open)}>
             Cadastrar animal
@@ -195,9 +202,15 @@ export function AnimalSearchPage({
                       <small>
                         {/* Lote de ordenha e grupo de manejo são coisas
                             diferentes: dizer "lote ENGORDA" seria falso. */}
-                        {item.lote_atual ??
-                          (item.grupo_manejo ? `em ${item.grupo_manejo}` : "sem lote")}
-                        {item.situacao ? ` · ${item.situacao}` : ""}
+                        {item.exited_on
+                          ? `baixa · ${
+                              item.exit_reason
+                                ? EXIT_REASON_LABEL[item.exit_reason].toLowerCase()
+                                : "sem motivo"
+                            }`
+                          : (item.lote_atual ??
+                            (item.grupo_manejo ? `em ${item.grupo_manejo}` : "sem lote"))}
+                        {item.situacao && !item.exited_on ? ` · ${item.situacao}` : ""}
                       </small>
                     </span>
                     <span className="chev" aria-hidden="true">

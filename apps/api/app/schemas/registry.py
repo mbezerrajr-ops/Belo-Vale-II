@@ -11,7 +11,7 @@ from datetime import date
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class FarmCreate(BaseModel):
@@ -108,6 +108,10 @@ class AnimalRead(BaseModel):
     lote_atual: str | None = None
     #: Área ou categoria em que o animal está (BEZERREIRO, ENGORDA…).
     grupo_manejo: str | None = None
+    #: Baixa. Nulos enquanto o animal está no rebanho.
+    exited_on: date | None = None
+    exit_reason: str | None = None
+    exit_notes: str | None = None
 
 
 class AnimalDetail(AnimalRead):
@@ -119,3 +123,28 @@ class AnimalPage(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+ExitReason = Literal["venda", "morte", "descarte", "doacao", "outro"]
+
+
+class AnimalExit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    exited_on: date
+    reason: ExitReason
+    notes: str | None = Field(default=None, max_length=1000)
+
+
+class AnimalExitUndo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def _required(cls, value: str) -> str:
+        cleaned = value.strip()
+        if len(cleaned) < 3:
+            raise ValueError("Explique em poucas palavras por que desfazer a baixa.")
+        return cleaned
