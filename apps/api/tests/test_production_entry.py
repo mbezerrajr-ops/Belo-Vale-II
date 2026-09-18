@@ -352,6 +352,22 @@ class TestSheet:
         ]
         assert body["lotes"] == ["LOTE 1", "LOTE 2"]
 
+    def test_without_a_lot_the_sheet_only_lists_the_lots(self, api, farm) -> None:
+        """A tela abre sem saber quais lotes existem: a primeira chamada
+        pergunta só isso."""
+        _, operator = make_user("operator")
+        make_animal(farm, brinco="389", name="ÁGATA", lote="LOTE 2")
+
+        body = api.get(
+            "/api/production/sheet",
+            headers=auth(operator),
+            params={"measured_on": DAY.isoformat()},
+        ).json()
+
+        assert body["lote"] is None
+        assert body["lotes"] == ["LOTE 2"]
+        assert body["items"] == []
+
     def test_sheet_leaves_out_animals_that_left_the_herd(self, api, farm) -> None:
         _, operator = make_user("operator")
         cow = make_animal(farm, brinco="389", name="ÁGATA", lote="LOTE 1")

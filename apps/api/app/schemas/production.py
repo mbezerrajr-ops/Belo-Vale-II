@@ -67,7 +67,8 @@ class SheetItem(BaseModel):
 
 class SheetOut(BaseModel):
     measured_on: date
-    lote: str
+    #: Nulo quando a tela pediu só a lista de lotes.
+    lote: str | None
     #: Lotes de ordenha com animais hoje, para o seletor da tela.
     lotes: list[str]
     items: list[SheetItem]

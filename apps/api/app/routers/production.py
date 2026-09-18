@@ -76,10 +76,16 @@ async def production_sheet(
     farm: Annotated[Farm, Depends(resolve_current_farm)],
     _: Annotated[User, Depends(require_minimum_role("operator"))],
     measured_on: date,
-    lote: Annotated[str, Query(min_length=1, max_length=64)],
+    lote: Annotated[str | None, Query(min_length=1, max_length=64)] = None,
 ) -> SheetOut:
-    rows = await entry.build_sheet(
-        session, farm_id=farm.id, lote=lote, measured_on=measured_on
+    # Sem lote, a resposta traz só a lista de lotes: é a primeira chamada da
+    # tela, que ainda não sabe quais existem.
+    rows = (
+        await entry.build_sheet(
+            session, farm_id=farm.id, lote=lote, measured_on=measured_on
+        )
+        if lote
+        else []
     )
     return SheetOut(
         measured_on=measured_on,
