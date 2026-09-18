@@ -2,13 +2,22 @@ import { useEffect, useState } from "react";
 
 import { getDashboard } from "../../api/client";
 import type { DashboardFilters, DashboardSummary } from "../../api/types";
+import {
+  BarList,
+  ChartCard,
+  Columns,
+  Donut,
+  Sparkline,
+  StatTile,
+  TableView,
+  fmt,
+} from "../../ui/charts";
 
 /**
  * Painel do rebanho.
  *
- * Porta os indicadores da plataforma legada sobre os dados no banco. As barras
- * são divs com largura proporcional, sem biblioteca de gráficos: a página
- * precisa abrir com sinal ruim, e um gráfico de barras não justifica 200 kB.
+ * Porta os indicadores da plataforma legada sobre os dados no banco, com as
+ * mesmas fórmulas. Cada gráfico tem tooltip por marca e visão em tabela.
  *
  * Quando falta o preço do leite, receita e lucro aparecem como "—", nunca como
  * R$ 0,00 — não saber quanto se recebe é diferente de não receber nada.
@@ -24,46 +33,9 @@ interface Props {
   onLoad?: LoadFn;
 }
 
-const currency = new Intl.NumberFormat("pt-BR", {
-  style: "currency",
-  currency: "BRL",
-});
-const decimal = new Intl.NumberFormat("pt-BR", {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-});
-const integer = new Intl.NumberFormat("pt-BR");
-
-function money(value: number | null): string {
-  return value === null ? "—" : currency.format(value);
-}
-
-function Bars({
-  data,
-  format,
-}: {
-  data: Array<[string, number]>;
-  format?: (value: number) => string;
-}): JSX.Element {
-  const max = Math.max(1, ...data.map(([, value]) => value));
-  return (
-    <ul className="bars">
-      {data.map(([label, value]) => (
-        <li key={label}>
-          <span className="bar-label">{label}</span>
-          <span className="bar-track">
-            <span
-              className="bar-fill"
-              style={{ width: `${Math.round((value / max) * 100)}%` }}
-            />
-          </span>
-          <span className="bar-value">
-            {format ? format(value) : integer.format(value)}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
+function shortDate(iso: string): string {
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year.slice(2)}`;
 }
 
 export function HerdDashboard({
@@ -92,13 +64,38 @@ export function HerdDashboard({
   }, [token, filters, onLoad]);
 
   if (error) return <p role="alert">{error}</p>;
-  if (panel === null) return <p>Carregando painel…</p>;
+  if (panel === null) {
+    return (
+      <section className="dashboard">
+        <h2>Painel do rebanho</h2>
+        <div className="kpis">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div className="skeleton kpi" key={i} style={{ minHeight: 82 }} />
+          ))}
+        </div>
+        <div className="skeleton skeleton-card" />
+        <div className="skeleton skeleton-card" />
+      </section>
+    );
+  }
 
   const lotNames = panel.lots.map((lot) => lot.lote);
+  const partialCoverage =
+    panel.measured_on !== null &&
+    panel.animals_with_reading > 0 &&
+    panel.animals_with_reading < panel.total_animals;
+
+  const lotsWithData = panel.lots.filter((lot) => lot.animals > 0 || lot.feed_cost > 0);
+  const lotsWithCost = lotsWithData.filter((lot) => lot.feed_cost > 0);
 
   return (
     <section className="dashboard">
-      <h2>Painel do rebanho</h2>
+      <div className="row-between">
+        <h2>Painel do rebanho</h2>
+        {panel.measured_on && (
+          <span className="count">Coleta de {shortDate(panel.measured_on)}</span>
+        )}
+      </div>
 
       <div className="filters">
         <div>
@@ -155,7 +152,7 @@ export function HerdDashboard({
           >
             {panel.available_dates.map((day) => (
               <option key={day} value={day}>
-                {day}
+                {shortDate(day)}
               </option>
             ))}
           </select>
@@ -176,126 +173,206 @@ export function HerdDashboard({
         </p>
       )}
 
-      {panel.measured_on !== null &&
-        panel.animals_with_reading > 0 &&
-        panel.animals_with_reading < panel.total_animals && (
-          <p className="warning">
-            Nesta data há leitura de {integer.format(panel.animals_with_reading)}{" "}
-            de {integer.format(panel.total_animals)} animais. O custo mostrado é o
-            do lote inteiro, então receita e lucro ficam subestimados — compare
-            apenas datas com cobertura parecida.
-          </p>
-        )}
-
-      <div className="kpis">
-        <div className="kpi">
-          <span>Animais</span>
-          <strong>{integer.format(panel.total_animals)}</strong>
-        </div>
-        <div className="kpi">
-          <span>Com leitura</span>
-          <strong>{integer.format(panel.animals_with_reading)}</strong>
-        </div>
-        <div className="kpi">
-          <span>Produção/dia</span>
-          <strong>{decimal.format(panel.total_production)} L</strong>
-        </div>
-        <div className="kpi">
-          <span>Custo/dia</span>
-          <strong>{money(panel.total_feed_cost)}</strong>
-        </div>
-        <div className="kpi">
-          <span>Receita/dia</span>
-          <strong>{money(panel.total_revenue)}</strong>
-        </div>
-        <div className="kpi">
-          <span>Lucro/dia</span>
-          <strong>{money(panel.total_profit)}</strong>
-        </div>
-      </div>
-
-      <h3>Composição do rebanho</h3>
-      <Bars data={Object.entries(panel.by_situation)} />
-      {panel.animals_without_lot > 0 && (
-        <p className="hint">
-          {integer.format(panel.animals_without_lot)} sem lote definido.
+      {partialCoverage && (
+        <p className="warning">
+          Nesta data há leitura de {fmt.int(panel.animals_with_reading)} de{" "}
+          {fmt.int(panel.total_animals)} animais. O custo mostrado é o do lote
+          inteiro, então receita e lucro ficam subestimados — compare apenas
+          datas com cobertura parecida.
         </p>
       )}
 
-      <h3>Comparativo por lote</h3>
-      {panel.lots.length === 0 ? (
-        <p>Nenhum lote com animais ou dieta.</p>
-      ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Lote</th>
-                <th>Vacas</th>
-                <th>Produção</th>
-                <th>Custo</th>
-                <th>Receita</th>
-                <th>Lucro</th>
-              </tr>
-            </thead>
-            <tbody>
-              {panel.lots.map((lot) => (
-                <tr key={lot.lote}>
-                  <td>{lot.lote}</td>
-                  <td>{integer.format(lot.animals)}</td>
-                  <td>{decimal.format(lot.production)} L</td>
-                  <td>{money(lot.feed_cost)}</td>
-                  <td>{money(lot.revenue)}</td>
-                  <td>{money(lot.profit)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <h3>Composição do custo de alimentação</h3>
-      {panel.feed_breakdown.length === 0 ? (
-        <p>Nenhum insumo cadastrado.</p>
-      ) : (
-        <Bars
-          data={panel.feed_breakdown.map((item) => [item.name, item.total_cost])}
-          format={(value) => currency.format(value)}
+      <div className="kpis">
+        <StatTile index={0} label="Animais" value={panel.total_animals} />
+        <StatTile
+          index={1}
+          label="Com leitura"
+          value={panel.animals_with_reading}
+          hint={
+            panel.total_animals > 0
+              ? fmt.pct(panel.animals_with_reading / panel.total_animals) + " do rebanho"
+              : undefined
+          }
         />
-      )}
+        <StatTile
+          index={2}
+          label="Produção/dia"
+          value={panel.total_production}
+          format={fmt.liters}
+          color="var(--series-3)"
+        />
+        <StatTile
+          index={3}
+          label="Custo/dia"
+          value={panel.total_feed_cost}
+          format={fmt.brl}
+          color="var(--series-2)"
+        />
+        <StatTile
+          index={4}
+          label="Receita/dia"
+          value={panel.total_revenue}
+          format={fmt.brl}
+          color="var(--series-1)"
+        />
+        <StatTile
+          index={5}
+          label="Lucro/dia"
+          value={panel.total_profit}
+          format={fmt.brl}
+          color={
+            panel.total_profit !== null && panel.total_profit < 0
+              ? "var(--danger)"
+              : "var(--good)"
+          }
+        />
+      </div>
 
-      <h3>Estágio de lactação</h3>
-      <Bars data={Object.entries(panel.lactation_stages)} />
-      <p className="hint">
-        Dias em lactação contados a partir do último parto registrado. Animais
-        sem parto informado não entram nesta conta.
-      </p>
+      <div className="grid2">
+        <ChartCard
+          index={0}
+          title="Composição do rebanho"
+          description={
+            panel.animals_without_lot > 0
+              ? `${fmt.int(panel.animals_without_lot)} sem lote definido.`
+              : undefined
+          }
+        >
+          <Donut
+            centerLabel="animais"
+            data={Object.entries(panel.by_situation).map(([label, value]) => ({
+              label,
+              value,
+            }))}
+          />
+        </ChartCard>
 
-      <h3>Maiores produções</h3>
-      {panel.top_producers.length === 0 ? (
-        <p>Sem leituras nesta data.</p>
-      ) : (
-        <Bars
-          data={panel.top_producers.map((item) => [
-            item.name ?? item.brinco ?? "—",
-            item.production,
+        <ChartCard
+          index={1}
+          title="Produção por coleta"
+          description="Total lido em cada data. A cobertura varia: compare datas parecidas."
+        >
+          <Sparkline
+            points={panel.production_by_date.map((point) => ({
+              label: shortDate(point.measured_on),
+              value: point.liters,
+            }))}
+            format={fmt.liters}
+          />
+          <TableView
+            columns={["Data", "Litros", "Animais lidos"]}
+            rows={panel.production_by_date.map((point) => [
+              shortDate(point.measured_on),
+              fmt.dec(point.liters),
+              point.animals,
+            ])}
+          />
+        </ChartCard>
+      </div>
+
+      <ChartCard
+        index={2}
+        title="Comparativo por lote"
+        description="Custo da dieta e receita da produção lida, por dia. Abaixo de cada lote, o lucro."
+      >
+        {lotsWithCost.length === 0 ? (
+          <p className="chart-empty">Nenhum lote com dieta cadastrada.</p>
+        ) : (
+          <Columns
+            series={["Custo", "Receita"]}
+            groups={lotsWithCost.map((lot) => ({
+              label: lot.lote,
+              values: [lot.feed_cost, lot.revenue ?? 0],
+              note:
+                lot.profit === null
+                  ? undefined
+                  : {
+                      text: fmt.brl(lot.profit),
+                      sign: lot.profit < 0 ? "neg" : lot.profit > 0 ? "pos" : "zero",
+                    },
+            }))}
+          />
+        )}
+        <TableView
+          columns={["Lote", "Vacas", "Produção", "Custo", "Receita", "Lucro"]}
+          rows={lotsWithData.map((lot) => [
+            lot.lote,
+            lot.animals,
+            fmt.liters(lot.production),
+            fmt.brl(lot.feed_cost),
+            fmt.brl(lot.revenue),
+            fmt.brl(lot.profit),
           ])}
-          format={(value) => `${decimal.format(value)} L`}
         />
-      )}
+      </ChartCard>
 
-      <h3>Menores produções</h3>
-      {panel.bottom_producers.length === 0 ? (
-        <p>Sem leituras nesta data.</p>
-      ) : (
-        <Bars
-          data={panel.bottom_producers.map((item) => [
-            item.name ?? item.brinco ?? "—",
-            item.production,
-          ])}
-          format={(value) => `${decimal.format(value)} L`}
-        />
-      )}
+      <div className="grid2">
+        <ChartCard
+          index={3}
+          title="Composição do custo de alimentação"
+          description="Preço por quilo × dieta de cada lote, por dia."
+        >
+          {panel.feed_breakdown.length === 0 ? (
+            <p className="chart-empty">Nenhum insumo cadastrado.</p>
+          ) : (
+            <BarList
+              data={panel.feed_breakdown.map((item) => ({
+                label: item.name,
+                value: item.total_cost,
+                series: 1,
+              }))}
+              format={fmt.brl}
+            />
+          )}
+        </ChartCard>
+
+        <ChartCard
+          index={4}
+          title="Estágio de lactação"
+          description="Dias desde o último parto. Animais sem parto informado não entram."
+        >
+          <BarList
+            data={Object.entries(panel.lactation_stages).map(([label, value]) => ({
+              label,
+              value,
+            }))}
+          />
+        </ChartCard>
+      </div>
+
+      <div className="grid2">
+        <ChartCard index={5} title="Maiores produções" description="Nesta data de coleta.">
+          {panel.top_producers.length === 0 ? (
+            <p className="chart-empty">Sem leituras nesta data.</p>
+          ) : (
+            <BarList
+              data={panel.top_producers.map((item) => ({
+                label: item.name ?? item.brinco ?? "—",
+                value: item.production,
+                series: 2,
+              }))}
+              format={fmt.liters}
+              tip={(d) => `${d.label}: ${fmt.liters(d.value)}`}
+            />
+          )}
+        </ChartCard>
+
+        <ChartCard index={6} title="Menores produções" description="Nesta data de coleta.">
+          {panel.bottom_producers.length === 0 ? (
+            <p className="chart-empty">Sem leituras nesta data.</p>
+          ) : (
+            <BarList
+              data={panel.bottom_producers.map((item) => ({
+                label: item.name ?? item.brinco ?? "—",
+                value: item.production,
+                series: 3,
+              }))}
+              format={fmt.liters}
+              tip={(d) => `${d.label}: ${fmt.liters(d.value)}`}
+            />
+          )}
+        </ChartCard>
+      </div>
     </section>
   );
 }

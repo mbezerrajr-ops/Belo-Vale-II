@@ -38,6 +38,18 @@ function defaultDecide(token: string): DecideFn {
     );
 }
 
+const FIELD_LABEL: Record<string, string> = {
+  animal_brinco: "Brinco",
+  animal_number: "Número",
+  animal_name: "Nome lido",
+  morning: "Manhã",
+  afternoon: "Tarde",
+  total: "Total",
+  measured_on: "Data",
+  lot: "Lote",
+  notes: "Obs.",
+};
+
 export function ReviewWorkspace({
   review,
   token,
@@ -48,17 +60,21 @@ export function ReviewWorkspace({
 
   return (
     <section aria-label="Revisão de importação">
-      <header>
-        <h1>Importação {review.import_id}</h1>
-        <p>Status: {review.status}</p>
-        {review.declared_lot === null && review.declared_measured_on === null ? null : (
-          <p>
-            Declarado no envio: lote {review.declared_lot ?? "—"}, data{" "}
-            {review.declared_measured_on ?? "—"}
+      <header className="row-between">
+        <div>
+          <h2>Conferência da ficha</h2>
+          <p className="muted">
+            Importação {review.import_id.slice(0, 8)} · {review.status}
           </p>
+        </div>
+        {review.declared_lot === null && review.declared_measured_on === null ? null : (
+          <span className="role-pill">
+            Declarado: lote {review.declared_lot ?? "—"}, data{" "}
+            {review.declared_measured_on ?? "—"}
+          </span>
         )}
       </header>
-      <ul>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {review.lines.map((line) => (
           <li key={line.id}>
             <ReviewLineCard line={line} decide={decideFn} onDecided={onDecided} />
@@ -118,7 +134,15 @@ function ReviewLineCard({
   };
 
   return (
-    <article aria-label={`Linha ${line.line_number}`}>
+    <article className="review-line" aria-label={`Linha ${line.line_number}`}>
+      <div className="row-between">
+        <strong>Linha {line.line_number}</strong>
+        {line.candidate_animal_id === null ? (
+          <span className="tag none">sem animal</span>
+        ) : (
+          <span className="tag">animal encontrado</span>
+        )}
+      </div>
       {line.crop_url === null ? null : (
         <img src={line.crop_url} alt={`Recorte da linha ${line.line_number}`} />
       )}
@@ -134,18 +158,18 @@ function ReviewLineCard({
       ) : null}
 
       {mode === "idle" ? (
-        <div>
+        <div className="row">
           <button type="button" onClick={handleStartApproval}>
             Aprovar
           </button>
-          <button type="button" onClick={handleReject}>
+          <button type="button" className="btn-danger" onClick={handleReject}>
             Rejeitar
           </button>
         </div>
       ) : null}
 
       {mode === "confirming-approval" ? (
-        <div>
+        <div className="row">
           <button
             type="button"
             onClick={handleConfirmApproval}
@@ -153,7 +177,7 @@ function ReviewLineCard({
           >
             Confirmar aprovação
           </button>
-          <button type="button" onClick={() => setMode("idle")}>
+          <button type="button" className="btn-ghost" onClick={() => setMode("idle")}>
             Cancelar
           </button>
         </div>
@@ -170,7 +194,7 @@ function NormalizedValuesTable({ line }: { line: ReviewLine }): JSX.Element {
     <dl>
       {entries.map(([key, value]) => (
         <div key={key}>
-          <dt>{key}</dt>
+          <dt>{FIELD_LABEL[key] ?? key}</dt>
           <dd>{value === null ? "—" : String(value)}</dd>
         </div>
       ))}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 import { createUser, listUsers, updateUser } from "../../api/client";
 import type { Role, UserAccount, UserPage } from "../../api/types";
@@ -36,6 +36,12 @@ const ROLE_LABEL: Record<string, string> = {
   operator: "Operador — envia fichas e consulta",
   reviewer: "Revisor — confere fichas e edita cadastro",
   admin: "Administrador — também gerencia contas",
+};
+
+const ROLE_SHORT: Record<string, string> = {
+  operator: "Operador",
+  reviewer: "Revisor",
+  admin: "Administrador",
 };
 
 function errorMessage(error: unknown): string {
@@ -104,6 +110,7 @@ export function UsersPage({
   return (
     <section className="users">
       <h2>Contas</h2>
+      <p className="muted">Cada pessoa com a sua conta: é o que dá nome a cada alteração.</p>
 
       <form
         onSubmit={(event) => {
@@ -119,6 +126,7 @@ export function UsersPage({
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           autoComplete="off"
+          inputMode="email"
         />
         <label htmlFor="user-password">Senha</label>
         <input
@@ -154,13 +162,17 @@ export function UsersPage({
 
       <h3>Contas existentes</h3>
       {page === null ? (
-        <p>Carregando…</p>
+        <div className="skeleton" style={{ height: 56 }} />
       ) : (
         <ul className="user-list">
-          {page.items.map((user) => (
-            <li key={user.id}>
+          {page.items.map((user, index) => (
+            <li key={user.id} style={{ "--i": index } as CSSProperties}>
+              <span className="avatar" aria-hidden="true">
+                {user.email.slice(0, 2)}
+              </span>
               <span>{user.email}</span>
-              <small>{ROLE_LABEL[user.role] ?? user.role}</small>
+              <span className="role-pill">{ROLE_SHORT[user.role] ?? user.role}</span>
+              <small>{ROLE_LABEL[user.role]?.split(" — ")[1] ?? ""}</small>
               {!user.is_active && <em>desativada</em>}
               {user.id !== currentUserId && (
                 <button

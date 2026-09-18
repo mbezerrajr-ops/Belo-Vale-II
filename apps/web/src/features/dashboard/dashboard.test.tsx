@@ -19,6 +19,10 @@ function summary(overrides: Partial<DashboardSummary> = {}): DashboardSummary {
   return {
     measured_on: "2026-08-25",
     available_dates: ["2026-08-25", "2026-07-22"],
+    production_by_date: [
+      { measured_on: "2026-07-22", liters: 2500, animals: 107 },
+      { measured_on: "2026-08-25", liters: 2000, animals: 45 },
+    ],
     milk_price: 2.59,
     total_animals: 401,
     animals_without_lot: 118,
@@ -118,7 +122,12 @@ describe("HerdDashboard", () => {
     await screen.findAllByText("LOTE 1");
     // Os valores aparecem nos KPIs e na tabela; verificar dentro da tabela
     // prova que a linha do lote traz custo, receita e lucro.
-    const linha = within(screen.getByRole("table")).getAllByRole("row")[1];
+    // Há mais de uma visão em tabela no painel; a do comparativo é a que
+    // tem a coluna "Vacas".
+    const tabela = screen
+      .getAllByRole("table")
+      .find((table) => within(table).queryByText("Vacas") !== null)!;
+    const linha = within(tabela).getAllByRole("row")[1];
     expect(within(linha).getByText(/1\.964,80/)).toBeInTheDocument();
     expect(within(linha).getByText(/5\.180,00/)).toBeInTheDocument();
     expect(within(linha).getByText(/3\.215,20/)).toBeInTheDocument();
