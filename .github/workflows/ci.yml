@@ -1,0 +1,115 @@
+# Verificação de cada push e pull request.
+#
+# Roda o que o runbook manda rodar à mão: varredura de credenciais, contrato
+# da baseline legada, suíte do backend contra PostgreSQL e Redis reais,
+# ida-e-volta da migration mais recente, testes, tipos e build do frontend.
+#
+# Nenhum job usa segredo do repositório: os bancos são contêineres
+# descartáveis do próprio runner, e os valores abaixo só existem ali.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Só leitura: nenhum job publica nada nem escreve no repositório.
+permissions:
+  contents: read
+
+# Um push novo na mesma branch cancela a verificação anterior, que já não
+# diz nada sobre o código atual.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    name: Credenciais e baseline legada
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Varredura de credenciais
+        run: python tools/credential_scan.py
+      - name: Testes do scanner
+        working-directory: tools
+        run: python -m unittest test_credential_scan -v
+      - name: Contrato do estado canônico
+        run: |
+          python -m unittest belo-vale-ii-projeto-completo/testes/test_state_contract.py -v
+          python -m unittest belo-vale-ii-projeto-completo/testes/test_import_relatorio_animais.py -v
+      - name: Validação da baseline
+        run: >-
+          python belo-vale-ii-projeto-completo/plataforma/build_platform_state.py validate
+          --canonical belo-vale-ii-projeto-completo/plataforma/state_canonical.json
+
+  api:
+    name: Backend (PostgreSQL + Redis)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ingestion
+          POSTGRES_USER: ingestion
+          POSTGRES_PASSWORD: ci-descartavel
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ingestion -d ingestion"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      POSTGRES_URL: postgresql+asyncpg://ingestion:ci-descartavel@localhost:5432/ingestion
+      # Banco 15: os testes do limitador de login usam prefixos próprios, e
+      # manter o banco separado deixa isso explícito.
+      REDIS_URL: redis://localhost:6379/15
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v6
+      - name: Dependências (lock congelado)
+        run: uv sync --frozen
+      - name: Migrations
+        run: uv run --frozen alembic upgrade head
+      - name: A migration mais recente desce e sobe
+        run: |
+          uv run --frozen alembic downgrade -1
+          uv run --frozen alembic upgrade head
+      - name: Testes
+        run: uv run --frozen pytest -q
+
+  web:
+    name: Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Dependências (lock congelado)
+        run: npm ci --no-audit --no-fund
+      - name: Testes
+        run: npx vitest run
+      - name: Tipos e build de produção
+        run: npm run build
