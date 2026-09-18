@@ -53,6 +53,8 @@ class Farm(TimestampedModel, Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     code: Mapped[str | None] = mapped_column(String(64), unique=True)
+    #: Preço pago por litro. Base do cálculo de receita no painel.
+    milk_price_per_liter: Mapped[float | None] = mapped_column(Numeric(10, 4))
     animals: Mapped[list[Animal]] = relationship(back_populates="farm")
 
 
@@ -350,6 +352,83 @@ class OfficialMeasurement(TimestampedModel, Base):
     )
     lote_observado: Mapped[str | None] = mapped_column(String(64))
     reviewed_by: Mapped[str | None] = mapped_column(String(255))
+
+
+class Supply(TimestampedModel, Base):
+    """Insumo da dieta.
+
+    O custo de alimentação é o produto do preço por quilo pela dieta de cada
+    lote — é assim que a fazenda controla o arraçoamento, e é o que torna o
+    custo por vaca uma divisão do custo do lote.
+    """
+
+    __tablename__ = "supplies"
+    __table_args__ = (
+        CheckConstraint("price_per_kg >= 0", name="ck_supplies_price_positive"),
+        Index("uq_supplies_farm_name", "farm_id", "name", unique=True),
+        Index(
+            "uq_supplies_farm_legacy_id",
+            "farm_id",
+            "legacy_id",
+            unique=True,
+            postgresql_where=text("legacy_id IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()")
+    )
+    farm_id: Mapped[UUID] = mapped_column(ForeignKey("farms.id", ondelete="RESTRICT"), nullable=False)
+    legacy_id: Mapped[str | None] = mapped_column(String(64))
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    price_per_kg: Mapped[float] = mapped_column(Numeric(10, 5), nullable=False)
+    prices: Mapped[list[SupplyPrice]] = relationship(back_populates="supply")
+    diets: Mapped[list[SupplyDiet]] = relationship(back_populates="supply")
+
+
+class SupplyPrice(TimestampedModel, Base):
+    """Preço é evento temporal, como medição: um preço novo acrescenta ao
+    histórico em vez de apagar o anterior."""
+
+    __tablename__ = "supply_prices"
+    __table_args__ = (
+        CheckConstraint(
+            "source IN ('legacy_baseline', 'manual')", name="ck_supply_prices_source"
+        ),
+        Index("uq_supply_prices_effective", "supply_id", "effective_on", unique=True),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()")
+    )
+    supply_id: Mapped[UUID] = mapped_column(
+        ForeignKey("supplies.id", ondelete="CASCADE"), nullable=False
+    )
+    price_per_kg: Mapped[float] = mapped_column(Numeric(10, 5), nullable=False)
+    effective_on: Mapped[date] = mapped_column(Date, nullable=False)
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+    recorded_by: Mapped[str | None] = mapped_column(String(255))
+    supply: Mapped[Supply] = relationship(back_populates="prices")
+
+
+class SupplyDiet(TimestampedModel, Base):
+    """Quilos por dia de um insumo, por lote."""
+
+    __tablename__ = "supply_diets"
+    __table_args__ = (
+        CheckConstraint("kg_per_day >= 0", name="ck_supply_diets_positive"),
+        Index("uq_supply_diets_lote", "supply_id", "lote", unique=True),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()")
+    )
+    supply_id: Mapped[UUID] = mapped_column(
+        ForeignKey("supplies.id", ondelete="CASCADE"), nullable=False
+    )
+    lote: Mapped[str] = mapped_column(String(64), nullable=False)
+    kg_per_day: Mapped[float] = mapped_column(Numeric(10, 3), nullable=False)
+    supply: Mapped[Supply] = relationship(back_populates="diets")
 
 
 class RefreshToken(TimestampedModel, Base):

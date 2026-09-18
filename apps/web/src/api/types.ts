@@ -102,6 +102,7 @@ export interface Farm {
   id: string;
   name: string;
   code: string | null;
+  milk_price_per_liter?: number | null;
 }
 
 export interface LotAssignment {
@@ -183,4 +184,72 @@ export interface UserAccount {
 export interface UserPage {
   items: UserAccount[];
   total: number;
+}
+
+// --- Painel do rebanho ---
+
+export interface LotSummary {
+  lote: string;
+  animals: number;
+  production: number;
+  feed_cost: number;
+  revenue: number | null;
+  profit: number | null;
+  cost_per_animal: number;
+  production_per_animal: number;
+  cost_ratio: number;
+}
+
+export interface SupplyBreakdown {
+  name: string;
+  price_per_kg: number;
+  total_cost: number;
+  cost_by_lot: Record<string, number>;
+}
+
+export interface Producer {
+  animal_id: string;
+  brinco: string | null;
+  name: string | null;
+  lote: string | null;
+  production: number;
+}
+
+export interface DashboardSummary {
+  measured_on: string | null;
+  available_dates: string[];
+  milk_price: number | null;
+  total_animals: number;
+  animals_without_lot: number;
+  animals_with_reading: number;
+  by_situation: Record<string, number>;
+  by_status: Record<string, number>;
+  lactation_stages: Record<string, number>;
+  lots: LotSummary[];
+  feed_breakdown: SupplyBreakdown[];
+  top_producers: Producer[];
+  bottom_producers: Producer[];
+  total_production: number;
+  total_feed_cost: number;
+  total_revenue: number | null;
+  total_profit: number | null;
+}
+
+export interface DashboardFilters {
+  measuredOn?: string;
+  lote?: string;
+  situacao?: string;
+}
+
+export interface SupplyDiet {
+  lote: string;
+  kg_per_day: number;
+}
+
+export interface Supply {
+  id: string;
+  name: string;
+  price_per_kg: number;
+  legacy_id: string | null;
+  diets: SupplyDiet[];
 }
