@@ -520,10 +520,21 @@ textarea:focus-visible {
 }
 
 .link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 40px;
   padding: 6px 12px;
   font-weight: 600;
   border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* No topo estreito o subtítulo da marca só empurra os controles. */
+@media (max-width: 639px) {
+  .topbar .wordmark small {
+    display: none;
+  }
 }
 
 label {

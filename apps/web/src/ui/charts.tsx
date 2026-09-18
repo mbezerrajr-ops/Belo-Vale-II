@@ -25,7 +25,10 @@ const currency = new Intl.NumberFormat("pt-BR", {
 export const fmt = {
   int: (value: number): string => integer.format(value),
   dec: (value: number): string => decimal.format(value),
-  brl: (value: number | null): string => (value === null ? "—" : currency.format(value)),
+  // Hífen não quebrável no sinal: "-R$ 1.089,19" não pode partir depois do
+  // "-", que é o que acontece num tile estreito.
+  brl: (value: number | null): string =>
+    value === null ? "—" : currency.format(value).replace(/^-/, "‑"),
   liters: (value: number): string => `${decimal.format(value)} L`,
   pct: (value: number): string => `${integer.format(value * 100)}%`,
 };
