@@ -144,8 +144,12 @@ export function AnimalDetailPanel({
 
       <dl className="animal-fields">
         <div>
-          <dt>Lote atual</dt>
-          <dd>{animal.lote_atual ?? "sem lote"}</dd>
+          <dt>Lote de ordenha</dt>
+          <dd>{animal.lote_atual ?? "—"}</dd>
+        </div>
+        <div>
+          <dt>Grupo de manejo</dt>
+          <dd>{animal.grupo_manejo ?? "—"}</dd>
         </div>
         <div>
           <dt>Situação</dt>
@@ -222,8 +226,8 @@ export function AnimalDetailPanel({
             submitLot();
           }}
         >
-          <h3>Mudar de lote</h3>
-          <label htmlFor="novo-lote">Novo lote</label>
+          <h3>Mudar de lote ou grupo</h3>
+          <label htmlFor="novo-lote">Novo lote ou grupo</label>
           <input
             id="novo-lote"
             value={lote}
@@ -238,7 +242,10 @@ export function AnimalDetailPanel({
             onChange={(event) => setValidFrom(event.target.value)}
           />
           <p className="hint">
-            O lote anterior fica no histórico, com a data em que terminou.
+            "LOTE 1", "LOTE 2" e "LOTE 3" são lotes de ordenha, com dieta e
+            custo. Outros nomes — ENGORDA, BEZERREIRO, PIQUETES — são áreas da
+            fazenda, e não substituem o lote de ordenha. O registro anterior do
+            mesmo tipo fica no histórico, com a data em que terminou.
           </p>
           <button type="submit" disabled={busy}>
             Confirmar lote
@@ -287,7 +294,7 @@ export function AnimalDetailPanel({
         </form>
       )}
 
-      <h3>Histórico de lotes</h3>
+      <h3>Histórico de lotes e grupos</h3>
       {animal.historico_lotes.length === 0 ? (
         <p className="chart-empty">Sem registro de lotação.</p>
       ) : (
@@ -302,6 +309,9 @@ export function AnimalDetailPanel({
                 aria-hidden="true"
               />
               <strong>{entry.lote}</strong>
+              <span className="role-pill">
+                {entry.kind === "diet" ? "ordenha" : "manejo"}
+              </span>
               <span>
                 {br(entry.valid_from)} — {entry.valid_to ? br(entry.valid_to) : "atual"}
               </span>

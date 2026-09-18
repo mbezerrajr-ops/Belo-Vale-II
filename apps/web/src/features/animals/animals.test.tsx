@@ -7,7 +7,7 @@
  * brinco, e nenhum campo de fazenda para o usuário preencher.
  */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AnimalDetailPanel } from "./AnimalDetailPanel";
@@ -32,9 +32,11 @@ function animal(overrides: Partial<AnimalDetail> = {}): AnimalDetail {
     peso: null,
     observacoes: null,
     lote_atual: "LOTE 3",
+    grupo_manejo: null,
     historico_lotes: [
       {
         lote: "LOTE 3",
+        kind: "diet",
         valid_from: "2026-08-25",
         valid_to: null,
         source: "legacy_baseline",
@@ -305,13 +307,100 @@ describe("AnimalDetailPanel — mudar de lote", () => {
     );
   });
 
-  it("explica que o histórico é preservado", () => {
+  it("explica o que é lote de ordenha e o que é área da fazenda", () => {
     render(
       <AnimalDetailPanel token={TOKEN} animal={animal()} canEdit onChanged={vi.fn()} />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: /mudar de lote/i }));
 
-    expect(screen.getByText(/o lote anterior fica no hist[óo]rico/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/s[ãa]o lotes de ordenha, com dieta e custo/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/registro anterior do mesmo tipo fica no hist[óo]rico/i),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("AnimalDetailPanel — lote de ordenha × grupo de manejo", () => {
+  it("não chama grupo de manejo de lote", () => {
+    // O caso que motivou isto: "ENGORDA" aparecia como se fosse o lote.
+    render(
+      <AnimalDetailPanel
+        token={TOKEN}
+        animal={animal({
+          lote_atual: null,
+          grupo_manejo: "ENGORDA",
+          historico_lotes: [
+            {
+              lote: "ENGORDA",
+              kind: "management",
+              valid_from: "2026-08-25",
+              valid_to: null,
+              source: "legacy_baseline",
+              reviewed_by: "titular",
+            },
+          ],
+        })}
+        canEdit
+        onChanged={vi.fn()}
+      />,
+    );
+
+    const ordenha = screen.getByText("Lote de ordenha").closest("div")!;
+    expect(within(ordenha).getByText("—")).toBeInTheDocument();
+
+    const manejo = screen.getByText("Grupo de manejo").closest("div")!;
+    expect(within(manejo).getByText("ENGORDA")).toBeInTheDocument();
+  });
+
+  it("mostra os dois quando o animal está em lote e em área", () => {
+    render(
+      <AnimalDetailPanel
+        token={TOKEN}
+        animal={animal({ lote_atual: "LOTE 1", grupo_manejo: "PIQUETES / REPASSE" })}
+        canEdit
+        onChanged={vi.fn()}
+      />,
+    );
+
+    const ordenha = screen.getByText("Lote de ordenha").closest("div")!;
+    expect(within(ordenha).getByText("LOTE 1")).toBeInTheDocument();
+    const manejo = screen.getByText("Grupo de manejo").closest("div")!;
+    expect(within(manejo).getByText("PIQUETES / REPASSE")).toBeInTheDocument();
+  });
+
+  it("rotula cada registro do histórico com seu tipo", () => {
+    render(
+      <AnimalDetailPanel
+        token={TOKEN}
+        animal={animal({
+          historico_lotes: [
+            {
+              lote: "LOTE 3",
+              kind: "diet",
+              valid_from: "2026-08-25",
+              valid_to: null,
+              source: "legacy_baseline",
+              reviewed_by: "titular",
+            },
+            {
+              lote: "ENGENHO",
+              kind: "management",
+              valid_from: "2026-09-01",
+              valid_to: null,
+              source: "manual",
+              reviewed_by: "revisor",
+            },
+          ],
+        })}
+        canEdit
+        onChanged={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("ordenha")).toBeInTheDocument();
+    expect(screen.getByText("manejo")).toBeInTheDocument();
   });
 });

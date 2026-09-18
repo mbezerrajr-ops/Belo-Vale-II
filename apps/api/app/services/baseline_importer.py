@@ -34,6 +34,7 @@ from app.db.models import (
     SupplyDiet,
     SupplyPrice,
 )
+from app.services.lot_kind import KIND_DIET, classify_lot
 from app.services.baseline_snapshot import (
     EXPECTED_BASELINE,
     AnimalRecord,
@@ -278,15 +279,20 @@ async def _apply_lot(
     if not record.lote:
         return
 
+    # "LOTE 1" é lote de ordenha; "BEZERREIRO" é uma área da fazenda. A
+    # baseline grava os dois no mesmo campo, e o tipo se perderia sem isto.
+    kind = classify_lot(record.lote) or KIND_DIET
+
     current = await session.scalar(
         select(AnimalLotAssignment).where(
             AnimalLotAssignment.animal_id == animal.id,
+            AnimalLotAssignment.kind == kind,
             AnimalLotAssignment.valid_to.is_(None),
         )
     )
     if current is not None:
-        # Já existe uma lotação vigente. A baseline não sobrescreve nem abre
-        # uma segunda: uma mudança real de lote é um evento próprio.
+        # Já existe uma lotação vigente deste tipo. A baseline não sobrescreve
+        # nem abre uma segunda: mudança de lote é um evento próprio.
         report.lot_assignments_skipped += 1
         return
 
@@ -294,6 +300,7 @@ async def _apply_lot(
         AnimalLotAssignment(
             animal_id=animal.id,
             lote=record.lote,
+            kind=kind,
             valid_from=reference_date,
             valid_to=None,
             source="legacy_baseline",

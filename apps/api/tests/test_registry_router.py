@@ -578,3 +578,97 @@ class TestSuppliesEndpoints:
             ]
         )[0]
         assert "milk_price_changed" in actions
+
+
+class TestLotKindEndpoints:
+    """Lote de ordenha e grupo de manejo não são a mesma coisa."""
+
+    def test_numbered_lot_is_a_diet_lot(self, api, db) -> None:
+        _farm(db)
+        token = _user(db, "revisor@belovale", "reviewer")
+
+        created = api.post(
+            "/api/animals",
+            headers=_auth(token),
+            json={"brinco": "2001", "name": "COM LOTE", "lote": "LOTE 2"},
+        ).json()
+
+        assert created["lote_atual"] == "LOTE 2"
+        assert created["grupo_manejo"] is None
+
+    def test_farm_area_is_not_reported_as_a_lot(self, api, db) -> None:
+        """O caso que motivou isto: "ENGORDA" aparecia como se fosse lote."""
+        _farm(db)
+        token = _user(db, "revisor@belovale", "reviewer")
+
+        created = api.post(
+            "/api/animals",
+            headers=_auth(token),
+            json={"brinco": "2002", "name": "NA ENGORDA", "lote": "ENGORDA"},
+        ).json()
+
+        assert created["lote_atual"] is None
+        assert created["grupo_manejo"] == "ENGORDA"
+
+    def test_an_animal_can_have_both_at_once(self, api, db) -> None:
+        """Estar num piquete não tira a vaca do lote de ordenha."""
+        _farm(db)
+        token = _user(db, "revisor@belovale", "reviewer")
+        created = api.post(
+            "/api/animals",
+            headers=_auth(token),
+            json={"brinco": "2003", "name": "NOS DOIS", "lote": "LOTE 1"},
+        ).json()
+
+        api.post(
+            f"/api/animals/{created['id']}/lote",
+            headers=_auth(token),
+            json={"lote": "PIQUETES / REPASSE", "valid_from": "2026-09-18"},
+        )
+
+        detail = api.get(f"/api/animals/{created['id']}", headers=_auth(token)).json()
+        assert detail["lote_atual"] == "LOTE 1"
+        assert detail["grupo_manejo"] == "PIQUETES / REPASSE"
+        assert {entry["kind"] for entry in detail["historico_lotes"]} == {
+            "diet",
+            "management",
+        }
+
+    def test_changing_the_group_keeps_the_diet_lot(self, api, db) -> None:
+        _farm(db)
+        token = _user(db, "revisor@belovale", "reviewer")
+        created = api.post(
+            "/api/animals",
+            headers=_auth(token),
+            json={"brinco": "2004", "name": "TROCA GRUPO", "lote": "LOTE 3"},
+        ).json()
+        api.post(
+            f"/api/animals/{created['id']}/lote",
+            headers=_auth(token),
+            json={"lote": "ENGENHO", "valid_from": "2026-09-18"},
+        )
+
+        api.post(
+            f"/api/animals/{created['id']}/lote",
+            headers=_auth(token),
+            json={"lote": "PALMA", "valid_from": "2026-09-19"},
+        )
+
+        detail = api.get(f"/api/animals/{created['id']}", headers=_auth(token)).json()
+        assert detail["lote_atual"] == "LOTE 3"
+        assert detail["grupo_manejo"] == "PALMA"
+
+    def test_dashboard_counts_management_groups_apart(self, api, db) -> None:
+        _farm(db)
+        token = _user(db, "revisor@belovale", "reviewer")
+        for brinco, lote in (("2005", "LOTE 1"), ("2006", "BEZERREIRO")):
+            api.post(
+                "/api/animals",
+                headers=_auth(token),
+                json={"brinco": brinco, "name": f"A{brinco}", "lote": lote},
+            )
+
+        body = api.get("/api/dashboard", headers=_auth(token)).json()
+
+        assert body["by_management_group"] == {"BEZERREIRO": 1}
+        assert [lot["lote"] for lot in body["lots"]] == ["LOTE 1"]

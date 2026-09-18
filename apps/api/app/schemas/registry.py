@@ -8,6 +8,7 @@ ignorados em vez de aceitos silenciosamente como identidade.
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -71,12 +72,16 @@ class BrincoLink(BaseModel):
 class LotAssign(BaseModel):
     lote: str = Field(min_length=1, max_length=64)
     valid_from: date
+    #: Omitido, é deduzido do nome: "LOTE 2" é ordenha, o resto é manejo.
+    kind: Literal["diet", "management"] | None = None
 
 
 class LotAssignmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     lote: str
+    #: `diet` = lote de ordenha; `management` = área ou categoria da fazenda.
+    kind: str
     valid_from: date
     valid_to: date | None
     source: str
@@ -99,7 +104,10 @@ class AnimalRead(BaseModel):
     nascimento: date | None
     peso: float | None
     observacoes: str | None
+    #: Lote de ordenha vigente. Nulo quando o animal não está em nenhum.
     lote_atual: str | None = None
+    #: Área ou categoria em que o animal está (BEZERREIRO, ENGORDA…).
+    grupo_manejo: str | None = None
 
 
 class AnimalDetail(AnimalRead):

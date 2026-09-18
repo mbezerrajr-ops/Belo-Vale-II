@@ -99,7 +99,7 @@ export function HerdDashboard({
 
       <div className="filters">
         <div>
-          <label htmlFor="filtro-lote">Lote</label>
+          <label htmlFor="filtro-lote">Lote de ordenha</label>
           <select
             id="filtro-lote"
             value={filters.lote ?? ""}
@@ -234,7 +234,7 @@ export function HerdDashboard({
           title="Composição do rebanho"
           description={
             panel.animals_without_lot > 0
-              ? `${fmt.int(panel.animals_without_lot)} sem lote definido.`
+              ? `${fmt.int(panel.animals_without_lot)} fora de lote de ordenha.`
               : undefined
           }
         >
@@ -272,7 +272,7 @@ export function HerdDashboard({
 
       <ChartCard
         index={2}
-        title="Comparativo por lote"
+        title="Comparativo por lote de ordenha"
         description="Custo da dieta e receita da produção lida, por dia. Abaixo de cada lote, o lucro."
       >
         {lotsWithCost.length === 0 ? (
@@ -306,9 +306,25 @@ export function HerdDashboard({
         />
       </ChartCard>
 
-      <div className="grid2">
+      {Object.keys(panel.by_management_group).length > 0 && (
         <ChartCard
           index={3}
+          title="Onde os animais estão"
+          description="Áreas e categorias da fazenda. Não são lotes de ordenha: não têm dieta nem custo."
+        >
+          <BarList
+            data={Object.entries(panel.by_management_group).map(([label, value]) => ({
+              label,
+              value,
+              series: 4,
+            }))}
+          />
+        </ChartCard>
+      )}
+
+      <div className="grid2">
+        <ChartCard
+          index={4}
           title="Composição do custo de alimentação"
           description="Preço por quilo × dieta de cada lote, por dia."
         >
@@ -327,7 +343,7 @@ export function HerdDashboard({
         </ChartCard>
 
         <ChartCard
-          index={4}
+          index={5}
           title="Estágio de lactação"
           description="Dias desde o último parto. Animais sem parto informado não entram."
         >
@@ -341,7 +357,7 @@ export function HerdDashboard({
       </div>
 
       <div className="grid2">
-        <ChartCard index={5} title="Maiores produções" description="Nesta data de coleta.">
+        <ChartCard index={6} title="Maiores produções" description="Nesta data de coleta.">
           {panel.top_producers.length === 0 ? (
             <p className="chart-empty">Sem leituras nesta data.</p>
           ) : (
@@ -357,7 +373,7 @@ export function HerdDashboard({
           )}
         </ChartCard>
 
-        <ChartCard index={6} title="Menores produções" description="Nesta data de coleta.">
+        <ChartCard index={7} title="Menores produções" description="Nesta data de coleta.">
           {panel.bottom_producers.length === 0 ? (
             <p className="chart-empty">Sem leituras nesta data.</p>
           ) : (

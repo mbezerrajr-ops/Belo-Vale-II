@@ -145,6 +145,10 @@ class AnimalLotAssignment(TimestampedModel, Base):
     sobrescreve o anterior: encerra a vigência do anterior e abre uma nova
     linha, de modo que relatórios históricos não sejam reinterpretados com o
     lote de hoje.
+
+    `kind` separa duas coisas que a baseline mistura: o lote de ordenha, que
+    tem dieta e custo, e o grupo de manejo, que é uma área ou categoria da
+    fazenda. Ver `app/services/lot_kind.py`.
     """
 
     __tablename__ = "animal_lot_assignments"
@@ -154,12 +158,19 @@ class AnimalLotAssignment(TimestampedModel, Base):
             name="ck_animal_lot_assignments_source",
         ),
         CheckConstraint(
+            "kind IN ('diet', 'management')",
+            name="ck_animal_lot_assignments_kind",
+        ),
+        CheckConstraint(
             "valid_to IS NULL OR valid_to >= valid_from",
             name="ck_animal_lot_assignments_period",
         ),
+        # Uma vigência por tipo: o animal pode estar num lote de ordenha e,
+        # ao mesmo tempo, num piquete.
         Index(
             "uq_animal_lot_assignments_current",
             "animal_id",
+            "kind",
             unique=True,
             postgresql_where=text("valid_to IS NULL"),
         ),
@@ -172,6 +183,9 @@ class AnimalLotAssignment(TimestampedModel, Base):
         ForeignKey("animals.id", ondelete="CASCADE"), nullable=False
     )
     lote: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: `diet` = lote de ordenha, com dieta e custo. `management` = área ou
+    #: categoria da fazenda, que diz onde o animal está.
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="diet")
     valid_from: Mapped[date] = mapped_column(Date, nullable=False)
     valid_to: Mapped[date | None] = mapped_column(Date)
     source: Mapped[str] = mapped_column(String(32), nullable=False)

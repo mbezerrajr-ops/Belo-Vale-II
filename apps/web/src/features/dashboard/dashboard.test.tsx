@@ -29,6 +29,7 @@ function summary(overrides: Partial<DashboardSummary> = {}): DashboardSummary {
     animals_with_reading: 45,
     by_situation: { "Em lactação": 250, Seca: 151 },
     by_status: { Ativo: 401 },
+    by_management_group: { BEZERREIRO: 28, ENGORDA: 14 },
     lactation_stages: { "0-100": 40, "101-200": 30, "201-305": 20, "305+": 10 },
     lots: [
       {
@@ -157,7 +158,7 @@ describe("HerdDashboard", () => {
     render(<HerdDashboard token={TOKEN} onLoad={load} />);
 
     await screen.findAllByText("LOTE 1");
-    fireEvent.change(screen.getByLabelText("Lote"), {
+    fireEvent.change(screen.getByLabelText("Lote de ordenha"), {
       target: { value: "LOTE 1" },
     });
 
@@ -298,5 +299,30 @@ describe("SuppliesPage", () => {
     expect(
       screen.queryByRole("button", { name: "Salvar preço" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("HerdDashboard — grupos de manejo", () => {
+  it("mostra as áreas da fazenda apartadas dos lotes", () => {
+    render(
+      <HerdDashboard token={TOKEN} onLoad={vi.fn().mockResolvedValue(summary())} />,
+    );
+
+    return screen.findByText(/onde os animais est[ãa]o/i).then(() => {
+      expect(screen.getByText("BEZERREIRO")).toBeInTheDocument();
+      // O filtro lista só lotes de ordenha, não as áreas.
+      const filtro = screen.getByLabelText("Lote de ordenha");
+      expect(within(filtro).queryByText("BEZERREIRO")).not.toBeInTheDocument();
+    });
+  });
+
+  it("diz que área da fazenda não tem dieta nem custo", async () => {
+    render(
+      <HerdDashboard token={TOKEN} onLoad={vi.fn().mockResolvedValue(summary())} />,
+    );
+
+    expect(
+      await screen.findByText(/n[ãa]o s[ãa]o lotes de ordenha/i),
+    ).toBeInTheDocument();
   });
 });

@@ -63,6 +63,7 @@ class DashboardRead(BaseModel):
     animals_with_reading: int
     by_situation: dict[str, int]
     by_status: dict[str, int]
+    by_management_group: dict[str, int]
     lactation_stages: dict[str, int]
     lots: list[LotSummaryRead]
     feed_breakdown: list[SupplyBreakdownRead]

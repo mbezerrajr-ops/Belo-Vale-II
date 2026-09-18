@@ -39,6 +39,7 @@ from app.services.animal_registry import (
     update_animal,
 )
 from app.services.brinco import normalize_brinco
+from app.services.lot_kind import KIND_DIET, KIND_MANAGEMENT
 
 router = APIRouter(prefix="/api", tags=["registry"])
 
@@ -77,9 +78,13 @@ def _conflict(error: AnimalRegistryError) -> HTTPException:
 
 
 async def _read_model(session: AsyncSession, animal: Animal) -> AnimalRead:
-    lot = await current_lot(session, animal_id=animal.id)
+    # Lote de ordenha e grupo de manejo vêm separados: dizer que uma vaca seca
+    # está "no lote BEZERREIRO" seria falso — ela não está em lote nenhum.
+    lot = await current_lot(session, animal_id=animal.id, kind=KIND_DIET)
+    group = await current_lot(session, animal_id=animal.id, kind=KIND_MANAGEMENT)
     data = AnimalRead.model_validate(animal).model_dump()
     data["lote_atual"] = lot.lote if lot else None
+    data["grupo_manejo"] = group.lote if group else None
     return AnimalRead(**data)
 
 
@@ -274,6 +279,7 @@ async def assign_lot_endpoint(
             actor=user.email,
             lote=payload.lote,
             valid_from=payload.valid_from,
+            kind=payload.kind,
         )
     except AnimalRegistryError as error:
         raise _conflict(error) from error
