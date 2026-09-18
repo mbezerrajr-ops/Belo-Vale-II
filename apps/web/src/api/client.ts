@@ -8,6 +8,7 @@ import {
   type AnimalUpdateInput,
   type CurrentUser,
   type Farm,
+  type LotKind,
   type DashboardFilters,
   type DashboardSummary,
   type Role,
@@ -269,11 +270,12 @@ export async function assignLot(
   animalId: string,
   lote: string,
   validFrom: string,
+  kind?: LotKind,
 ): Promise<Animal> {
   const response = await fetch(`${API_BASE_URL}/api/animals/${animalId}/lote`, {
     method: "POST",
     headers: jsonHeaders(token),
-    body: JSON.stringify({ lote, valid_from: validFrom }),
+    body: JSON.stringify({ lote, valid_from: validFrom, kind }),
   });
   return parseJsonOrThrow<Animal>(response);
 }

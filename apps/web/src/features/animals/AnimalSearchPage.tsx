@@ -154,7 +154,7 @@ export function AnimalSearchPage({
             onChange={(event) => setNewName(event.target.value)}
             autoComplete="off"
           />
-          <label htmlFor="new-lote">Lote (opcional)</label>
+          <label htmlFor="new-lote">Lote ou grupo (opcional)</label>
           <input
             id="new-lote"
             value={newLote}
@@ -193,7 +193,10 @@ export function AnimalSearchPage({
                     <span className="name">
                       {item.name ?? "sem nome"}
                       <small>
-                        {item.lote_atual ?? "sem lote"}
+                        {/* Lote de ordenha e grupo de manejo são coisas
+                            diferentes: dizer "lote ENGORDA" seria falso. */}
+                        {item.lote_atual ??
+                          (item.grupo_manejo ? `em ${item.grupo_manejo}` : "sem lote")}
                         {item.situacao ? ` · ${item.situacao}` : ""}
                       </small>
                     </span>

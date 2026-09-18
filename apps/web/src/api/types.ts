@@ -105,8 +105,12 @@ export interface Farm {
   milk_price_per_liter?: number | null;
 }
 
+export type LotKind = "diet" | "management";
+
 export interface LotAssignment {
   lote: string;
+  /** `diet` = lote de ordenha; `management` = área ou categoria da fazenda. */
+  kind: LotKind;
   valid_from: string;
   valid_to: string | null;
   source: string;
@@ -127,7 +131,10 @@ export interface Animal {
   nascimento: string | null;
   peso: number | null;
   observacoes: string | null;
+  /** Lote de ordenha. Nulo quando o animal não está em nenhum. */
   lote_atual: string | null;
+  /** Área ou categoria em que o animal está (BEZERREIRO, ENGORDA…). */
+  grupo_manejo: string | null;
 }
 
 export interface AnimalDetail extends Animal {
@@ -231,6 +238,7 @@ export interface DashboardSummary {
   animals_with_reading: number;
   by_situation: Record<string, number>;
   by_status: Record<string, number>;
+  by_management_group: Record<string, number>;
   lactation_stages: Record<string, number>;
   lots: LotSummary[];
   feed_breakdown: SupplyBreakdown[];
