@@ -124,7 +124,7 @@ async def _active_reading(
     )
 
 
-async def _diet_lot_on(
+async def diet_lot_on(
     session: AsyncSession, *, animal_id: UUID, day: date
 ) -> str | None:
     """Lote de ordenha em que o animal estava naquele dia."""
@@ -208,7 +208,7 @@ async def record_reading(
         provenance="manual_entry",
         entered_by_user_id=user.id,
         reviewed_by=user.email,
-        lote_observado=await _diet_lot_on(
+        lote_observado=await diet_lot_on(
             session, animal_id=animal_id, day=measured_on
         ),
     )

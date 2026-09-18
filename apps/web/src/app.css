@@ -2016,3 +2016,283 @@ tbody tr:hover td {
 .actions button.danger {
   color: var(--danger);
 }
+
+/* ---------- importação de coleta ---------- */
+
+.import-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.import-panel h3,
+.import-panel p {
+  margin: 0;
+}
+
+.import-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+}
+
+.import-controls > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.import-controls label {
+  margin: 0;
+}
+
+.import-controls input {
+  margin: 0;
+}
+
+.import-preview {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  animation: rise var(--dur) var(--ease-out) both;
+}
+
+.import-summary {
+  color: var(--ink-2);
+}
+
+.import-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.import-counts li {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+
+.import-counts strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.scroll-x {
+  overflow-x: auto;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+.import-table {
+  width: 100%;
+  min-width: 34rem;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.import-table th,
+.import-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.import-table th {
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.import-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.import-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.78rem;
+  color: var(--ink-2);
+}
+
+.pill.tone-good,
+.import-counts .tone-good {
+  background: var(--good-soft);
+  color: var(--good);
+}
+
+.pill.tone-warn,
+.import-counts .tone-warn {
+  background: var(--warn-soft);
+  color: var(--ink);
+}
+
+.pill.tone-bad,
+.import-counts .tone-bad {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.import-table tr.tone-bad td {
+  background: color-mix(in srgb, var(--danger-soft) 45%, transparent);
+}
+
+.import-problems code {
+  display: block;
+  margin: 2px 0 6px;
+  font-size: 0.8rem;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.import-problems ul,
+.import-kept ul {
+  margin: 8px 0;
+  padding-left: 18px;
+}
+
+.import-mode {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.import-mode label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.import-mode input[type="radio"] {
+  width: auto;
+  margin: 0;
+}
+
+.import-history {
+  display: grid;
+  gap: 6px;
+}
+
+.import-history h4 {
+  margin: 8px 0 0;
+}
+
+.import-history ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.import-history li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 0.9rem;
+}
+
+.import-history span,
+.import-history small {
+  color: var(--ink-2);
+}
+
+.prod-print {
+  justify-self: start;
+}
+
+/* ---------- impressão ---------- */
+
+.print-area {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  body {
+    background: #fff !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+
+  .print-area {
+    display: block;
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    color: #000;
+    font-family: var(--font-body);
+    font-size: 11pt;
+  }
+
+  .print-area h1 {
+    margin: 0 0 4px;
+    font-family: var(--font-display);
+    font-size: 16pt;
+  }
+
+  .print-area p {
+    margin: 0 0 10px;
+  }
+
+  .print-area table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .print-area th,
+  .print-area td {
+    padding: 5px 6px;
+    border: 1px solid #555;
+    text-align: left;
+  }
+
+  .print-area tr {
+    break-inside: avoid;
+  }
+
+  .print-area thead {
+    display: table-header-group;
+  }
+
+  .print-area .write-in {
+    width: 22%;
+  }
+
+  .print-area td.write-in {
+    height: 22px;
+  }
+
+  .print-area .print-foot {
+    margin-top: 14px;
+  }
+}

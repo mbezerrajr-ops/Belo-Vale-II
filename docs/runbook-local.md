@@ -180,6 +180,14 @@ Para chamadas diretas à API (sem passar pelo proxy do nginx):
 - **Funcionário esqueceu a senha**: em Contas, "Redefinir senha" gera uma
   senha provisória mostrada uma única vez, válida por 72 h. Quem entra com ela
   só consegue escolher uma senha nova.
+- **Importar a coleta de um arquivo**: em Produção, "Importar arquivo". Aceita
+  CSV, XLSX e PDF com texto, com o brinco na primeira coluna (ou com cabeçalho
+  Brinco/Número, Nome, Produção/Litros em qualquer ordem). A prévia mostra o
+  que cada linha vai virar antes de gravar. Revisor ou administrador pode
+  substituir leituras diferentes das já lançadas, informando o motivo.
+- **Imprimir**: em Produção, "Imprimir folha em branco" gera a folha do lote
+  para preencher no curral; em Animais, "Imprimir lista" imprime todos os
+  animais do filtro.
 
 ## 7. Rodar os testes de backend
 

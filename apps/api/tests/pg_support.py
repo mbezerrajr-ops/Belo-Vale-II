@@ -32,6 +32,7 @@ PASSWORD = "capim elefante molhado"
 _CLEANUP = (
     "DELETE FROM audit_events",
     "DELETE FROM official_measurements",
+    "DELETE FROM production_imports",
     "DELETE FROM validation_alerts",
     "DELETE FROM review_decisions",
     "DELETE FROM extracted_lines",

@@ -1,8 +1,9 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 import { createAnimal, searchAnimals } from "../../api/client";
 import { EXIT_REASON_LABEL, type Animal, type AnimalPage, type AnimalSearch } from "../../api/types";
 import { Icons } from "../../ui/Brand";
+import { brDate, localToday } from "../../ui/dates";
 
 /**
  * Busca de animais.
@@ -31,6 +32,17 @@ function looksLikeBrinco(term: string): boolean {
   return /^[bB]?\d*[-\s]?\d+[a-zA-Z]*$/.test(term.trim()) && /\d/.test(term);
 }
 
+/** O limite de página da API. A impressão percorre todas. */
+const PRINT_PAGE = 200;
+
+function describeSearch(search: AnimalSearch): string {
+  if (search.brinco) return `Brinco ${search.brinco}`;
+  if (search.name) return `Nome contendo "${search.name}"`;
+  if (search.semBrinco) return "Animais sem brinco";
+  if (search.rebanho === "baixados") return "Animais que saíram do rebanho";
+  return "Todos os animais do rebanho";
+}
+
 function errorMessage(error: unknown): string {
   const body = (error as { body?: { detail?: string } })?.body;
   return body?.detail ?? "Não foi possível completar a ação. Tente novamente.";
@@ -51,8 +63,42 @@ export function AnimalSearchPage({
   const [newBrinco, setNewBrinco] = useState("");
   const [newName, setNewName] = useState("");
   const [newLote, setNewLote] = useState("");
+  const [lastSearch, setLastSearch] = useState<AnimalSearch>({});
+  const [printItems, setPrintItems] = useState<Animal[] | null>(null);
+
+  // Imprime depois que a lista completa entrou na página, e a tira de novo
+  // quando a impressão termina.
+  useEffect(() => {
+    if (printItems === null) return;
+    const done = (): void => setPrintItems(null);
+    window.addEventListener("afterprint", done);
+    window.print();
+    return () => window.removeEventListener("afterprint", done);
+  }, [printItems]);
+
+  async function printAll(): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      const collected: Animal[] = [];
+      let total = Infinity;
+      for (let offset = 0; offset < total; offset += PRINT_PAGE) {
+        const page = await onSearch(token, { ...lastSearch, limit: PRINT_PAGE, offset });
+        total = page.total;
+        collected.push(...page.items);
+        if (page.items.length === 0) break;
+      }
+      setPrintItems(collected);
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function run(search: AnimalSearch): Promise<void> {
+    setLastSearch(search);
+    setPrintItems(null);
     setBusy(true);
     setError(null);
     try {
@@ -223,8 +269,51 @@ export function AnimalSearchPage({
           )}
           <p className="count">
             {result.total} {result.total === 1 ? "animal" : "animais"}
+            {result.total > 0 && (
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => void printAll()}
+                disabled={busy}
+              >
+                Imprimir lista
+              </button>
+            )}
           </p>
         </>
+      )}
+
+      {printItems !== null && (
+        <div className="print-area" aria-hidden="true">
+          <h1>Lista de animais</h1>
+          <p>
+            {describeSearch(lastSearch)} · {printItems.length}{" "}
+            {printItems.length === 1 ? "animal" : "animais"} · impresso em{" "}
+            {brDate(localToday())}
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Brinco</th>
+                <th>Nome</th>
+                <th>Lote ou área</th>
+                <th>Situação</th>
+                <th>Último parto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {printItems.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.brinco ?? "sem brinco"}</td>
+                  <td>{item.name ?? "sem nome"}</td>
+                  <td>{item.lote_atual ?? item.grupo_manejo ?? "—"}</td>
+                  <td>{item.exited_on ? "baixa" : (item.situacao ?? "—")}</td>
+                  <td>{brDate(item.ultimo_parto)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );

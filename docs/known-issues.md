@@ -54,11 +54,25 @@ O relatório de reconciliação (`docs/reports/conflitos-reconciliacao-manual.pd
 não identificador, e não é usado para localizar, casar ou fundir animais. Sob essa regra,
 das quatro categorias encontradas, apenas uma exige decisão humana antes da migração.
 
-### Pendência real: 30 animais com brinco, situação "Em lactação" e DEL vazio
+### Resolvido: 30 animais com brinco, situação "Em lactação" e DEL vazio
 
-São avisos de qualidade de dado genuínos — o DEL não pôde ser calculado por falta de
-data de último parto compatível. Resolver exige confirmar o último parto ou corrigir a
-situação com evidência; nunca inventar ou zerar o DEL apenas para eliminar o alerta.
+Reavaliado em 2026-09-18: não é pendência no sistema novo. As 30 têm data de
+último parto preenchida; vazio está só o campo DEL digitado à mão no legado. O
+sistema novo calcula os dias em lactação a partir da data do parto, e as 132
+vacas em lactação com brinco têm essa data no banco. O aviso continua saindo
+na validação do estado canônico, porque ele confere o campo do legado — é
+esperado.
+
+### Coleta de 25/08/2026 será substituída
+
+O titular vai enviar os dados de 25/08 normalizados. Decisão: nada foi apagado
+nem anulado; os dados novos entram pela importação de arquivo, modo
+"substituir", e as leituras antigas ficam como `superseded`, com motivo.
+
+MULATA e SERRANA têm leitura em 25/08 e **não têm brinco**. Nenhum arquivo as
+alcança, então a leitura delas de 25/08 permanece a da baseline mesmo depois
+da substituição. Para trocá-la, é preciso vincular o brinco (ficha do animal)
+antes de importar, ou corrigir a leitura à mão.
 
 ### Não são pendências — apenas preservados ou registrados como observação
 
@@ -231,6 +245,37 @@ obrigatória no primeiro acesso. É o mesmo risco que a redefinição trata (uma
 senha que passou por mais de uma mão). Aplicar a troca obrigatória também na
 criação é uma linha no endpoint, mas muda o fluxo do dono e ficou para ele
 decidir.
+
+## Importação de coleta por arquivo — decisões registradas
+
+Decididas pelo titular em 2026-09-18:
+
+- **A primeira coluna é o brinco.** O "Número" dos arquivos do sistema antigo
+  é o brinco. A associação é só por ele; nome diferente do cadastro vira aviso
+  na prévia. O legado removia tudo que não fosse dígito dessa coluna, o que
+  transformava `B2-647` em `2647` — por isso as vacas `B*` nunca casavam.
+- **Substituir não apaga ausências.** No modo "substituir", leitura com valor
+  diferente é substituída; a vaca que já tinha leitura na data e não está no
+  arquivo mantém a leitura antiga.
+- **Quem importa.** "Só leituras novas" é de qualquer conta; "substituir" é de
+  revisor ou administrador, com motivo.
+
+Decisões de implementação:
+
+- **Zero à esquerda não é adivinhado.** `026` e `26` continuam brincos
+  diferentes (`app/services/brinco.py`). Quando uma planilha guarda o brinco
+  como número e apaga o zero, a linha fica sem associação e a prévia avisa
+  que existe o brinco com zero, pedindo a coluna formatada como texto.
+- **Brinco repetido com valores diferentes** no mesmo arquivo não entra:
+  escolher uma das linhas seria adivinhar qual está certa.
+- **PDF só com texto.** PDF digitalizado (foto) é recusado com mensagem; não
+  há OCR real.
+- **O arquivo fica guardado** em `production_imports`, imutável, com hash,
+  modo, motivo e quem enviou. Reenviar o mesmo arquivo na mesma data e modo
+  não duplica nada.
+- **Limites:** 5 MB, 50 MB descompactado para XLSX, 50 páginas de PDF, 5000
+  linhas. XML de planilha só é lido com `defusedxml`; fórmulas nunca são
+  executadas.
 
 ## Uso diário — decisões registradas
 
