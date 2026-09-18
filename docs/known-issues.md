@@ -200,6 +200,15 @@ O upload e o dashboard pediam, cada um, o UUID da fazenda digitado à mão.
 A fazenda agora vem de `GET /api/farms/current`, resolvida no servidor, e
 nenhuma tela pede isso ao usuário.
 
+## Área "Fichas" escondida sem OCR real
+
+O provedor de OCR padrão é falso: devolve sempre o mesmo animal e data.
+Deixar a área "Fichas" visível faria uma leitura inventada chegar à revisão
+parecendo verdadeira. A área só aparece com `VISION_PROVIDER=http` ou com
+`PHOTO_SHEETS_DEMO=true` (demonstração e E2E), e a API se recusa a subir em
+produção com o modo de demonstração ligado. O código do fluxo continua
+inteiro e coberto pelo E2E.
+
 ## `HttpVisionProvider` sem integração externa real comprovada
 
 Ver `docs/vision-provider-status.md` para a classificação completa.
@@ -208,14 +217,25 @@ credenciais no frontend, timeout, parsing do formato esperado); nunca
 executado contra um provedor de visão/OCR real, por não haver credencial
 disponível ou autorizada neste ambiente.
 
-## CI — resolvido, com um limite
+## CI — resolvido
 
 `.github/workflows/ci.yml` roda em todo push e PR: varredura de credenciais,
 contrato da baseline, suíte do backend contra PostgreSQL e Redis reais (com
-ida e volta da migration mais recente), vitest, tipos e build do frontend.
+ida e volta da migration mais recente), vitest, tipos e build do frontend, e
+o Playwright E2E contra a pilha Docker inteira (API, worker, MinIO, nginx),
+com segredos gerados no próprio runner.
 
-Fica de fora o Playwright E2E, que precisa do Docker Compose inteiro (API,
-worker, MinIO, nginx). Continua sendo rodado à mão, conforme o runbook.
+O E2E entrou no CI porque, fora dele, apodreceu: de 27/08 a 18/09 ninguém o
+rodou, e ele deixou de funcionar por quatro motivos diferentes (seed sem
+brinco, senha fora da política, tela antiga, `.env.e2e` inexistente).
+
+## Imagem da MinIO fora do Docker Hub
+
+A MinIO deixou de publicar as imagens gratuitas no Docker Hub; o compose não
+subia em máquina que ainda não tivesse a imagem em cache. A imagem passou a
+vir do espelho oficial `quay.io/minio/minio`, mesma versão de antes, fixada
+por digest. É um remendo: para produção, o armazenamento de arquivos deve ir
+para um serviço gerenciado compatível com S3 (decisão da fase de deploy).
 
 ## Segurança para exposição pública: o que falta
 
@@ -239,12 +259,10 @@ Resolvidos nesta etapa:
   e-mail: exigiria um provedor de envio, e a fazenda tem sempre um
   administrador por perto.
 
-Decisão pendente, registrada para não passar despercebida: a conta criada
-pelo administrador já nasce com a senha que ele digitou, sem troca
-obrigatória no primeiro acesso. É o mesmo risco que a redefinição trata (uma
-senha que passou por mais de uma mão). Aplicar a troca obrigatória também na
-criação é uma linha no endpoint, mas muda o fluxo do dono e ficou para ele
-decidir.
+Decidido pelo titular em 2026-09-18: a conta criada pelo administrador
+também troca a senha no primeiro acesso (a senha digitada por ele passou por
+duas mãos). A senha inicial não expira sozinha — demorar a entrar não é
+motivo para travar a conta.
 
 ## Importação de coleta por arquivo — decisões registradas
 
