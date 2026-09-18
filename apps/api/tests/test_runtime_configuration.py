@@ -59,3 +59,57 @@ def test_development_may_disable_the_secure_cookie() -> None:
 
     settings = Settings(environment="development", auth_cookie_secure=False)
     assert settings.auth_cookie_secure is False
+
+
+def _nginx_config() -> str:
+    return (_repository_root() / "infra" / "nginx.web.conf").read_text(encoding="utf-8")
+
+
+def _api_dockerfile() -> str:
+    return (_repository_root() / "infra" / "Dockerfile.api").read_text(encoding="utf-8")
+
+
+def test_nginx_sets_the_security_headers_the_browser_needs() -> None:
+    """Exposta na internet, a aplicação depende do navegador para recusar o
+    que ela nunca faz."""
+    config = _nginx_config()
+
+    for header in (
+        "Content-Security-Policy",
+        "X-Content-Type-Options",
+        "X-Frame-Options",
+        "Referrer-Policy",
+        "Permissions-Policy",
+    ):
+        assert f"add_header {header}" in config, header
+
+
+def test_csp_blocks_third_party_scripts_and_framing() -> None:
+    config = _nginx_config()
+
+    assert "default-src 'self'" in config
+    assert "script-src 'self'" in config
+    # Nenhuma página deve ser embutida em outro site: as ações mudam dados do
+    # rebanho e seriam alvo de clickjacking.
+    assert "frame-ancestors 'none'" in config
+    assert 'X-Frame-Options "DENY"' in config
+    assert "object-src 'none'" in config
+
+
+def test_hsts_stays_disabled_until_there_is_tls() -> None:
+    """Habilitar HSTS sem certificado torna o site inacessível pelo max-age."""
+    config = _nginx_config()
+
+    for line in config.splitlines():
+        if "Strict-Transport-Security" in line:
+            assert line.strip().startswith("#"), line
+
+
+def test_api_reads_forwarded_headers_from_trusted_sources_only() -> None:
+    """Sem `--proxy-headers` o limite de login por origem seria inútil atrás do
+    proxy; com `*` seria burlável, porque a porta 8000 é publicada."""
+    dockerfile = _api_dockerfile()
+
+    assert "--proxy-headers" in dockerfile
+    assert "--forwarded-allow-ips" in dockerfile
+    assert 'FORWARDED_ALLOW_IPS="*"' not in dockerfile
