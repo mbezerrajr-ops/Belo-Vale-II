@@ -68,7 +68,7 @@ async def login(
     # um forjar a origem e escapar do limite.
     origin = request.client.host if request.client else "desconhecida"
 
-    retry_after = throttle.check(email, origin)
+    retry_after = await throttle.check(email, origin)
     if retry_after is not None:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -85,14 +85,14 @@ async def login(
     if user is None or not user.is_active or not password_is_valid:
         # A mesma resposta para conta inexistente, inativa e senha errada:
         # distinguir revelaria quais e-mails existem no sistema.
-        throttle.record_failure(email, origin)
+        await throttle.record_failure(email, origin)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    throttle.record_success(email, origin)
+    await throttle.record_success(email, origin)
     try:
         token = create_access_token(
             user.id, settings.auth_secret, settings.auth_token_ttl_seconds
