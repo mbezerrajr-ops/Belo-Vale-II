@@ -79,6 +79,15 @@ class User(TimestampedModel, Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default=text("true"), nullable=False
     )
+    #: Verdadeiro depois que um administrador redefine a senha: a conta só
+    #: acessa a troca de senha até escolher uma nova.
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
+    #: Validade da senha provisória. Nula para senha escolhida pelo usuário.
+    password_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
 
 class Animal(TimestampedModel, Base):
@@ -99,6 +108,15 @@ class Animal(TimestampedModel, Base):
 
     __tablename__ = "animals"
     __table_args__ = (
+        CheckConstraint(
+            "exit_reason IS NULL OR exit_reason IN "
+            "('venda', 'morte', 'descarte', 'doacao', 'outro')",
+            name="ck_animals_exit_reason",
+        ),
+        CheckConstraint(
+            "(exited_on IS NULL) = (exit_reason IS NULL)",
+            name="ck_animals_exit_complete",
+        ),
         Index("uq_animals_farm_identifier", "farm_id", "identifier", unique=True),
         Index(
             "uq_animals_farm_brinco",
@@ -132,6 +150,10 @@ class Animal(TimestampedModel, Base):
     nascimento: Mapped[date | None] = mapped_column(Date)
     peso: Mapped[float | None] = mapped_column(Numeric(6, 2))
     observacoes: Mapped[str | None] = mapped_column(Text)
+    #: Baixa: data e motivo andam juntos (CHECK no banco). Nulos = no rebanho.
+    exited_on: Mapped[date | None] = mapped_column(Date)
+    exit_reason: Mapped[str | None] = mapped_column(String(16))
+    exit_notes: Mapped[str | None] = mapped_column(Text)
     farm: Mapped[Farm] = relationship(back_populates="animals")
     lot_assignments: Mapped[list[AnimalLotAssignment]] = relationship(
         back_populates="animal"
@@ -314,9 +336,12 @@ class ReviewDecision(TimestampedModel, Base):
 class OfficialMeasurement(TimestampedModel, Base):
     __tablename__ = "official_measurements"
     __table_args__ = (
-        CheckConstraint("status IN ('active', 'superseded')", name="ck_official_measurements_status"),
         CheckConstraint(
-            "provenance IN ('ocr_review', 'legacy_baseline')",
+            "status IN ('active', 'superseded', 'voided')",
+            name="ck_official_measurements_status",
+        ),
+        CheckConstraint(
+            "provenance IN ('ocr_review', 'legacy_baseline', 'manual_entry')",
             name="ck_official_measurements_provenance",
         ),
         # Toda medição ativa continua obrigada a ter proveniência rastreável e
@@ -332,6 +357,10 @@ class OfficialMeasurement(TimestampedModel, Base):
             " OR"
             " (provenance = 'legacy_baseline'"
             "  AND baseline_import_id IS NOT NULL"
+            "  AND reviewed_by IS NOT NULL AND length(btrim(reviewed_by)) > 0)"
+            " OR"
+            " (provenance = 'manual_entry'"
+            "  AND entered_by_user_id IS NOT NULL"
             "  AND reviewed_by IS NOT NULL AND length(btrim(reviewed_by)) > 0)"
             ")",
             name="ck_official_measurements_active_review_provenance",
@@ -366,6 +395,14 @@ class OfficialMeasurement(TimestampedModel, Base):
     )
     lote_observado: Mapped[str | None] = mapped_column(String(64))
     reviewed_by: Mapped[str | None] = mapped_column(String(255))
+    #: Quem lançou, quando a origem é `manual_entry`.
+    entered_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT")
+    )
+    #: Medição que esta corrige, quando é uma correção.
+    supersedes_measurement_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("official_measurements.id", ondelete="RESTRICT")
+    )
 
 
 class Supply(TimestampedModel, Base):
