@@ -33,6 +33,8 @@ _CLEANUP = (
     "DELETE FROM audit_events",
     "DELETE FROM official_measurements",
     "DELETE FROM production_imports",
+    "DELETE FROM event_proposals",
+    "DELETE FROM event_proposal_sources",
     "DELETE FROM validation_alerts",
     "DELETE FROM review_decisions",
     "DELETE FROM extracted_lines",

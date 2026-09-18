@@ -16,6 +16,7 @@ from app.routers.users import router as users_router
 from app.routers.production import router as production_router
 from app.routers.production_import import router as production_import_router
 from app.routers.features import router as features_router
+from app.routers.proposals import router as proposals_router
 from app.routers.reviews import router as reviews_router
 from app.services.approval import (
     ConcurrentReviewError,
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
     app.include_router(production_router)
     app.include_router(production_import_router)
     app.include_router(features_router)
+    app.include_router(proposals_router)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
