@@ -23,11 +23,28 @@ from app.main import create_app
 
 
 class StubSession:
+    """Sessão mínima para os testes de autenticação.
+
+    Aceita escrita porque o login passou a emitir um refresh token; estes
+    testes cobrem token e papel, não a persistência da sessão, que tem suíte
+    própria em `test_refresh_tokens.py`.
+    """
+
     def __init__(self, user: User) -> None:
         self.user = user
+        self.added: list[object] = []
 
     async def scalar(self, statement: object) -> User | None:
         return self.user
+
+    def add(self, instance: object) -> None:
+        self.added.append(instance)
+
+    async def commit(self) -> None:
+        return None
+
+    async def flush(self) -> None:
+        return None
 
 
 class EmptyCapturingSession:

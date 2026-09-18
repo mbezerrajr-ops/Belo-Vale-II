@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
+from app.core.password_policy import validate_password
 from app.db.models import User
 from app.db.session import get_session_factory
 
@@ -20,8 +21,9 @@ async def create_first_admin(
     normalized_email = email.strip().lower()
     if normalized_email.count("@") != 1:
         raise ValueError("a valid email is required")
-    if len(password) < 12:
-        raise ValueError("password must contain at least 12 characters")
+    # Uma única fonte de verdade: a regra do primeiro admin é a mesma aplicada
+    # às contas criadas depois, para não existirem dois padrões de senha.
+    validate_password(password, email=normalized_email)
     admin = User(
         email=normalized_email,
         password_hash=hash_password(password),

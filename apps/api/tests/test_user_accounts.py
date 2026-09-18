@@ -54,7 +54,11 @@ def _execute(statements: list[tuple[str, dict]]) -> list:
 def api():
     app = create_app()
     app.dependency_overrides[get_settings] = lambda: Settings(
-        environment="test", auth_secret=SECRET
+        environment="test",
+        auth_secret=SECRET,
+        # O TestClient fala http, e um cookie `Secure` não seria reenviado.
+        # Em produção o validador de configuração impede desligar isto.
+        auth_cookie_secure=False,
     )
     engine = create_async_engine(_database_url(), poolclass=NullPool)
     factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -444,3 +448,90 @@ class TestLoginThrottling:
 
         assert existente.status_code == inexistente.status_code == 401
         assert existente.json() == inexistente.json()
+
+
+class TestSessionLifecycle:
+    """A sessão precisa durar sem que o token de acesso deixe de ser curto."""
+
+    def test_login_sets_an_httponly_refresh_cookie(self, api, db) -> None:
+        _account(db, "sessao@belovale", "operator")
+
+        response = api.post(
+            "/api/auth/login", json={"email": "sessao@belovale", "password": STRONG}
+        )
+
+        assert response.status_code == 200
+        cookie = response.headers.get("set-cookie", "")
+        assert "bv_refresh=" in cookie
+        assert "HttpOnly" in cookie
+        assert "SameSite=strict" in cookie.replace("samesite", "SameSite")
+        assert "Path=/api/auth" in cookie
+
+    def test_refresh_returns_a_usable_access_token(self, api, db) -> None:
+        """O que importa é o token funcionar, não ser textualmente diferente:
+        o JWT carrega `iat`/`exp` em segundos, então uma renovação no mesmo
+        segundo do login produz a mesma string — e continua correta."""
+        _account(db, "renova@belovale", "operator")
+        api.post(
+            "/api/auth/login", json={"email": "renova@belovale", "password": STRONG}
+        )
+
+        response = api.post("/api/auth/refresh")
+
+        assert response.status_code == 200
+        token = response.json()["access_token"]
+        assert api.get("/api/auth/me", headers=_auth(token)).status_code == 200
+
+    def test_refresh_rotates_the_session_cookie(self, api, db) -> None:
+        """O refresh anterior precisa deixar de valer a cada uso."""
+        _account(db, "rotaciona@belovale", "operator")
+        login = api.post(
+            "/api/auth/login", json={"email": "rotaciona@belovale", "password": STRONG}
+        )
+        primeiro = login.cookies.get("bv_refresh")
+
+        segundo = api.post("/api/auth/refresh").cookies.get("bv_refresh")
+
+        assert primeiro is not None
+        assert segundo is not None
+        assert segundo != primeiro
+
+    def test_reusing_an_old_session_cookie_ends_the_session(self, api, db) -> None:
+        """Reapresentar um refresh já rotacionado indica roubo: a sessão cai."""
+        _account(db, "roubada@belovale", "operator")
+        login = api.post(
+            "/api/auth/login", json={"email": "roubada@belovale", "password": STRONG}
+        )
+        antigo = login.cookies.get("bv_refresh")
+        api.post("/api/auth/refresh")
+
+        # O atacante apresenta o cookie antigo, que já foi rotacionado.
+        roubo = api.post("/api/auth/refresh", cookies={"bv_refresh": antigo})
+        assert roubo.status_code == 401
+
+        # E a sessão legítima também cai, porque não dá para saber quem é quem.
+        assert api.post("/api/auth/refresh").status_code == 401
+
+    def test_refresh_without_cookie_is_unauthorized(self, api, db) -> None:
+        assert api.post("/api/auth/refresh").status_code == 401
+
+    def test_logout_ends_the_session(self, api, db) -> None:
+        _account(db, "sai@belovale", "operator")
+        api.post("/api/auth/login", json={"email": "sai@belovale", "password": STRONG})
+
+        assert api.post("/api/auth/logout").status_code == 204
+        assert api.post("/api/auth/refresh").status_code == 401
+
+    def test_deactivating_an_account_ends_its_session(self, api, db) -> None:
+        """Tirar o acesso de quem saiu da fazenda precisa valer na hora."""
+        _, admin = _account(db, "dono@belovale", "admin")
+        target_id, _ = _account(db, "demitido@belovale", "operator")
+        api.post(
+            "/api/auth/login", json={"email": "demitido@belovale", "password": STRONG}
+        )
+
+        api.patch(
+            f"/api/users/{target_id}", headers=_auth(admin), json={"is_active": False}
+        )
+
+        assert api.post("/api/auth/refresh").status_code == 401

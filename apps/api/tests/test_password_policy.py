@@ -17,6 +17,18 @@ from app.core.password_policy import (
 
 
 class TestLength:
+    def test_minimum_is_eight(self) -> None:
+        """Definido pelo titular. As demais regras seguem valendo, e são elas
+        que impedem que oito caracteres virem `12345678`."""
+        assert MINIMUM_LENGTH == 8
+
+    def test_accepts_eight_characters(self) -> None:
+        validate_password("boi3pasto")
+
+    def test_rejects_seven_characters(self) -> None:
+        with pytest.raises(PasswordPolicyError):
+            validate_password("boi3pas")
+
     def test_accepts_a_long_passphrase(self) -> None:
         validate_password("capim elefante molhado")
 

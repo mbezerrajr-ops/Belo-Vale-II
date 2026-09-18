@@ -352,6 +352,41 @@ class OfficialMeasurement(TimestampedModel, Base):
     reviewed_by: Mapped[str | None] = mapped_column(String(255))
 
 
+class RefreshToken(TimestampedModel, Base):
+    """Sessão longa, revogável.
+
+    O token de acesso é curto de propósito; este é o que permite ao usuário
+    continuar trabalhando sem refazer login a cada quinze minutos. Como ele
+    vale por muito tempo, precisa ser revogável — e por isso vive no banco, ao
+    contrário do token de acesso, que é autocontido.
+
+    Guarda-se apenas o hash: quem obtiver leitura do banco não consegue assumir
+    a sessão de ninguém.
+    """
+
+    __tablename__ = "refresh_tokens"
+    __table_args__ = (
+        Index("uq_refresh_tokens_hash", "token_hash", unique=True),
+        Index("ix_refresh_tokens_user", "user_id"),
+        Index("ix_refresh_tokens_family", "family_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()")
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: Tokens gerados por rotação de uma mesma sessão compartilham a família,
+    #: para que detectar reuso permita derrubar a sessão inteira.
+    family_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_reason: Mapped[str | None] = mapped_column(String(64))
+
+
 class AuditEvent(TimestampedModel, Base):
     __tablename__ = "audit_events"
 

@@ -16,9 +16,16 @@ import re
 import unicodedata
 
 
-#: Comprimento mínimo. Alto o bastante para inviabilizar força bruta mesmo sem
-#: exigir símbolos, e alcançável com duas ou três palavras comuns.
-MINIMUM_LENGTH = 12
+#: Comprimento mínimo, definido pelo titular do projeto.
+#:
+#: Oito caracteres reduzem a resistência a força bruta caso o banco vaze, o que
+#: aqui é mitigado por duas defesas que continuam valendo: as senhas são
+#: derivadas com scrypt, que torna a quebra em lote cara, e o login bloqueia
+#: após cinco tentativas, que é o ataque realista contra uma aplicação exposta.
+#:
+#: As demais regras deste módulo seguem ativas e são elas que impedem que oito
+#: caracteres virem `12345678` ou o nome do usuário.
+MINIMUM_LENGTH = 8
 
 #: Termos que não podem aparecer como a senha inteira nem dominá-la. São os
 #: primeiros palpites de qualquer ataque contra este sistema.
@@ -56,7 +63,8 @@ def _fold(value: str) -> str:
 def describe_policy() -> str:
     return (
         f"A senha precisa ter pelo menos {MINIMUM_LENGTH} caracteres. "
-        "Prefira uma frase fácil de lembrar, como três palavras juntas. "
+        "Quanto mais longa, mais segura: uma frase com duas ou três palavras "
+        "é fácil de lembrar e difícil de adivinhar. "
         "Não use apenas números, palavras óbvias nem partes do seu e-mail."
     )
 
@@ -66,7 +74,8 @@ def validate_password(password: str, *, email: str | None = None) -> None:
     if len(password) < MINIMUM_LENGTH:
         raise PasswordPolicyError(
             f"A senha precisa ter pelo menos {MINIMUM_LENGTH} caracteres. "
-            "Uma frase com três palavras costuma ser fácil de lembrar e segura."
+            "Quanto mais longa, melhor: uma frase com duas ou três palavras "
+            "costuma ser fácil de lembrar e bem mais segura."
         )
 
     if _DIGITS_ONLY.match(password):

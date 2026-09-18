@@ -212,18 +212,13 @@ funcionários. Isso já está atendido por política de senha, limite de tentati
 de login e gestão de contas com RBAC. Continuam em aberto, e **todos importam
 antes de expor a aplicação**:
 
-- **Sessão curta demais para uso real.** O token de acesso dura 15 minutos e
-  não há renovação, então quem estiver no curral é desconectado no meio do
-  trabalho. A correção certa é um refresh token em cookie `HttpOnly`/`Secure`/
-  `SameSite` — nunca esticar o token nem mover para `localStorage`, que o
-  exporia a XSS.
+- **Limite de login é por processo.** O contador vive na memória da API; com
+  mais de uma réplica, cada uma conta em separado. O Redis que já existe no
+  projeto é o lugar natural para isso.
 - **HTTPS não é obrigatório em lugar nenhum.** Sem TLS, senha e token viajam
   em texto puro. Precisa de certificado, redirecionamento e HSTS.
 - **Sem cabeçalhos de segurança** (CSP, `X-Content-Type-Options`,
   `Referrer-Policy`).
-- **Limite de login é por processo.** O contador vive na memória da API; com
-  mais de uma réplica, cada uma conta em separado. O Redis que já existe no
-  projeto é o lugar natural para isso.
 - **Origem do cliente depende de configuração.** O limite usa
   `request.client.host`; atrás de proxy reverso o uvicorn precisa rodar com
   `--proxy-headers`, senão todas as requisições parecem vir do proxy.
