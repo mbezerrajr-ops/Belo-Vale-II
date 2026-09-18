@@ -13,6 +13,14 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   reporter: "list",
+  // Margem para o executor de CI, mais lento e compartilhado que uma máquina
+  // de desenvolvimento: sobretudo importa para a primeira asserção de cada
+  // execução, que ainda paga o custo de conexões (banco, navegador) frias.
+  expect: { timeout: 15_000 },
+  // Maior que a maior janela de `toPass` usada nos specs (45s, para o worker
+  // processar a ficha): o tempo do teste inteiro precisa sobrar folga além
+  // da espera mais longa que ele contém, não apenas igualá-la.
+  timeout: 90_000,
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:8080",
     trace: "retain-on-failure",
