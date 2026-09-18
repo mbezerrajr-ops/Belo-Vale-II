@@ -185,9 +185,32 @@ Para chamadas diretas à API (sem passar pelo proxy do nginx):
   Brinco/Número, Nome, Produção/Litros em qualquer ordem). A prévia mostra o
   que cada linha vai virar antes de gravar. Revisor ou administrador pode
   substituir leituras diferentes das já lançadas, informando o motivo.
+- **Revisão** (caixa de propostas): o que vier de foto de caderno, áudio ou
+  texto entra aqui como proposta pendente — produção, parto (a partir da data
+  ou do DEL), secagem, baixa, troca de lote ou observação. Nada entra no
+  rebanho sem aprovação. O animal só é associado pelo brinco; nome lido vira
+  sugestão ("É esta"). Revisor ou administrador corrige os campos e aprova, ou
+  rejeita com motivo; operador só vê. A contagem de pendentes aparece na
+  navegação.
 - **Imprimir**: em Produção, "Imprimir folha em branco" gera a folha do lote
   para preencher no curral; em Animais, "Imprimir lista" imprime todos os
   animais do filtro.
+
+### Carregar uma leitura na caixa de revisão
+
+Enquanto os leitores de foto e áudio (locais, sem provedor externo) não
+existem, uma extração em JSON entra pela mesma porta que eles vão usar:
+
+```bash
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec -T api   uv run --no-sync python -m app.core.load_proposals   --email revisor@fazenda --file - --kind photo --label "caderno de 25/08" < extracao.json
+```
+
+`--file -` lê da entrada padrão; fora do contêiner, passe o caminho do
+arquivo. O formato é o de `EventExtraction.to_raw`
+(`apps/api/app/services/event_extraction.py`): `reference_date` e uma lista
+`events` com `event_type`, `brinco`, `nome`, `fields`, `evidence` e
+`confidence`. Um arquivo inválido é recusado inteiro (código de saída 2), sem
+gravar nada.
 
 ## 7. Rodar os testes de backend
 

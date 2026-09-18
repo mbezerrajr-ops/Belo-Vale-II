@@ -311,6 +311,30 @@ Decisões de implementação:
 - **Painel e folha de coleta ignoram animais com baixa.** A produção que eles
   deram antes da saída continua no banco e na série histórica.
 
+## Caixa de revisão (fase 1, sem leitura automática) — decisões registradas
+
+- **Toda leitura vira proposta, nunca dado direto.** Foto, áudio e texto
+  geram `event_proposals` pendentes; só a aprovação de um revisor aplica o
+  evento, pelos mesmos serviços do cadastro (`update_animal`, baixa, lote).
+  A produção aprovada usa a proveniência `proposal_review`, e o trigger do
+  banco exige uma proposta aprovada do mesmo animal decidida pela mesma conta.
+- **O que foi lido não muda.** `raw_fields`, a fonte e a saída bruta do
+  leitor são imutáveis (triggers); a correção do revisor vai em
+  `applied_payload`. Proposta decidida não volta a pendente.
+- **Só o brinco associa.** Nome lido gera sugestões; sem brinco, aprovar exige
+  escolher o animal. Nome divergente do cadastro gera alerta.
+- **DEL não é gravado.** "DEL 120" vira data de parto calculada, com o alerta
+  `derived_from_del` para o revisor confirmar.
+- **Produção diferente da já lançada pede motivo**, como na importação por
+  arquivo; igual é registrada como "já lançada", sem duplicar.
+- **Leitura local, sem provedor externo.** As fases de visão e áudio vão rodar
+  modelos na própria infraestrutura; nenhuma imagem ou gravação sai dela.
+- **Resolvido junto: 500 ao editar parto ou peso na ficha do animal.** A
+  auditoria do cadastro tentava gravar `date`/`Decimal` direto em JSON;
+  agora converte (`_jsonable` em `animal_registry.py`).
+- **Navegação com nove áreas** quebra em duas linhas em telas de computador
+  estreitas, em vez de cortar a última.
+
 ## Cadastro mestre — resolvido
 
 API e telas existem: buscar animal, ver ficha, vincular brinco, mudar de lote,
