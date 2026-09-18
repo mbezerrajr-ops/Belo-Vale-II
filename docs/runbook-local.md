@@ -98,17 +98,61 @@ O bootstrap se recusa a rodar se já existir qualquer usuário no banco.
 
 ## 5. Cadastrar fazenda e animal (cadastro mestre)
 
-Não há endpoint HTTP para isso na v1 — é inserido diretamente no banco:
+Pela API. A fazenda é resolvida no servidor: nenhum endpoint aceita `farm_id`
+do cliente.
+
+Crie a fazenda (exige **admin**) e confira qual está em uso:
 
 ```bash
-docker compose --env-file infra/.env.local -f infra/docker-compose.yml exec -T db \
-  psql -U ingestion -d ingestion -c \
-  "INSERT INTO farms (id, name) VALUES (gen_random_uuid(), 'Minha Fazenda');"
+curl -X POST http://localhost:8000/api/farms \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Belo Vale II"}'
 
-docker compose --env-file infra/.env.local -f infra/docker-compose.yml exec -T db \
-  psql -U ingestion -d ingestion -c \
-  "INSERT INTO animals (id, farm_id, identifier, name) VALUES (gen_random_uuid(), '<FARM_ID>', '497', 'PONTA CURTA');"
+curl http://localhost:8000/api/farms/current -H "Authorization: Bearer $TOKEN"
 ```
+
+Cadastre um animal (exige **reviewer**). O brinco é opcional — um animal pode
+entrar no cadastro antes de ter brinco:
+
+```bash
+curl -X POST http://localhost:8000/api/animals \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"brinco": "B2-008", "name": "Cabelo de Fogo", "lote": "LOTE 1"}'
+```
+
+Endpoints disponíveis:
+
+| Método | Rota | Papel mínimo | Para quê |
+| --- | --- | --- | --- |
+| `POST` | `/api/farms` | admin | Cria a fazenda |
+| `GET` | `/api/farms/current` | operator | A fazenda em uso |
+| `POST` | `/api/animals` | reviewer | Cadastra animal |
+| `GET` | `/api/animals` | operator | Lista, com `brinco`, `name`, `sem_brinco`, `limit`, `offset` |
+| `GET` | `/api/animals/{id}` | operator | Detalhe com histórico de lotação |
+| `PATCH` | `/api/animals/{id}` | reviewer | Campos descritivos (nome, situação, status…) |
+| `POST` | `/api/animals/{id}/brinco` | reviewer | Vincula ou troca o brinco |
+| `POST` | `/api/animals/{id}/lote` | reviewer | Registra mudança de lote |
+
+### Vincular brinco a um animal que não tem
+
+É por aqui que os 142 registros migrados sem brinco passam a receber matching
+automático. Como muda a identidade operacional do animal, a evidência é
+obrigatória e fica na auditoria junto com o valor anterior:
+
+```bash
+curl -X POST http://localhost:8000/api/animals/<ID>/brinco \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"brinco": "B2-731", "evidence": "Brinco aplicado no curral em 18/09/2026"}'
+```
+
+Para encontrar os animais nessa situação: `GET /api/animals?sem_brinco=true`.
+
+O brinco **não** pode ser alterado pelo `PATCH` genérico — a requisição falha
+explicitamente em vez de ser ignorada. Trocar de lote também tem rota própria,
+porque acrescenta uma linha ao histórico em vez de sobrescrever a anterior.
 
 ## 6. Acessar a aplicação
 
