@@ -205,9 +205,12 @@ documentados e verificados em `docs/runbook-local.md`, mas não existe um
 pipeline de CI (GitHub Actions ou equivalente) automatizando essas
 verificações a cada push/PR. Fora do escopo desta task.
 
-## Sem endpoint HTTP para cadastro de fazenda/animal
+## Cadastro mestre: API pronta, tela ainda não
 
-O "cadastro mestre" (fazendas, animais) só é populável via inserção direta
-no banco (`INSERT` via `psql`), documentado no runbook. Não há tela nem
-endpoint de API para isso na v1 — consistente com o spec original, que não
-menciona esse CRUD como parte do escopo do pipeline de ingestão.
+O CRUD de fazendas e animais existe na API, com RBAC e auditoria — não é mais
+necessário `INSERT` via `psql`. Ver a seção 5 do runbook.
+
+O que **falta**: não há tela no frontend para essas operações. Cadastrar um
+animal, vincular um brinco ou mudar um animal de lote exige, hoje, chamar a
+API diretamente. Para quem opera a fazenda, isso ainda não está usável.
+
