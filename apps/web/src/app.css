@@ -432,11 +432,15 @@ a {
   .areanav {
     position: static;
     justify-content: flex-start;
+    flex-wrap: wrap;
     gap: 4px;
     padding: 4px;
     margin: 0 0 22px;
     border: 1px solid var(--line);
-    border-radius: 999px;
+    /* Com nove áreas a barra pode quebrar em duas linhas em telas médias:
+       o raio menor mantém o contorno bonito nos dois casos. */
+    border-radius: 22px;
+    overflow: visible;
     background: var(--surface);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -446,10 +450,10 @@ a {
   .areanav button {
     flex: 0 0 auto;
     flex-direction: row;
-    gap: 8px;
-    padding: 8px 16px;
+    gap: 7px;
+    padding: 8px 13px;
     border-radius: 999px;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
   }
 
   .areanav button svg {

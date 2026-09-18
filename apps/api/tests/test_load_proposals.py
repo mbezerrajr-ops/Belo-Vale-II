@@ -73,3 +73,17 @@ def test_accepts_the_three_source_kinds(db, tmp_path, kind) -> None:
 
     assert main(["--email", "reviewer@belovale", "--file", path, "--kind", kind]) == 0
     assert one("SELECT kind FROM event_proposal_sources") == [(kind,)]
+
+
+def test_reads_the_extraction_from_stdin(db, monkeypatch) -> None:
+    """`--file -` lê da entrada padrão: o E2E manda a extração para dentro do
+    contêiner sem precisar copiar arquivo."""
+    import io
+
+    make_farm()
+    make_user("reviewer")
+    payload = json.dumps({"events": [{"event_type": "note", "brinco": "1", "fields": {"texto": "x"}}]})
+    monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+
+    assert main(["--email", "reviewer@belovale", "--file", "-", "--label", "via stdin"]) == 0
+    assert one("SELECT label FROM event_proposal_sources") == [("via stdin",)]

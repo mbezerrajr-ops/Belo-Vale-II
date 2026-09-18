@@ -38,7 +38,10 @@ class LoadError(Exception):
 
 async def _load(email: str, path: Path, kind: str, label: str) -> int:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        # "-" lê da entrada padrão: útil para mandar a extração para dentro
+        # de um contêiner sem copiar arquivo.
+        text = sys.stdin.read() if str(path) == "-" else path.read_text(encoding="utf-8")
+        data = json.loads(text)
     except (OSError, json.JSONDecodeError) as error:
         raise LoadError(f"Não foi possível ler {path}: {error}") from error
     try:
@@ -67,7 +70,7 @@ async def _load(email: str, path: Path, kind: str, label: str) -> int:
                 farm_id=farms[0].id,
                 user=user,
                 kind=kind,
-                label=label or path.name,
+                label=label or ("leitura" if str(path) == "-" else path.name),
                 extraction=extraction,
             )
             await session.commit()
@@ -79,7 +82,9 @@ async def _load(email: str, path: Path, kind: str, label: str) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--email", required=True, help="Conta que registra a leitura.")
-    parser.add_argument("--file", required=True, type=Path, help="Extração em JSON.")
+    parser.add_argument(
+        "--file", required=True, type=Path, help="Extração em JSON ('-' para ler da entrada padrão)."
+    )
     parser.add_argument("--kind", default="text", choices=SOURCE_KINDS)
     parser.add_argument("--label", default="", help="Nome exibido na caixa de revisão.")
     args = parser.parse_args(argv)

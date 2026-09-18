@@ -120,5 +120,33 @@ export async function logout(page: Page): Promise<void> {
 }
 
 export async function openArea(page: Page, name: RegExp | string): Promise<void> {
-  await page.getByRole("navigation", { name: "Áreas" }).getByRole("button", { name }).click();
+  // A barra ganha itens depois do primeiro desenho (Fichas, contagem da
+  // revisão); um clique no meio desse rearranjo pode cair no vizinho. Clica
+  // de novo até a área ficar marcada como atual.
+  const button = page.getByRole("navigation", { name: "Áreas" }).getByRole("button", { name });
+  await expect(async () => {
+    await button.click();
+    await expect(button).toHaveAttribute("aria-current", "true", { timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
+}
+
+/**
+ * Manda uma leitura para a caixa de revisão pelo comando de carga, como os
+ * leitores de foto e áudio farão. A extração vai pela entrada padrão.
+ */
+export function loadProposals(extraction: object, label: string): void {
+  composeExec(
+    [
+      "api", "uv", "run", "--no-sync", "python", "-m", "app.core.load_proposals",
+      "--email", E2E_ADMIN_EMAIL, "--file", "-", "--label", label, "--kind", "photo",
+    ],
+    JSON.stringify(extraction),
+  );
+}
+
+/** `aaaa-mm-dd` de alguns dias atrás. Nunca "hoje": o executor do CI roda em
+ * UTC, e depois das 21h no Nordeste o "hoje" dele já é amanhã na fazenda. */
+export function daysAgo(days: number): string {
+  const moment = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return moment.toISOString().slice(0, 10);
 }
