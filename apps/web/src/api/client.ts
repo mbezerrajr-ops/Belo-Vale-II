@@ -1,6 +1,16 @@
 import {
   ApiError,
+  type Animal,
+  type AnimalCreateInput,
+  type AnimalDetail,
+  type AnimalPage,
+  type AnimalSearch,
+  type AnimalUpdateInput,
   type CurrentUser,
+  type Farm,
+  type Role,
+  type UserAccount,
+  type UserPage,
   type DecisionRequest,
   type DecisionResult,
   type ImportReview,
@@ -165,4 +175,156 @@ export async function decideLine(
     },
   );
   return parseJsonOrThrow<DecisionResult>(response);
+}
+
+
+// --- Cadastro mestre ---
+//
+// Nenhuma destas funções recebe `farm_id`: a fazenda é resolvida no servidor.
+// Pedir isso ao usuário seria expor um UUID a quem só quer achar uma vaca.
+
+function jsonHeaders(token: string): HeadersInit {
+  return { ...authHeaders(token), "Content-Type": "application/json" };
+}
+
+export async function getCurrentFarm(token: string): Promise<Farm> {
+  const response = await fetch(`${API_BASE_URL}/api/farms/current`, {
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow<Farm>(response);
+}
+
+export async function searchAnimals(
+  token: string,
+  search: AnimalSearch = {},
+): Promise<AnimalPage> {
+  const params = new URLSearchParams();
+  if (search.brinco) params.set("brinco", search.brinco);
+  if (search.name) params.set("name", search.name);
+  if (search.semBrinco) params.set("sem_brinco", "true");
+  params.set("limit", String(search.limit ?? 25));
+  params.set("offset", String(search.offset ?? 0));
+
+  const response = await fetch(`${API_BASE_URL}/api/animals?${params}`, {
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow<AnimalPage>(response);
+}
+
+export async function getAnimal(
+  token: string,
+  animalId: string,
+): Promise<AnimalDetail> {
+  const response = await fetch(`${API_BASE_URL}/api/animals/${animalId}`, {
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow<AnimalDetail>(response);
+}
+
+export async function createAnimal(
+  token: string,
+  input: AnimalCreateInput,
+): Promise<Animal> {
+  const response = await fetch(`${API_BASE_URL}/api/animals`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify(input),
+  });
+  return parseJsonOrThrow<Animal>(response);
+}
+
+export async function updateAnimal(
+  token: string,
+  animalId: string,
+  changes: AnimalUpdateInput,
+): Promise<Animal> {
+  const response = await fetch(`${API_BASE_URL}/api/animals/${animalId}`, {
+    method: "PATCH",
+    headers: jsonHeaders(token),
+    body: JSON.stringify(changes),
+  });
+  return parseJsonOrThrow<Animal>(response);
+}
+
+/** Vincular brinco muda a identidade operacional, então a evidência é exigida. */
+export async function linkBrinco(
+  token: string,
+  animalId: string,
+  brinco: string,
+  evidence: string,
+): Promise<Animal> {
+  const response = await fetch(`${API_BASE_URL}/api/animals/${animalId}/brinco`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ brinco, evidence }),
+  });
+  return parseJsonOrThrow<Animal>(response);
+}
+
+export async function assignLot(
+  token: string,
+  animalId: string,
+  lote: string,
+  validFrom: string,
+): Promise<Animal> {
+  const response = await fetch(`${API_BASE_URL}/api/animals/${animalId}/lote`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ lote, valid_from: validFrom }),
+  });
+  return parseJsonOrThrow<Animal>(response);
+}
+
+// --- Contas ---
+
+export async function listUsers(token: string): Promise<UserPage> {
+  const response = await fetch(`${API_BASE_URL}/api/users`, {
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow<UserPage>(response);
+}
+
+export async function createUser(
+  token: string,
+  email: string,
+  password: string,
+  role: Role,
+): Promise<UserAccount> {
+  const response = await fetch(`${API_BASE_URL}/api/users`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ email, password, role }),
+  });
+  return parseJsonOrThrow<UserAccount>(response);
+}
+
+export async function updateUser(
+  token: string,
+  userId: string,
+  changes: { role?: Role; is_active?: boolean },
+): Promise<UserAccount> {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+    method: "PATCH",
+    headers: jsonHeaders(token),
+    body: JSON.stringify(changes),
+  });
+  return parseJsonOrThrow<UserAccount>(response);
+}
+
+export async function changeOwnPassword(
+  token: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/users/me/password`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, await response.json());
+  }
 }

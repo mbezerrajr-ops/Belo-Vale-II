@@ -95,3 +95,92 @@ export class ApiError extends Error {
     this.body = body;
   }
 }
+
+// --- Cadastro mestre ---
+
+export interface Farm {
+  id: string;
+  name: string;
+  code: string | null;
+}
+
+export interface LotAssignment {
+  lote: string;
+  valid_from: string;
+  valid_to: string | null;
+  source: string;
+  reviewed_by: string | null;
+}
+
+export interface Animal {
+  id: string;
+  farm_id: string;
+  brinco: string | null;
+  brinco_origem: string | null;
+  legacy_id: string | null;
+  numero_legado: string | null;
+  name: string | null;
+  situacao: string | null;
+  status: string | null;
+  ultimo_parto: string | null;
+  nascimento: string | null;
+  peso: number | null;
+  observacoes: string | null;
+  lote_atual: string | null;
+}
+
+export interface AnimalDetail extends Animal {
+  historico_lotes: LotAssignment[];
+}
+
+export interface AnimalPage {
+  items: Animal[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AnimalSearch {
+  brinco?: string;
+  name?: string;
+  semBrinco?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface AnimalCreateInput {
+  brinco?: string | null;
+  name?: string | null;
+  numero_legado?: string | null;
+  situacao?: string | null;
+  status?: string | null;
+  ultimo_parto?: string | null;
+  lote?: string | null;
+  lote_valid_from?: string | null;
+}
+
+export type AnimalUpdateInput = Partial<{
+  name: string | null;
+  situacao: string | null;
+  status: string | null;
+  ultimo_parto: string | null;
+  numero_legado: string | null;
+  observacoes: string | null;
+}>;
+
+// --- Contas ---
+
+export type Role = "operator" | "reviewer" | "admin";
+
+export interface UserAccount {
+  id: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface UserPage {
+  items: UserAccount[];
+  total: number;
+}
