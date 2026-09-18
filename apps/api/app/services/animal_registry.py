@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Animal, AnimalLotAssignment, AuditEvent
 from app.services.brinco import normalize_brinco
+from app.services.lot_kind import KIND_DIET, classify_lot
 
 
 class AnimalRegistryError(ValueError):
@@ -162,6 +163,7 @@ async def create_animal(
             AnimalLotAssignment(
                 animal_id=animal.id,
                 lote=lote,
+                kind=classify_lot(lote) or KIND_DIET,
                 valid_from=lote_valid_from or date.today(),
                 valid_to=None,
                 source="manual",
@@ -275,22 +277,29 @@ async def assign_lot(
     lote: str,
     valid_from: date,
     source: str = "manual",
+    kind: str | None = None,
 ) -> AnimalLotAssignment | None:
     """Registra uma mudança de lote como evento temporal.
 
     Encerra a vigência anterior na véspera e abre a nova. Devolve ``None``
     quando o animal já está no lote informado — repetir a informação não é
     uma mudança.
+
+    `kind` separa lote de ordenha de grupo de manejo; quando omitido, é
+    deduzido do nome. Cada tipo tem sua própria vigência, então mudar de
+    piquete não tira a vaca do lote de ordenha.
     """
     if not lote or not lote.strip():
         raise AnimalRegistryError("Informe o lote.")
 
     animal = await _load_animal(session, animal_id=animal_id, farm_id=farm_id)
     lote = lote.strip()
+    kind = kind or classify_lot(lote) or KIND_DIET
 
     current = await session.scalar(
         select(AnimalLotAssignment).where(
             AnimalLotAssignment.animal_id == animal.id,
+            AnimalLotAssignment.kind == kind,
             AnimalLotAssignment.valid_to.is_(None),
         )
     )
@@ -309,6 +318,7 @@ async def assign_lot(
     assignment = AnimalLotAssignment(
         animal_id=animal.id,
         lote=lote,
+        kind=kind,
         valid_from=valid_from,
         valid_to=None,
         source=source,
@@ -322,19 +332,21 @@ async def assign_lot(
         actor=actor,
         action="animal_lot_changed",
         entity_id=animal.id,
-        previous={"lote": current.lote} if current is not None else None,
-        new={"lote": lote, "valid_from": valid_from.isoformat()},
+        previous={"lote": current.lote, "kind": kind} if current is not None else None,
+        new={"lote": lote, "kind": kind, "valid_from": valid_from.isoformat()},
     )
     await session.commit()
     return assignment
 
 
 async def current_lot(
-    session: AsyncSession, *, animal_id: UUID
+    session: AsyncSession, *, animal_id: UUID, kind: str = KIND_DIET
 ) -> AnimalLotAssignment | None:
+    """Lotação vigente de um tipo. Por padrão, o lote de ordenha."""
     return await session.scalar(
         select(AnimalLotAssignment).where(
             AnimalLotAssignment.animal_id == animal_id,
+            AnimalLotAssignment.kind == kind,
             AnimalLotAssignment.valid_to.is_(None),
         )
     )

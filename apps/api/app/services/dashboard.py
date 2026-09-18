@@ -25,6 +25,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.lot_kind import KIND_DIET, KIND_MANAGEMENT
 from app.db.models import (
     Animal,
     AnimalLotAssignment,
@@ -112,6 +113,9 @@ class DashboardSummary:
     animals_with_reading: int
     by_situation: dict[str, int]
     by_status: dict[str, int]
+    #: Quantos animais em cada área/categoria da fazenda (BEZERREIRO, ENGORDA…).
+    #: Não são lotes: não têm dieta nem custo.
+    by_management_group: dict[str, int]
     lactation_stages: dict[str, int]
     lots: list[LotSummary] = field(default_factory=list)
     feed_breakdown: list[SupplyBreakdown] = field(default_factory=list)
@@ -142,11 +146,18 @@ def _producao(values: dict) -> float:
     return 0.0
 
 
-async def _current_lots(session: AsyncSession, farm_id: UUID) -> dict[UUID, str]:
+async def _current_lots(
+    session: AsyncSession, farm_id: UUID, kind: str
+) -> dict[UUID, str]:
+    """Lotação vigente de um tipo, por animal."""
     rows = await session.execute(
         select(AnimalLotAssignment.animal_id, AnimalLotAssignment.lote)
         .join(Animal, Animal.id == AnimalLotAssignment.animal_id)
-        .where(Animal.farm_id == farm_id, AnimalLotAssignment.valid_to.is_(None))
+        .where(
+            Animal.farm_id == farm_id,
+            AnimalLotAssignment.kind == kind,
+            AnimalLotAssignment.valid_to.is_(None),
+        )
     )
     return {animal_id: lote for animal_id, lote in rows}
 
@@ -223,7 +234,10 @@ async def build_dashboard(
     animals = list(
         await session.scalars(select(Animal).where(Animal.farm_id == farm_id))
     )
-    lots = await _current_lots(session, farm_id)
+    # Lote de ordenha e grupo de manejo são coisas diferentes: só o primeiro
+    # tem dieta e custo. Misturá-los faria a fazenda "ter" lotes sem dieta.
+    lots = await _current_lots(session, farm_id, KIND_DIET)
+    groups = await _current_lots(session, farm_id, KIND_MANAGEMENT)
 
     readings: dict[UUID, float] = {}
     if reference is not None:
@@ -247,6 +261,7 @@ async def build_dashboard(
 
     by_situation: dict[str, int] = {}
     by_status: dict[str, int] = {}
+    by_group: dict[str, int] = {}
     stages: dict[str, int] = {label: 0 for label, _, _ in _STAGES}
     without_lot = 0
     for animal in selected:
@@ -256,6 +271,9 @@ async def build_dashboard(
         by_status[animal.status or "—"] = by_status.get(animal.status or "—", 0) + 1
         if animal.id not in lots:
             without_lot += 1
+        group = groups.get(animal.id)
+        if group is not None:
+            by_group[group] = by_group.get(group, 0) + 1
         if reference is not None:
             stage = lactation_stage(animal.ultimo_parto, reference)
             if stage is not None:
@@ -320,6 +338,7 @@ async def build_dashboard(
         animals_with_reading=sum(1 for a in selected if a.id in readings),
         by_situation=by_situation,
         by_status=by_status,
+        by_management_group=dict(sorted(by_group.items())),
         lactation_stages=stages,
         lots=lot_summaries,
         feed_breakdown=breakdown,
