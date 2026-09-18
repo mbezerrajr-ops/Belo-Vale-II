@@ -94,9 +94,18 @@ class ProducerEntry:
 
 
 @dataclass
+class ProductionPoint:
+    measured_on: date
+    liters: float
+    animals: int
+
+
+@dataclass
 class DashboardSummary:
     measured_on: date | None
     available_dates: list[date]
+    #: Série para o gráfico de tendência: total lido em cada data de coleta.
+    production_by_date: list[ProductionPoint]
     milk_price: float | None
     total_animals: int
     animals_without_lot: int
@@ -197,6 +206,20 @@ async def build_dashboard(
     )
     reference = measured_on or (available[0] if available else None)
 
+    # Tendência: total e cobertura de cada data, sem filtro — é a linha do
+    # tempo da fazenda inteira, e um filtro de lote a esvaziaria.
+    series_rows = await session.execute(
+        select(OfficialMeasurement.measured_on, OfficialMeasurement.values)
+        .join(Animal, Animal.id == OfficialMeasurement.animal_id)
+        .where(Animal.farm_id == farm_id, OfficialMeasurement.status == "active")
+    )
+    by_date: dict[date, ProductionPoint] = {}
+    for day, values in series_rows:
+        point = by_date.setdefault(day, ProductionPoint(measured_on=day, liters=0.0, animals=0))
+        point.liters += _producao(values or {})
+        point.animals += 1
+    production_by_date = [by_date[day] for day in sorted(by_date)]
+
     animals = list(
         await session.scalars(select(Animal).where(Animal.farm_id == farm_id))
     )
@@ -290,6 +313,7 @@ async def build_dashboard(
     return DashboardSummary(
         measured_on=reference,
         available_dates=available,
+        production_by_date=production_by_date,
         milk_price=milk_price if has_milk_price else None,
         total_animals=len(selected),
         animals_without_lot=without_lot,

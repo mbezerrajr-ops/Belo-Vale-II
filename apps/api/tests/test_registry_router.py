@@ -513,10 +513,14 @@ class TestSuppliesEndpoints:
             json={"name": "Silagem", "price_per_kg": 0.35},
         ).json()
 
+        # Uma data claramente no passado: o preço da criação é registrado em
+        # "hoje", e usar a mesma data aqui corrigiria o registro em vez de
+        # acrescentar — o que é o comportamento certo, mas não o que este
+        # teste quer provar.
         api.patch(
             f"/api/supplies/{supply['id']}",
             headers=_auth(token),
-            json={"price_per_kg": 0.42, "effective_on": "2026-09-18"},
+            json={"price_per_kg": 0.42, "effective_on": "2020-01-01"},
         )
 
         prices = db(

@@ -221,6 +221,20 @@ class TestTotals:
 
         _run(scenario)
 
+    def test_production_series_by_date(self) -> None:
+        """Alimenta o gráfico de tendência: total e cobertura por coleta."""
+
+        async def scenario(factory) -> None:
+            async with factory() as session:
+                farm = await _scenario_farm(session, "Série por data")
+                panel = await build_dashboard(session, farm_id=farm.id)
+
+                assert [
+                    (p.measured_on, p.liters, p.animals) for p in panel.production_by_date
+                ] == [(date(2026, 8, 25), 60.0, 3)]
+
+        _run(scenario)
+
     def test_available_dates_are_listed(self) -> None:
         async def scenario(factory) -> None:
             async with factory() as session:
