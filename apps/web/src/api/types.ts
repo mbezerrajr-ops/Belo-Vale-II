@@ -333,3 +333,85 @@ export interface ReadingConflict {
   message: string;
   existing: Reading;
 }
+
+// --- Importação de coleta por arquivo ---
+
+export type ImportMode = "new_only" | "replace";
+
+export type ImportRowStatus =
+  | "new"
+  | "same"
+  | "different"
+  | "not_found"
+  | "no_brinco"
+  | "invalid"
+  | "exited"
+  | "duplicate";
+
+export interface ImportPreviewRow {
+  location: string;
+  brinco_lido: string;
+  brinco: string | null;
+  nome_arquivo: string | null;
+  producao: number;
+  status: ImportRowStatus;
+  animal_id: string | null;
+  animal_nome: string | null;
+  existing_measurement_id: string | null;
+  existing_producao: number | null;
+  existing_provenance: string | null;
+  notes: string[];
+}
+
+export interface ImportProblem {
+  location: string;
+  text: string;
+  reason: string;
+}
+
+export interface KeptReading {
+  animal_id: string;
+  brinco: string | null;
+  nome: string | null;
+  producao: number | null;
+}
+
+export interface ImportPreview {
+  file_format: "csv" | "xlsx" | "pdf";
+  filename: string;
+  sha256: string;
+  measured_on: string;
+  counts: Record<ImportRowStatus, number>;
+  rows: ImportPreviewRow[];
+  problems: ImportProblem[];
+  /** Leituras da data que não estão no arquivo: ficam como estão. */
+  kept: KeptReading[];
+}
+
+export interface ImportSummary {
+  created: number;
+  replaced: number;
+  skipped_same: number;
+  skipped_different: number;
+  not_found: number;
+  no_brinco: number;
+  invalid: number;
+  exited: number;
+  duplicate: number;
+  unreadable_lines: number;
+  kept: number;
+}
+
+export interface ImportRecord {
+  id: string;
+  measured_on: string;
+  filename: string;
+  file_format: string;
+  mode: ImportMode;
+  reason: string | null;
+  imported_by: string;
+  created_at: string;
+  summary: ImportSummary;
+  /** O mesmo arquivo já tinha sido importado nesta data e modo. */
+  already_imported: boolean;
+}

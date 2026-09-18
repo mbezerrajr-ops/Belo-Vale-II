@@ -12,6 +12,9 @@ import {
   type DashboardFilters,
   type DashboardSummary,
   type ExitReason,
+  type ImportMode,
+  type ImportPreview,
+  type ImportRecord,
   type PasswordReset,
   type ProductionSheet,
   type Reading,
@@ -521,4 +524,53 @@ export async function voidReading(
   if (!response.ok) {
     throw new ApiError(response.status, await response.json());
   }
+}
+
+// --- Importação de coleta por arquivo ---
+
+function importForm(file: File, measuredOn: string): FormData {
+  const form = new FormData();
+  form.set("file", file);
+  form.set("measured_on", measuredOn);
+  return form;
+}
+
+/** Lê o arquivo no servidor e mostra o que aconteceria. Não grava nada. */
+export async function previewImport(
+  token: string,
+  file: File,
+  measuredOn: string,
+): Promise<ImportPreview> {
+  const response = await fetch(`${API_BASE_URL}/api/production/import/preview`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: importForm(file, measuredOn),
+  });
+  return parseJsonOrThrow<ImportPreview>(response);
+}
+
+/** Grava. O servidor recalcula tudo a partir do arquivo; nada da prévia é reenviado. */
+export async function commitImport(
+  token: string,
+  file: File,
+  measuredOn: string,
+  mode: ImportMode,
+  reason: string | null,
+): Promise<ImportRecord> {
+  const form = importForm(file, measuredOn);
+  form.set("mode", mode);
+  if (reason) form.set("reason", reason);
+  const response = await fetch(`${API_BASE_URL}/api/production/import`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: form,
+  });
+  return parseJsonOrThrow<ImportRecord>(response);
+}
+
+export async function listImports(token: string): Promise<ImportRecord[]> {
+  const response = await fetch(`${API_BASE_URL}/api/production/imports`, {
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow<ImportRecord[]>(response);
 }

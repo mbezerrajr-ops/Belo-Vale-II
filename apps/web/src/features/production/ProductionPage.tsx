@@ -14,6 +14,7 @@ import {
   type SheetItem,
 } from "../../api/types";
 import { brDate, liters, localToday } from "../../ui/dates";
+import { ImportPanel } from "./ImportPanel";
 
 /**
  * Lançamento de produção, vaca a vaca.
@@ -139,6 +140,20 @@ export function ProductionPage({
   const [sheet, setSheet] = useState<ProductionSheet | null>(null);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [how, setHow] = useState<"digitar" | "importar">("digitar");
+  // Muda depois de uma importação, para a folha reler o que foi gravado.
+  const [reloadKey, setReloadKey] = useState(0);
+  // A folha para imprimir só existe enquanto se imprime: fora disso, os
+  // nomes das vacas apareceriam duas vezes na página.
+  const [printing, setPrinting] = useState(false);
+
+  useEffect(() => {
+    if (!printing) return;
+    const done = (): void => setPrinting(false);
+    window.addEventListener("afterprint", done);
+    window.print();
+    return () => window.removeEventListener("afterprint", done);
+  }, [printing]);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
@@ -163,7 +178,7 @@ export function ProductionPage({
     return () => {
       cancelled = true;
     };
-  }, [token, day, lote, onLoadSheet]);
+  }, [token, day, lote, onLoadSheet, reloadKey]);
 
   function patch(animalId: string, changes: Partial<RowState>): void {
     setRows((current) => ({
@@ -319,10 +334,38 @@ export function ProductionPage({
     <section className="production">
       <h2>Produção do dia</h2>
       <p className="muted">
-        Digite os litros de cada vaca. Cada valor é salvo sozinho ao sair do campo;
-        Enter passa para a próxima.
+        Digite os litros de cada vaca ou importe o arquivo da coleta. Digitando, cada
+        valor é salvo sozinho ao sair do campo; Enter passa para a próxima.
       </p>
 
+      <div className="search-shortcuts" role="group" aria-label="Como lançar">
+        <button
+          type="button"
+          aria-pressed={how === "digitar"}
+          onClick={() => setHow("digitar")}
+        >
+          Digitar
+        </button>
+        <button
+          type="button"
+          aria-pressed={how === "importar"}
+          onClick={() => setHow("importar")}
+        >
+          Importar arquivo
+        </button>
+      </div>
+
+      {how === "importar" && (
+        <ImportPanel
+          token={token}
+          canReplace={canCorrect}
+          today={today}
+          onImported={() => setReloadKey((key) => key + 1)}
+        />
+      )}
+
+      {how === "digitar" && (
+      <>
       <div className="prod-controls">
         <label htmlFor="prod-day">Data da coleta</label>
         <input
@@ -371,6 +414,13 @@ export function ProductionPage({
                 {brDate(day)}
               </span>
             </div>
+            <button
+              type="button"
+              className="secondary prod-print"
+              onClick={() => setPrinting(true)}
+            >
+              Imprimir folha em branco
+            </button>
             <div
               className="prod-progress"
               role="progressbar"
@@ -510,6 +560,39 @@ export function ProductionPage({
 
       {sheet !== null && sheet.lote !== null && items.length === 0 && (
         <p className="chart-empty">Nenhuma vaca neste lote hoje.</p>
+      )}
+      </>
+      )}
+
+      {/* Só aparece no papel: a folha para preencher à mão no curral. */}
+      {printing && sheet !== null && items.length > 0 && (
+        <div className="print-area" aria-hidden="true">
+          <h1>Folha de coleta de leite</h1>
+          <p>
+            {lote} · {brDate(day)} · {items.length} vacas
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Brinco</th>
+                <th>Nome</th>
+                <th className="write-in">Litros</th>
+                <th className="write-in">Obs.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.animal_id}>
+                  <td>{item.brinco ?? "sem brinco"}</td>
+                  <td>{item.name ?? "sem nome"}</td>
+                  <td className="write-in" />
+                  <td className="write-in" />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="print-foot">Anotado por: ______________________</p>
+        </div>
       )}
     </section>
   );
