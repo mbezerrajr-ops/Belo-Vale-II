@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     vision_model_name: str = "unconfigured"
     auth_secret: SecretStr | None = None
     auth_token_ttl_seconds: int = Field(default=900, ge=60, le=86_400)
+    #: Validade da sessão renovável, em segundos. Padrão de 30 dias.
+    auth_refresh_ttl_seconds: int = Field(
+        default=30 * 24 * 60 * 60, ge=3_600, le=365 * 24 * 60 * 60
+    )
+    #: Marca o cookie de sessão como `Secure`. Padrão verdadeiro: sem TLS o
+    #: cookie viaja em texto puro. Só desligue para desenvolvimento local em
+    #: http://localhost, onde o navegador não enviaria um cookie `Secure`.
+    auth_cookie_secure: bool = True
 
     @field_validator("auth_secret")
     @classmethod
@@ -57,6 +65,16 @@ class Settings(BaseSettings):
         if missing:
             raise ValueError(
                 "Missing required production settings: " + ", ".join(missing)
+            )
+
+        # Um cookie de sessão sem `Secure` viaja em texto puro. Desligar isso
+        # é legítimo em desenvolvimento local, onde não há TLS; em produção é
+        # um erro de configuração que entregaria a sessão de qualquer usuário,
+        # e falhar na inicialização é melhor do que descobrir depois.
+        if self.runtime_role == "api" and not self.auth_cookie_secure:
+            raise ValueError(
+                "auth_cookie_secure must stay enabled in production: without it "
+                "the session cookie travels in clear text"
             )
         return self
 
