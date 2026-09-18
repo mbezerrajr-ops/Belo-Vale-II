@@ -29,6 +29,7 @@ class ExpectedCounts:
     animal_count: int
     measurement_count: int
     measurements_by_date: Mapping[date, int]
+    supply_count: int = 4
 
 
 #: Contagens confirmadas da baseline. Qualquer desvio precisa ser explicado
@@ -65,9 +66,33 @@ class AnimalRecord:
 
 
 @dataclass(frozen=True)
+class SupplyDietRecord:
+    lote: str
+    kg_per_day: float
+
+
+@dataclass(frozen=True)
+class SupplyPriceRecord:
+    effective_on: date
+    price_per_kg: float
+
+
+@dataclass(frozen=True)
+class SupplyRecord:
+    legacy_id: str
+    name: str
+    price_per_kg: float
+    prices: tuple[SupplyPriceRecord, ...] = field(default=())
+    diets: tuple[SupplyDietRecord, ...] = field(default=())
+
+
+@dataclass(frozen=True)
 class BaselineSnapshot:
     animals: tuple[AnimalRecord, ...]
     source_sha256: str
+    supplies: tuple[SupplyRecord, ...] = field(default=())
+    #: Preço pago por litro de leite. Base do cálculo de receita.
+    milk_price_per_liter: float | None = None
 
     @property
     def animal_count(self) -> int:
@@ -145,12 +170,39 @@ def _parse_animal(raw: Mapping[str, Any]) -> AnimalRecord:
     )
 
 
+def _parse_supply(raw: Mapping[str, Any]) -> SupplyRecord:
+    dieta = raw.get("dieta") or {}
+    return SupplyRecord(
+        legacy_id=str(raw.get("id") or "").strip(),
+        name=_text(raw.get("nome")) or "",
+        price_per_kg=float(raw.get("precoKg") or 0),
+        prices=tuple(
+            SupplyPriceRecord(
+                effective_on=_parse_date(entry.get("data")),
+                price_per_kg=float(entry.get("preco") or 0),
+            )
+            for entry in (raw.get("historico") or [])
+        ),
+        diets=tuple(
+            SupplyDietRecord(lote=str(lote), kg_per_day=float(kg or 0))
+            for lote, kg in sorted(dieta.items())
+        ),
+    )
+
+
 def parse_baseline(text: str) -> BaselineSnapshot:
     """Lê o estado canônico. Não lê usuários nem credenciais."""
     state = json.loads(text)
     animals = tuple(_parse_animal(raw) for raw in state.get("vacas", []))
+    supplies = tuple(_parse_supply(raw) for raw in state.get("insumos", []))
+    milk_price = state.get("precoLeite")
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    return BaselineSnapshot(animals=animals, source_sha256=digest)
+    return BaselineSnapshot(
+        animals=animals,
+        source_sha256=digest,
+        supplies=supplies,
+        milk_price_per_liter=float(milk_price) if milk_price is not None else None,
+    )
 
 
 def validate_snapshot(
@@ -193,6 +245,11 @@ def validate_snapshot(
     )
 
     if expected is not None:
+        if len(snapshot.supplies) != expected.supply_count:
+            errors.append(
+                f"esperados {expected.supply_count} insumos, "
+                f"encontrados {len(snapshot.supplies)}"
+            )
         if snapshot.animal_count != expected.animal_count:
             errors.append(
                 f"esperados {expected.animal_count} animais, "

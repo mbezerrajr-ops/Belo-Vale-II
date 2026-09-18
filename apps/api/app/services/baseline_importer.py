@@ -28,13 +28,18 @@ from app.db.models import (
     Animal,
     AnimalLotAssignment,
     BaselineImport,
+    Farm,
     OfficialMeasurement,
+    Supply,
+    SupplyDiet,
+    SupplyPrice,
 )
 from app.services.baseline_snapshot import (
     EXPECTED_BASELINE,
     AnimalRecord,
     BaselineSnapshot,
     ExpectedCounts,
+    SupplyRecord,
     validate_snapshot,
 )
 
@@ -50,6 +55,11 @@ class ImportReport:
     measurements_skipped: int = 0
     lot_assignments_created: int = 0
     lot_assignments_skipped: int = 0
+    supplies_created: int = 0
+    supplies_updated: int = 0
+    supply_prices_created: int = 0
+    supply_diets_created: int = 0
+    milk_price_set: bool = False
     errors: list[str] = field(default_factory=list)
 
     def as_lines(self) -> list[str]:
@@ -64,6 +74,11 @@ class ImportReport:
             f"já existentes={self.measurements_skipped}",
             f"lotações criadas={self.lot_assignments_created} "
             f"já vigentes={self.lot_assignments_skipped}",
+            f"insumos criados={self.supplies_created} "
+            f"atualizados={self.supplies_updated} "
+            f"preços={self.supply_prices_created} "
+            f"dietas={self.supply_diets_created}",
+            f"preço do leite definido={'sim' if self.milk_price_set else 'não'}",
         ]
         lines.extend(f"ERRO: {message}" for message in self.errors)
         return lines
@@ -232,6 +247,10 @@ async def import_baseline(
                 report=report,
             )
 
+        await _apply_supplies(
+            session, farm_id=farm_id, snapshot=snapshot, actor=approved_by, report=report
+        )
+
         await session.flush()
 
         if dry_run:
@@ -329,3 +348,110 @@ async def _apply_measurements(
         )
         existing_dates.add(measurement.measured_on)
         report.measurements_created += 1
+
+
+async def _apply_supplies(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    snapshot: BaselineSnapshot,
+    actor: str,
+    report: ImportReport,
+) -> None:
+    """Migra insumos, preços e dieta por lote.
+
+    Reconciliado por ``legacy_id``, como os animais: reimportar atualiza em vez
+    de duplicar. Preços e dietas já existentes não são recriados, porque preço
+    é evento datado e a dieta é única por lote.
+    """
+    if snapshot.milk_price_per_liter is not None:
+        farm = await session.scalar(select(Farm).where(Farm.id == farm_id))
+        if farm is not None and farm.milk_price_per_liter is None:
+            farm.milk_price_per_liter = snapshot.milk_price_per_liter
+            report.milk_price_set = True
+
+    existing = {
+        supply.legacy_id: supply
+        for supply in await session.scalars(
+            select(Supply).where(Supply.farm_id == farm_id, Supply.legacy_id.is_not(None))
+        )
+    }
+
+    for record in snapshot.supplies:
+        supply = existing.get(record.legacy_id)
+        if supply is None:
+            supply = Supply(
+                farm_id=farm_id,
+                legacy_id=record.legacy_id,
+                name=record.name,
+                price_per_kg=record.price_per_kg,
+            )
+            session.add(supply)
+            await session.flush()
+            existing[record.legacy_id] = supply
+            report.supplies_created += 1
+        elif (
+            supply.name != record.name
+            or float(supply.price_per_kg) != float(record.price_per_kg)
+        ):
+            supply.name = record.name
+            supply.price_per_kg = record.price_per_kg
+            report.supplies_updated += 1
+
+        await _apply_supply_prices(session, supply=supply, record=record, actor=actor, report=report)
+        await _apply_supply_diets(session, supply=supply, record=record, report=report)
+
+
+async def _apply_supply_prices(
+    session: AsyncSession,
+    *,
+    supply: Supply,
+    record: SupplyRecord,
+    actor: str,
+    report: ImportReport,
+) -> None:
+    known = {
+        row
+        for row in await session.scalars(
+            select(SupplyPrice.effective_on).where(SupplyPrice.supply_id == supply.id)
+        )
+    }
+    for price in record.prices:
+        if price.effective_on is None or price.effective_on in known:
+            continue
+        session.add(
+            SupplyPrice(
+                supply_id=supply.id,
+                price_per_kg=price.price_per_kg,
+                effective_on=price.effective_on,
+                source="legacy_baseline",
+                recorded_by=actor,
+            )
+        )
+        known.add(price.effective_on)
+        report.supply_prices_created += 1
+
+
+async def _apply_supply_diets(
+    session: AsyncSession,
+    *,
+    supply: Supply,
+    record: SupplyRecord,
+    report: ImportReport,
+) -> None:
+    known = {
+        row
+        for row in await session.scalars(
+            select(SupplyDiet.lote).where(SupplyDiet.supply_id == supply.id)
+        )
+    }
+    for diet in record.diets:
+        if diet.lote in known:
+            continue
+        session.add(
+            SupplyDiet(
+                supply_id=supply.id, lote=diet.lote, kg_per_day=diet.kg_per_day
+            )
+        )
+        known.add(diet.lote)
+        report.supply_diets_created += 1

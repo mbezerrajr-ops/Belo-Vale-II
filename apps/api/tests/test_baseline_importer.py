@@ -20,6 +20,8 @@ from app.db.models import (
     BaselineImport,
     Farm,
     OfficialMeasurement,
+    Supply,
+    SupplyDiet,
     User,
 )
 from app.services.baseline_importer import import_baseline
@@ -329,10 +331,13 @@ class TestDryRun:
         async def scenario(factory) -> None:
             async with factory() as session:
                 farm = await _fresh_farm(session, "Dry run")
+                # O id é guardado antes: a simulação altera o preço do leite da
+                # fazenda e o rollback do savepoint expira o objeto.
+                farm_id = farm.id
                 report = await import_baseline(
                     session,
                     parse_baseline(baseline_text),
-                    farm_id=farm.id,
+                    farm_id=farm_id,
                     approved_by=APPROVER,
                     reference_date=REFERENCE,
                     source_path="state_canonical.json",
@@ -344,7 +349,11 @@ class TestDryRun:
 
             # Sessão nova: garante que nada foi persistido.
             async with factory() as verification:
-                assert await _counts(verification, farm.id) == (0, 0, 0)
+                assert await _counts(verification, farm_id) == (0, 0, 0)
+                milk = await verification.scalar(
+                    select(Farm.milk_price_per_liter).where(Farm.id == farm_id)
+                )
+                assert milk is None
 
         _run(scenario)
 
@@ -396,5 +405,144 @@ class TestNoLegacyCredentials:
                 )
                 after = await session.scalar(select(func.count()).select_from(User))
                 assert before == after
+
+        _run(scenario)
+
+
+class TestSupplyMigration:
+    """Os 4 insumos e o preço do leite existem na baseline e alimentam o
+    cálculo de custo de alimentação do painel."""
+
+    def test_imports_the_four_supplies(self, baseline_text: str) -> None:
+        async def scenario(factory) -> None:
+            async with factory() as session:
+                farm = await _fresh_farm(session, "Insumos completos")
+                report = await import_baseline(
+                    session,
+                    parse_baseline(baseline_text),
+                    farm_id=farm.id,
+                    approved_by=APPROVER,
+                    reference_date=REFERENCE,
+                    source_path="state_canonical.json",
+                    dry_run=False,
+                )
+                assert report.supplies_created == 4
+
+                names = sorted(
+                    await session.scalars(
+                        select(Supply.name).where(Supply.farm_id == farm.id)
+                    )
+                )
+                assert names == [
+                    "Caroço",
+                    "Casca de Mandioca",
+                    "Concentrado",
+                    "Silagem",
+                ]
+
+        _run(scenario)
+
+    def test_imports_diets_per_lot(self, baseline_text: str) -> None:
+        async def scenario(factory) -> None:
+            async with factory() as session:
+                farm = await _fresh_farm(session, "Dietas por lote")
+                report = await import_baseline(
+                    session,
+                    parse_baseline(baseline_text),
+                    farm_id=farm.id,
+                    approved_by=APPROVER,
+                    reference_date=REFERENCE,
+                    source_path="state_canonical.json",
+                    dry_run=False,
+                )
+                # 4 insumos × 3 lotes
+                assert report.supply_diets_created == 12
+
+                concentrado = await session.scalar(
+                    select(Supply).where(
+                        Supply.farm_id == farm.id, Supply.name == "Concentrado"
+                    )
+                )
+                diets = {
+                    row.lote: float(row.kg_per_day)
+                    for row in await session.scalars(
+                        select(SupplyDiet).where(SupplyDiet.supply_id == concentrado.id)
+                    )
+                }
+                assert diets == {"LOTE 1": 480.0, "LOTE 2": 400.0, "LOTE 3": 80.0}
+
+        _run(scenario)
+
+    def test_sets_the_milk_price(self, baseline_text: str) -> None:
+        async def scenario(factory) -> None:
+            async with factory() as session:
+                farm = await _fresh_farm(session, "Preço do leite")
+                farm_id = farm.id
+                await import_baseline(
+                    session,
+                    parse_baseline(baseline_text),
+                    farm_id=farm_id,
+                    approved_by=APPROVER,
+                    reference_date=REFERENCE,
+                    source_path="state_canonical.json",
+                    dry_run=False,
+                )
+                price = await session.scalar(
+                    select(Farm.milk_price_per_liter).where(Farm.id == farm_id)
+                )
+                assert float(price) == 2.59
+
+        _run(scenario)
+
+    def test_supply_import_is_idempotent(self, baseline_text: str) -> None:
+        async def scenario(factory) -> None:
+            async with factory() as session:
+                farm = await _fresh_farm(session, "Insumos idempotentes")
+                snapshot = parse_baseline(baseline_text)
+                kwargs = dict(
+                    farm_id=farm.id,
+                    approved_by=APPROVER,
+                    reference_date=REFERENCE,
+                    source_path="state_canonical.json",
+                    dry_run=False,
+                )
+                await import_baseline(session, snapshot, **kwargs)
+                second = await import_baseline(session, snapshot, **kwargs)
+
+                assert second.supplies_created == 0
+                assert second.supply_diets_created == 0
+                assert second.supply_prices_created == 0
+                total = await session.scalar(
+                    select(func.count()).select_from(Supply).where(Supply.farm_id == farm.id)
+                )
+                assert total == 4
+
+        _run(scenario)
+
+    def test_does_not_overwrite_a_milk_price_already_set(
+        self, baseline_text: str
+    ) -> None:
+        """Reimportar a baseline não pode desfazer um preço atualizado depois."""
+
+        async def scenario(factory) -> None:
+            async with factory() as session:
+                farm = await _fresh_farm(session, "Preço já ajustado")
+                farm_id = farm.id
+                farm.milk_price_per_liter = 3.10
+                await session.commit()
+
+                await import_baseline(
+                    session,
+                    parse_baseline(baseline_text),
+                    farm_id=farm_id,
+                    approved_by=APPROVER,
+                    reference_date=REFERENCE,
+                    source_path="state_canonical.json",
+                    dry_run=False,
+                )
+                price = await session.scalar(
+                    select(Farm.milk_price_per_liter).where(Farm.id == farm_id)
+                )
+                assert float(price) == 3.10
 
         _run(scenario)
