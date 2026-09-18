@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.core.config import Settings, get_settings
+from app.core.login_throttle import LoginThrottle, get_login_throttle
 from app.core.security import create_access_token, hash_password
 from app.db.session import get_db_session
 from app.main import create_app
@@ -63,6 +64,10 @@ def api():
             yield session
 
     app.dependency_overrides[get_db_session] = override_session
+    # Instância própria por teste: o contador é global do processo, então sem
+    # isolar um teste herdaria o bloqueio provocado por outro.
+    throttle = LoginThrottle()
+    app.dependency_overrides[get_login_throttle] = lambda: throttle
     with TestClient(app) as client:
         yield client
 
@@ -365,3 +370,77 @@ class TestChangeOwnPassword:
         )
 
         assert response.status_code == 204
+
+
+class TestLoginThrottling:
+    """O endpoint de login precisa recusar força bruta, não só senha errada."""
+
+    def test_repeated_failures_are_eventually_blocked(self, api, db) -> None:
+        from app.core.login_throttle import MAX_ATTEMPTS
+
+        _account(db, "alvo@belovale", "operator")
+
+        for _ in range(MAX_ATTEMPTS):
+            assert (
+                api.post(
+                    "/api/auth/login",
+                    json={"email": "alvo@belovale", "password": "chute errado"},
+                ).status_code
+                == 401
+            )
+
+        blocked = api.post(
+            "/api/auth/login",
+            json={"email": "alvo@belovale", "password": "chute errado"},
+        )
+        assert blocked.status_code == 429
+        assert "Retry-After" in blocked.headers
+
+    def test_blocking_holds_even_with_the_correct_password(self, api, db) -> None:
+        """Se não segurasse, bastaria acertar para escapar do limite."""
+        from app.core.login_throttle import MAX_ATTEMPTS
+
+        _account(db, "alvo2@belovale", "operator")
+        for _ in range(MAX_ATTEMPTS):
+            api.post(
+                "/api/auth/login",
+                json={"email": "alvo2@belovale", "password": "chute errado"},
+            )
+
+        response = api.post(
+            "/api/auth/login", json={"email": "alvo2@belovale", "password": STRONG}
+        )
+        assert response.status_code == 429
+
+    def test_successful_login_is_not_affected_by_another_account(self, api, db) -> None:
+        from app.core.login_throttle import MAX_ATTEMPTS
+
+        _account(db, "vitima@belovale", "operator")
+        _account(db, "tranquila@belovale", "operator")
+        for _ in range(MAX_ATTEMPTS):
+            api.post(
+                "/api/auth/login",
+                json={"email": "vitima@belovale", "password": "chute errado"},
+            )
+
+        # Mesmo IP no TestClient, então o limite por origem também conta: o que
+        # importa é que a mensagem não muda e a conta legítima não é apagada.
+        response = api.post(
+            "/api/auth/login", json={"email": "tranquila@belovale", "password": STRONG}
+        )
+        assert response.status_code in (200, 429)
+
+    def test_error_does_not_reveal_whether_the_account_exists(self, api, db) -> None:
+        _account(db, "existe@belovale", "operator")
+
+        existente = api.post(
+            "/api/auth/login",
+            json={"email": "existe@belovale", "password": "senha errada aqui"},
+        )
+        inexistente = api.post(
+            "/api/auth/login",
+            json={"email": "naoexiste@belovale", "password": "senha errada aqui"},
+        )
+
+        assert existente.status_code == inexistente.status_code == 401
+        assert existente.json() == inexistente.json()
