@@ -14,7 +14,7 @@ type UploadState =
   | { status: "idle" }
   | { status: "uploading" }
   | { status: "queued"; result: UploadResult }
-  | { status: "duplicate" }
+  | { status: "duplicate"; notice?: string }
   | { status: "reprocessing" }
   | { status: "error"; message: string };
 
@@ -58,7 +58,16 @@ export function UploadForm({ token, farmId, onUploaded }: UploadFormProps): JSX.
       const result = await reprocessImport(duplicateOfImportId, token);
       setState({ status: "queued", result });
       onUploaded?.(result);
-    } catch {
+    } catch (error) {
+      // A leitura da primeira foto ainda está rodando: a API recusa, com
+      // razão, reprocessar no meio. O aviso e o botão continuam na tela.
+      if (error instanceof ApiError && error.code === "import_already_processing") {
+        setState({
+          status: "duplicate",
+          notice: "A leitura desta foto ainda está em andamento. Aguarde alguns segundos e tente de novo.",
+        });
+        return;
+      }
       setState({ status: "error", message: "Não foi possível reprocessar a importação existente." });
     }
   };
@@ -106,6 +115,7 @@ export function UploadForm({ token, farmId, onUploaded }: UploadFormProps): JSX.
       {state.status !== "duplicate" && state.status !== "reprocessing" ? null : (
         <div role="alert" className="replacement-warning">
           <p>Esta foto já foi enviada anteriormente.</p>
+          {state.status === "duplicate" && state.notice ? <p>{state.notice}</p> : null}
           <button
             type="button"
             className="btn-ghost"

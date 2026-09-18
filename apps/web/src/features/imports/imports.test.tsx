@@ -153,4 +153,35 @@ describe("UploadForm", () => {
 
     globalThis.fetch = originalFetch;
   });
+
+  it("explains that the first reading is still running and keeps the retry at hand", async () => {
+    const user = userEvent.setup();
+    const originalFetch = globalThis.fetch;
+    const reply = (status: number, body: unknown) => ({
+      ok: status < 400,
+      status,
+      json: async () => body,
+    });
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        reply(409, { code: "duplicate_image", existing_import_id: "66666666-6666-6666-6666-666666666666" }),
+      )
+      .mockResolvedValueOnce(reply(409, { code: "import_already_processing" }))
+      .mockResolvedValueOnce(reply(202, { id: "66666666-6666-6666-6666-666666666666", status: "queued" })) as unknown as typeof fetch;
+
+    render(<UploadForm token="test-token" farmId="11111111-1111-1111-1111-111111111111" />);
+
+    await user.upload(screen.getByLabelText("Foto da ficha"), new File(["fake"], "sheet.jpg", { type: "image/jpeg" }));
+    await user.click(screen.getByRole("button", { name: "Enviar foto" }));
+    await user.click(await screen.findByRole("button", { name: "Reprocessar mesmo assim" }));
+
+    // A leitura da primeira foto ainda está em andamento: a tela diz isso e
+    // mantém o botão, em vez de obrigar a enviar a foto de novo.
+    expect(await screen.findByText(/ainda está em andamento/i)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Reprocessar mesmo assim" }));
+    expect(await screen.findByText(/Importação enviada/i)).toBeVisible();
+
+    globalThis.fetch = originalFetch;
+  });
 });

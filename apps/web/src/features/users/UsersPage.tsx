@@ -46,7 +46,7 @@ function until(iso: string): string {
 }
 
 const ROLE_LABEL: Record<string, string> = {
-  operator: "Operador — envia fichas e consulta",
+  operator: "Operador — lança a produção e consulta",
   reviewer: "Revisor — confere fichas e edita cadastro",
   admin: "Administrador — também gerencia contas",
 };
