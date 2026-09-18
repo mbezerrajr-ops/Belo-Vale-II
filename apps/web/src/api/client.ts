@@ -31,8 +31,39 @@ export async function login(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
+    // O refresh volta num cookie HttpOnly; sem isto o navegador o descarta.
+    credentials: "include",
   });
   return parseJsonOrThrow<LoginResult>(response);
+}
+
+/**
+ * Renova o token de acesso usando o cookie de sessão.
+ *
+ * O acesso dura pouco de propósito. Esta chamada é o que permite continuar
+ * trabalhando sem refazer login — o token nunca fica guardado por horas, e o
+ * cookie que o renova não é legível por JavaScript.
+ *
+ * Devolve `null` quando a sessão acabou, para a interface levar ao login sem
+ * tratar isso como erro inesperado.
+ */
+export async function refreshSession(): Promise<LoginResult | null> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    return null;
+  }
+  return parseJsonOrThrow<LoginResult>(response);
+}
+
+/** Encerra a sessão no servidor, não apenas no navegador. */
+export async function logout(): Promise<void> {
+  await fetch(`${API_BASE_URL}/api/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
 }
 
 export async function getCurrentUser(token: string): Promise<CurrentUser> {
