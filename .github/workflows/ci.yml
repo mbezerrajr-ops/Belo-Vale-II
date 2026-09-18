@@ -38,6 +38,8 @@ jobs:
       - name: Testes do scanner
         working-directory: tools
         run: python -m unittest test_credential_scan -v
+      - name: Dependências de leitura do PDF legado
+        run: pip install -r belo-vale-ii-projeto-completo/plataforma/requirements-import.txt
       - name: Contrato do estado canônico
         run: |
           python -m unittest belo-vale-ii-projeto-completo/testes/test_state_contract.py -v
