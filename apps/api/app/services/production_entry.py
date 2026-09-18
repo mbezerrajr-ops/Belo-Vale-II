@@ -16,12 +16,13 @@ Nada disso apaga linha: histórico de produção é prova, não rascunho.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.farm_clock import farm_today
 from app.db.models import Animal, AnimalLotAssignment, AuditEvent, OfficialMeasurement, User
 from app.services.lot_kind import KIND_DIET
 
@@ -29,15 +30,6 @@ from app.services.lot_kind import KIND_DIET
 #: certamente erro de digitação (215 em vez de 21,5); a maior produção da
 #: baseline é 37,5 L.
 MAX_LITERS = 80.0
-
-#: A fazenda fica no Nordeste, sem horário de verão desde 2019. Um fuso fixo
-#: evita depender da base de fusos do sistema operacional.
-FARM_TZ = timezone(timedelta(hours=-3), name="America/Recife")
-
-
-def farm_today() -> date:
-    """Hoje, no relógio da fazenda — não no do servidor."""
-    return datetime.now(FARM_TZ).date()
 
 
 class ProductionEntryError(ValueError):

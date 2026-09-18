@@ -7,19 +7,22 @@ autorização de domínio delegada ao navegador.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.farm_clock import farm_today
 from app.core.security import require_minimum_role
 from app.db.models import Animal, Farm, User
 from app.db.session import get_db_session
 from app.schemas.registry import (
     AnimalCreate,
     AnimalDetail,
+    AnimalExit,
+    AnimalExitUndo,
     AnimalPage,
     AnimalRead,
     AnimalUpdate,
@@ -36,6 +39,8 @@ from app.services.animal_registry import (
     current_lot,
     link_brinco,
     lot_history,
+    register_exit,
+    undo_exit,
     update_animal,
 )
 from app.services.brinco import normalize_brinco
@@ -147,10 +152,18 @@ async def list_animals(
     sem_brinco: bool = Query(
         default=False, description="Apenas animais sem brinco legível."
     ),
+    rebanho: Literal["ativos", "baixados", "todos"] = Query(
+        default="ativos",
+        description="Animais no rebanho, só os que tiveram baixa, ou todos.",
+    ),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> AnimalPage:
     filters = [Animal.farm_id == farm.id]
+    if rebanho == "ativos":
+        filters.append(Animal.exited_on.is_(None))
+    elif rebanho == "baixados":
+        filters.append(Animal.exited_on.is_not(None))
     if brinco:
         normalized = normalize_brinco(brinco)
         # Um termo ilegível não pode virar "qualquer coisa": não casa nada.
@@ -284,4 +297,57 @@ async def assign_lot_endpoint(
     except AnimalRegistryError as error:
         raise _conflict(error) from error
     animal = await _load_or_404(session, animal_id, farm.id)
+    return await _read_model(session, animal)
+
+
+@router.post("/animals/{animal_id}/exit", response_model=AnimalRead)
+async def register_exit_endpoint(
+    animal_id: UUID,
+    payload: AnimalExit,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    farm: Annotated[Farm, Depends(resolve_current_farm)],
+    user: Annotated[User, Depends(require_minimum_role("reviewer"))],
+) -> AnimalRead:
+    if payload.exited_on > farm_today():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="A data da baixa não pode ser no futuro.",
+        )
+    await _load_or_404(session, animal_id, farm.id)
+    try:
+        animal = await register_exit(
+            session,
+            animal_id=animal_id,
+            farm_id=farm.id,
+            actor=user.email,
+            exited_on=payload.exited_on,
+            reason=payload.reason,
+            notes=payload.notes,
+        )
+    except AnimalRegistryError as error:
+        await session.rollback()
+        raise _conflict(error) from error
+    return await _read_model(session, animal)
+
+
+@router.post("/animals/{animal_id}/exit/undo", response_model=AnimalRead)
+async def undo_exit_endpoint(
+    animal_id: UUID,
+    payload: AnimalExitUndo,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    farm: Annotated[Farm, Depends(resolve_current_farm)],
+    user: Annotated[User, Depends(require_minimum_role("reviewer"))],
+) -> AnimalRead:
+    await _load_or_404(session, animal_id, farm.id)
+    try:
+        animal = await undo_exit(
+            session,
+            animal_id=animal_id,
+            farm_id=farm.id,
+            actor=user.email,
+            reason=payload.reason,
+        )
+    except AnimalRegistryError as error:
+        await session.rollback()
+        raise _conflict(error) from error
     return await _read_model(session, animal)
