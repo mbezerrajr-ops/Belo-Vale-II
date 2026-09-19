@@ -192,6 +192,13 @@ Para chamadas diretas à API (sem passar pelo proxy do nginx):
   sugestão ("É esta"). Revisor ou administrador corrige os campos e aprova, ou
   rejeita com motivo; operador só vê. A contagem de pendentes aparece na
   navegação.
+  - **Filtrar por arquivo:** a fileira "Arquivos" tem um botão para cada
+    arquivo lido, com quantas propostas ele tem; "Todos" volta a mostrar tudo.
+  - **Trocar a data do arquivo:** quando o leitor erra a data do cabeçalho,
+    "Trocar data do arquivo" aplica a data certa a todas as pendentes dele de
+    uma vez (revisor ou administrador). "DEL", "ontem" e os alertas de data
+    se recalculam; data escrita na própria linha e propostas já decididas não
+    mudam. A data lida continua registrada, com quem corrigiu.
 - **Imprimir**: em Produção, "Imprimir folha em branco" gera a folha do lote
   para preencher no curral; em Animais, "Imprimir lista" imprime todos os
   animais do filtro.

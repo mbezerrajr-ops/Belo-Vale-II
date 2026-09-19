@@ -311,6 +311,34 @@ Decisões de implementação:
 - **Painel e folha de coleta ignoram animais com baixa.** A produção que eles
   deram antes da saída continua no banco e na série histórica.
 
+## Revisão por arquivo — decisões registradas
+
+- **Filtro por arquivo** na caixa de Revisão, pedido do titular (19/09/2026).
+- **Data do arquivo inteiro de uma vez.** A fonte lida continua imutável; a
+  migração `0011` acrescenta só `corrected_reference_date`, quem corrigiu e
+  quando, e o trigger aceita mudança apenas nessas colunas (a correção não
+  pode ser apagada). As pendentes são normalizadas de novo a partir do que
+  foi lido (`raw_fields`) com a nova data; os alertas sobre o animal (brinco,
+  nome) ficam como estavam. Cada proposta muda de versão: quem estava com o
+  cartão aberto recarrega antes de aprovar. Fica em `audit_events`
+  (`source_date_corrected`).
+
+## Resolvido: sair e recarregar reabria a sessão
+
+O botão Sair mostrava o login na hora e revogava a sessão no servidor sem
+esperar resposta. Se a página recarregasse logo em seguida (ou a aba fosse
+fechada), o pedido era cortado, e o cookie de sessão, ainda válido, reabria o
+app logado como quem tinha acabado de sair — num celular compartilhado, uma
+sessão viva sem ninguém saber. Achado pelo E2E, que falhava de forma
+intermitente ("Contas" e "senha provisória"). Agora o Sair apaga o token
+local, espera a revogação (até 5 s, para quem está sem rede) e só então mostra
+o login.
+
+A suíte E2E também falha se rodada várias vezes seguidas contra o mesmo
+Redis: os logins errados propositais acionam o limitador por origem ("Muitas
+tentativas de login"). É a proteção funcionando; recrie a pilha (`down -v`)
+entre rodadas locais, como o CI faz.
+
 ## Leitor local de folhas (fase 2, passo 1) — decisões registradas
 
 Decisões do titular em 19/09/2026, a partir da primeira folha real:

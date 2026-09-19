@@ -637,6 +637,20 @@ export async function approveProposal(
   return parseJsonOrThrow(response);
 }
 
+/** Troca a data de um arquivo lido: vale para todas as propostas pendentes dele. */
+export async function redateSource(
+  token: string,
+  sourceId: string,
+  referenceDate: string,
+): Promise<{ updated: number; kept_decided: number }> {
+  const response = await fetch(`${API_BASE_URL}/api/proposals/sources/${sourceId}/date`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ reference_date: referenceDate }),
+  });
+  return parseJsonOrThrow(response);
+}
+
 export async function rejectProposal(
   token: string,
   proposalId: string,

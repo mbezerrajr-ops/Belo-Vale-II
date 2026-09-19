@@ -485,7 +485,12 @@ export interface Proposal {
     id: string;
     kind: "photo" | "audio" | "text";
     label: string;
+    /** A data que vale: a corrigida por quem revisa, ou a lida. */
     reference_date: string | null;
+    /** A data como o leitor a leu no arquivo. */
+    reference_date_read: string | null;
+    /** Quem corrigiu a data do arquivo, se alguém corrigiu. */
+    corrected_by: string | null;
     extractor_name: string;
     created_at: string;
   };
