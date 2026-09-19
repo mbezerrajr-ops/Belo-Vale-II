@@ -2588,3 +2588,82 @@ button.danger {
   background: var(--danger);
   border-color: var(--danger);
 }
+
+/* ---------- revisão: filtro por arquivo e data do arquivo ---------- */
+
+/* Muitos arquivos: no celular a fileira rola de lado em vez de empilhar. */
+.file-filter {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 4px;
+}
+
+.file-filter button {
+  flex: 0 0 auto;
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 900px) {
+  .file-filter {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}
+
+.search-shortcuts .count {
+  display: inline-block;
+  min-width: 1.4em;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.search-shortcuts button[aria-pressed="true"] .count {
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  color: inherit;
+}
+
+.source-date {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.source-date .hint {
+  margin: 0;
+}
+
+.source-date-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.source-date-form label {
+  margin: 0;
+}
+
+.source-date-form input {
+  width: auto;
+  margin: 0;
+}
+
+.source-date-form small {
+  flex-basis: 100%;
+  color: var(--muted);
+}

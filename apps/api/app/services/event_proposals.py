@@ -31,6 +31,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.core.farm_clock import farm_today
 from app.db.models import (
@@ -334,15 +335,19 @@ class InboxItem:
     candidate: Animal | None
     suggestions: list[Animal]
     decided_by: str | None
+    #: Quem corrigiu a data do arquivo, quando foi corrigida.
+    corrected_by: str | None = None
 
 
 async def list_proposals(
     session: AsyncSession, *, farm_id: UUID, status: str, limit: int = 100
 ) -> list[InboxItem]:
+    corrector = aliased(User)
     query = (
-        select(EventProposal, EventProposalSource, User.email)
+        select(EventProposal, EventProposalSource, User.email, corrector.email)
         .join(EventProposalSource, EventProposalSource.id == EventProposal.source_id)
         .outerjoin(User, User.id == EventProposal.decided_by_user_id)
+        .outerjoin(corrector, corrector.id == EventProposalSource.corrected_by_user_id)
         .where(EventProposal.farm_id == farm_id, EventProposal.status == status)
     )
     if status == STATUS_PENDING:
@@ -354,7 +359,7 @@ async def list_proposals(
     animals = list(await session.scalars(select(Animal).where(Animal.farm_id == farm_id)))
     by_id = {animal.id: animal for animal in animals}
     items = []
-    for proposal, source, email in rows:
+    for proposal, source, email, corrected_by in rows:
         animal_id = proposal.applied_animal_id or proposal.candidate_animal_id
         candidate = by_id.get(animal_id) if animal_id else None
         items.append(
@@ -364,6 +369,7 @@ async def list_proposals(
                 candidate=candidate,
                 suggestions=[] if candidate else _suggestions(animals, proposal),
                 decided_by=email,
+                corrected_by=corrected_by,
             )
         )
     return items
@@ -496,6 +502,97 @@ def _audit(session, *, farm_id, actor, action, proposal, new) -> None:
             new_value=new,
         )
     )
+
+
+# ------------------------------------------------------- data do arquivo inteiro
+
+#: Alertas sobre quem é o animal: não dependem da data e sobrevivem à troca.
+#: Os primeiros vêm antes dos da leitura, os últimos depois (como na criação).
+_IDENTITY_FIRST = frozenset({"no_brinco", "animal_not_found", "brinco_variant"})
+_IDENTITY_LAST = frozenset({"name_mismatch", "animal_exited"})
+
+
+@dataclass
+class RedateResult:
+    updated: int
+    kept_decided: int
+
+
+async def redate_source(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    user: User,
+    source_id: UUID,
+    new_date: date,
+) -> RedateResult:
+    """Troca a data de um arquivo lido e recalcula as propostas pendentes.
+
+    Cada proposta é normalizada de novo a partir do que foi lido
+    (`raw_fields`, imutável) com a nova data de referência: produção sem data
+    própria vai para a nova data, "DEL 45" conta a partir dela, "ontem" também.
+    Data escrita na própria linha continua a da linha. Decididas não mudam.
+    A fonte guarda a data lida e a corrigida, com quem corrigiu. Não faz commit.
+    """
+    if new_date > farm_today():
+        raise ProposalInvalid(f"A data {new_date:%d/%m/%Y} está no futuro.")
+    source = await session.scalar(
+        select(EventProposalSource)
+        .where(EventProposalSource.id == source_id, EventProposalSource.farm_id == farm_id)
+        .with_for_update()
+    )
+    if source is None:
+        raise ProposalNotFound("Arquivo não encontrado.")
+    proposals = list(
+        await session.scalars(
+            select(EventProposal)
+            .where(EventProposal.source_id == source.id)
+            .order_by(EventProposal.position)
+            .with_for_update()
+        )
+    )
+
+    previous = source.effective_reference_date
+    updated = 0
+    for proposal in proposals:
+        if proposal.status != STATUS_PENDING:
+            continue
+        fields = {k: v for k, v in proposal.raw_fields.items() if k not in ("brinco", "nome")}
+        payload, reading_alerts = normalize_event(
+            proposal.event_type, fields, reference_date=new_date
+        )
+        old = proposal.alerts or []
+        proposal.payload = payload
+        proposal.alerts = (
+            [a for a in old if a.get("code") in _IDENTITY_FIRST]
+            + reading_alerts
+            + [a for a in old if a.get("code") in _IDENTITY_LAST]
+        )
+        # Quem estava com o cartão aberto com a data antiga precisa recarregar.
+        proposal.version += 1
+        updated += 1
+
+    source.corrected_reference_date = new_date
+    source.corrected_by_user_id = user.id
+    source.corrected_at = datetime.now(timezone.utc)
+    session.add(
+        AuditEvent(
+            farm_id=farm_id,
+            actor=user.email,
+            action="source_date_corrected",
+            entity_type="event_proposal_source",
+            entity_id=source.id,
+            previous_value={
+                "reference_date": previous.isoformat() if previous else None,
+                "reference_date_read": source.reference_date.isoformat()
+                if source.reference_date
+                else None,
+            },
+            new_value={"reference_date": new_date.isoformat(), "proposals_updated": updated},
+        )
+    )
+    await session.flush()
+    return RedateResult(updated=updated, kept_decided=len(proposals) - updated)
 
 
 async def approve_proposal(

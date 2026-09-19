@@ -485,6 +485,12 @@ class EventProposalSource(TimestampedModel, Base):
         CheckConstraint(
             "kind IN ('photo', 'audio', 'text')", name="ck_event_proposal_sources_kind"
         ),
+        CheckConstraint(
+            "(corrected_reference_date IS NULL AND corrected_by_user_id IS NULL AND corrected_at IS NULL)"
+            " OR (corrected_reference_date IS NOT NULL AND corrected_by_user_id IS NOT NULL"
+            " AND corrected_at IS NOT NULL)",
+            name="ck_event_proposal_sources_correction",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -500,6 +506,17 @@ class EventProposalSource(TimestampedModel, Base):
     created_by_user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
+    #: Data corrigida por quem revisa, quando o leitor errou a do cabeçalho.
+    #: `reference_date` continua sendo a que foi lida.
+    corrected_reference_date: Mapped[date | None] = mapped_column(Date)
+    corrected_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT")
+    )
+    corrected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    @property
+    def effective_reference_date(self) -> date | None:
+        return self.corrected_reference_date or self.reference_date
 
 
 class EventProposal(TimestampedModel, Base):

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   approveProposal,
   listProposals,
+  redateSource,
   rejectProposal,
   searchAnimals,
 } from "../../api/client";
@@ -43,6 +44,11 @@ type RejectFn = (
   reason: string,
 ) => Promise<void>;
 type SearchFn = (token: string, search: AnimalSearch) => Promise<AnimalPage>;
+type RedateFn = (
+  token: string,
+  sourceId: string,
+  referenceDate: string,
+) => Promise<{ updated: number; kept_decided: number }>;
 
 interface Props {
   token: string;
@@ -52,6 +58,7 @@ interface Props {
   onApprove?: ApproveFn;
   onReject?: RejectFn;
   onSearch?: SearchFn;
+  onRedate?: RedateFn;
   /** Chamado depois de cada decisão, para atualizar contadores. */
   onChanged?: () => void;
 }
@@ -487,6 +494,86 @@ function DecidedItem({ proposal }: { proposal: Proposal }): JSX.Element {
   );
 }
 
+/**
+ * Data do arquivo: a que vale para as propostas sem data própria. O leitor
+ * erra o cabeçalho (25/08/2026 lido como 2024); trocar aqui vale para todas
+ * as pendentes do arquivo de uma vez. A data lida continua registrada.
+ */
+function SourceDate({
+  source,
+  pending,
+  token,
+  canDecide,
+  onRedate,
+  onDone,
+}: {
+  source: Proposal["source"];
+  pending: number;
+  token: string;
+  canDecide: boolean;
+  onRedate: RedateFn;
+  onDone: () => void;
+}): JSX.Element | null {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(source.reference_date ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const corrected =
+    source.corrected_by !== null && source.reference_date_read !== source.reference_date;
+  const inputId = `source-date-${source.id}`;
+
+  async function apply(): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      await onRedate(token, source.id, value);
+      setEditing(false);
+      onDone();
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!corrected && !canDecide) return null;
+  return (
+    <div className="source-date">
+      {corrected && (
+        <p className="hint">
+          Data corrigida — lida como{" "}
+          {source.reference_date_read ? brDate(source.reference_date_read) : "ilegível"}, corrigida
+          por {source.corrected_by}.
+        </p>
+      )}
+      {canDecide && !editing && (
+        <button type="button" className="link-btn" onClick={() => setEditing(true)}>
+          Trocar data do arquivo
+        </button>
+      )}
+      {canDecide && editing && (
+        <div className="source-date-form">
+          <label htmlFor={inputId}>Nova data do arquivo</label>
+          <input
+            id={inputId}
+            type="date"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+          />
+          <button type="button" disabled={!value || busy} onClick={() => void apply()}>
+            Aplicar às {pending} {pending === 1 ? "pendente" : "pendentes"}
+          </button>
+          <button type="button" className="link-btn" onClick={() => setEditing(false)}>
+            Cancelar
+          </button>
+          <small>Aprovadas e rejeitadas não mudam. Data escrita na própria linha também não.</small>
+          {error && <p role="alert">{error}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ReviewInbox({
   token,
   canDecide,
@@ -494,9 +581,12 @@ export function ReviewInbox({
   onApprove = approveProposal,
   onReject = rejectProposal,
   onSearch = searchAnimals,
+  onRedate = redateSource,
   onChanged,
 }: Props): JSX.Element {
   const [tab, setTab] = useState<ProposalStatus>("pending");
+  // Filtro por arquivo: null = todos.
+  const [sourceId, setSourceId] = useState<string | null>(null);
   const [items, setItems] = useState<Proposal[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -515,18 +605,27 @@ export function ReviewInbox({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, tab]);
 
-  const groups: { label: string; kind: string; date: string | null; items: Proposal[] }[] = [];
+  // Um botão por arquivo, na ordem em que aparecem, com quantas propostas têm.
+  const files: { id: string; label: string; count: number }[] = [];
   for (const item of items ?? []) {
-    const last = groups[groups.length - 1];
-    if (last && last.items[0].source.id === item.source.id) last.items.push(item);
-    else
-      groups.push({
-        label: item.source.label,
-        kind: item.source.kind,
-        date: item.source.reference_date,
-        items: [item],
-      });
+    const file = files.find((entry) => entry.id === item.source.id);
+    if (file) file.count += 1;
+    else files.push({ id: item.source.id, label: item.source.label, count: 1 });
   }
+  const selected = sourceId !== null && files.some((file) => file.id === sourceId) ? sourceId : null;
+  const visible = (items ?? []).filter((item) => selected === null || item.source.id === selected);
+
+  const groups: { source: Proposal["source"]; items: Proposal[] }[] = [];
+  for (const item of visible) {
+    const last = groups[groups.length - 1];
+    if (last && last.source.id === item.source.id) last.items.push(item);
+    else groups.push({ source: item.source, items: [item] });
+  }
+
+  const afterChange = (): void => {
+    void reload("pending");
+    onChanged?.();
+  };
 
   return (
     <section className="review-inbox">
@@ -549,6 +648,24 @@ export function ReviewInbox({
         ))}
       </div>
 
+      {files.length > 0 && (
+        <div className="search-shortcuts file-filter" role="group" aria-label="Arquivos">
+          <button type="button" aria-pressed={selected === null} onClick={() => setSourceId(null)}>
+            Todos <span className="count">{items?.length ?? 0}</span>
+          </button>
+          {files.map((file) => (
+            <button
+              key={file.id}
+              type="button"
+              aria-pressed={selected === file.id}
+              onClick={() => setSourceId(file.id)}
+            >
+              {file.label} <span className="count">{file.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {!canDecide && tab === "pending" && (
         <p className="hint">Um revisor aprova estas propostas.</p>
       )}
@@ -565,15 +682,23 @@ export function ReviewInbox({
 
       {tab === "pending" &&
         groups.map((group) => (
-          <div key={group.items[0].source.id} className="proposal-group">
+          <div key={group.source.id} className="proposal-group">
             <h3>
-              {group.label}
+              {group.source.label}
               <small>
-                {SOURCE_LABEL[group.kind] ?? group.kind}
-                {group.date ? ` · ${brDate(group.date)}` : ""} · {group.items.length}{" "}
-                {group.items.length === 1 ? "evento" : "eventos"}
+                {SOURCE_LABEL[group.source.kind] ?? group.source.kind}
+                {group.source.reference_date ? ` · ${brDate(group.source.reference_date)}` : ""} ·{" "}
+                {group.items.length} {group.items.length === 1 ? "evento" : "eventos"}
               </small>
             </h3>
+            <SourceDate
+              source={group.source}
+              pending={group.items.length}
+              token={token}
+              canDecide={canDecide}
+              onRedate={onRedate}
+              onDone={afterChange}
+            />
             {group.items.map((item) => (
               <ProposalCard
                 key={`${item.id}-${item.version}`}
@@ -583,10 +708,7 @@ export function ReviewInbox({
                 onApprove={onApprove}
                 onReject={onReject}
                 onSearch={onSearch}
-                onDone={() => {
-                  void reload("pending");
-                  onChanged?.();
-                }}
+                onDone={afterChange}
               />
             ))}
           </div>
@@ -594,7 +716,7 @@ export function ReviewInbox({
 
       {tab !== "pending" && items !== null && items.length > 0 && (
         <ul className="decided-list">
-          {items.map((item) => (
+          {visible.map((item) => (
             <DecidedItem key={item.id} proposal={item} />
           ))}
         </ul>

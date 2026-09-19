@@ -20,15 +20,21 @@ test.describe.configure({ mode: "serial" });
 const TAG = runTag();
 const LABEL = `caderno ${TAG}`;
 const DAY = daysAgo(2);
+// Folha cuja data o leitor errou: uns dois anos antes (como 2026 lido 2024).
+const SHEET_LABEL = `folha ${TAG}`;
+const WRONG_DAY = daysAgo(2 + 731);
+const br = (iso: string): string => iso.split("-").reverse().join("/");
 
 let withBrinco: { brinco: string; name: string };
 let onlyName: { brinco: string; name: string };
+let sheetCow: { brinco: string; name: string };
 
 test.beforeAll(() => {
   ensureAdminExists();
   ensureFarm();
   withBrinco = createMilkingCow(`${TAG}R`);
   onlyName = createMilkingCow(`${TAG}S`);
+  sheetCow = createMilkingCow(`${TAG}T`);
   loadProposals(
     {
       extractor_name: "e2e",
@@ -50,6 +56,21 @@ test.beforeAll(() => {
       ],
     },
     LABEL,
+  );
+  loadProposals(
+    {
+      extractor_name: "e2e",
+      reference_date: WRONG_DAY,
+      events: [
+        {
+          event_type: "production",
+          brinco: sheetCow.brinco,
+          fields: { producao: "12", parcelas: "7 + 5" },
+          evidence: { text: `${sheetCow.brinco} 7 + 5 = 12` },
+        },
+      ],
+    },
+    SHEET_LABEL,
   );
 });
 
@@ -93,4 +114,26 @@ test("observação só com o nome exige escolher o animal", async ({ page }) => 
   const decided = page.locator(".decided-item", { hasText: onlyName.name });
   await expect(decided).toContainText("mancando da pata traseira");
   await expect(decided).toContainText("Aprovada por e2e@belovale.test");
+});
+
+test("filtra por arquivo e troca a data do arquivo inteiro", async ({ page }) => {
+  await loginAsAdmin(page);
+  await openArea(page, /Revisão/);
+
+  const files = page.getByRole("group", { name: "Arquivos" });
+  await files.getByRole("button", { name: new RegExp(SHEET_LABEL) }).click();
+  await expect(page.getByRole("heading", { name: new RegExp(LABEL) })).toHaveCount(0);
+
+  const card = page.getByRole("article", { name: `Produção — ${sheetCow.brinco}` });
+  await expect(card).toContainText("ordenhas 7 + 5");
+  await expect(card).toContainText("mais de 6 meses");
+
+  await page.getByRole("button", { name: "Trocar data do arquivo" }).click();
+  await page.getByLabel("Nova data do arquivo").fill(DAY);
+  await page.getByRole("button", { name: /Aplicar às 1 pendente/ }).click();
+
+  const heading = page.getByRole("heading", { name: new RegExp(SHEET_LABEL) });
+  await expect(heading).toContainText(br(DAY));
+  await expect(page.getByText(`lida como ${br(WRONG_DAY)}`, { exact: false })).toBeVisible();
+  await expect(card).not.toContainText("mais de 6 meses");
 });

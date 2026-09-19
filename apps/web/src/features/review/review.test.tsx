@@ -39,6 +39,8 @@ function proposal(overrides: Partial<Proposal> = {}): Proposal {
       kind: "photo",
       label: "caderno de 25/08",
       reference_date: "2026-08-25",
+      reference_date_read: "2026-08-25",
+      corrected_by: null,
       extractor_name: "teste",
       created_at: "2026-09-18T10:00:00Z",
     },
@@ -72,6 +74,7 @@ function setup(
   const onApprove = vi.fn().mockResolvedValue({ id: "p-1", status: "approved", result: {} });
   const onReject = vi.fn().mockResolvedValue(undefined);
   const onSearch = vi.fn().mockResolvedValue({ items: [], total: 0, limit: 25, offset: 0 });
+  const onRedate = vi.fn().mockResolvedValue({ updated: 1, kept_decided: 0 });
   const onChanged = vi.fn();
   render(
     <ReviewInbox
@@ -81,11 +84,12 @@ function setup(
       onApprove={onApprove}
       onReject={onReject}
       onSearch={onSearch}
+      onRedate={onRedate}
       onChanged={onChanged}
       {...props}
     />,
   );
-  return { onList, onApprove, onReject, onSearch, onChanged };
+  return { onList, onApprove, onReject, onSearch, onRedate, onChanged };
 }
 
 async function card(): Promise<HTMLElement> {
@@ -101,7 +105,7 @@ describe("ReviewInbox", () => {
     setup();
 
     const item = await card();
-    expect(screen.getByText("caderno de 25/08")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /caderno de 25\/08/ })).toBeInTheDocument();
     expect(within(item).getByText("389 Ágata 215")).toBeInTheDocument();
     expect(within(item).getByText(/fora do plausível/i)).toBeInTheDocument();
     expect(within(item).getByText("ÁGATA")).toBeInTheDocument();
@@ -312,5 +316,78 @@ describe("ReviewInbox", () => {
     expect(await screen.findByText(/maria@belovale/)).toBeInTheDocument();
     expect(screen.getByText(/Data da coleta: 25\/08\/2026 · Litros: 21,5 L/)).toBeInTheDocument();
     expect(onList).toHaveBeenLastCalledWith(TOKEN, "approved");
+  });
+});
+
+function fromSource(id: string, label: string, overrides: Partial<Proposal> = {}): Proposal {
+  const base = proposal();
+  return proposal({
+    id: `p-${id}-${overrides.position ?? 1}`,
+    source: { ...base.source, id, label },
+    ...overrides,
+  });
+}
+
+describe("ReviewInbox — arquivos", () => {
+  it("tem um botão para cada arquivo, que filtra a revisão", async () => {
+    setup({}, [
+      fromSource("s-1", "Folha 3º lote", { brinco_lido: "389" }),
+      fromSource("s-1", "Folha 3º lote", { brinco_lido: "853", position: 2 }),
+      fromSource("s-2", "Áudio do Zé", { brinco_lido: "701" }),
+    ]);
+
+    const files = await screen.findByRole("group", { name: "Arquivos" });
+    expect(within(files).getByRole("button", { name: /todos.*3/i })).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(within(files).getByRole("button", { name: /áudio do zé.*1/i }));
+
+    expect(screen.queryByRole("article", { name: /389/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("article", { name: /701/ })).toBeInTheDocument();
+
+    fireEvent.click(within(files).getByRole("button", { name: /todos/i }));
+    expect(screen.getAllByRole("article")).toHaveLength(3);
+  });
+
+  it("troca a data do arquivo inteiro de uma vez", async () => {
+    const { onRedate, onList, onChanged } = setup({}, [
+      fromSource("s-1", "Folha 3º lote", { brinco_lido: "389" }),
+      fromSource("s-1", "Folha 3º lote", { brinco_lido: "853", position: 2 }),
+    ]);
+
+    fireEvent.click(await screen.findByRole("button", { name: /trocar data do arquivo/i }));
+    fireEvent.change(screen.getByLabelText(/nova data do arquivo/i), {
+      target: { value: "2026-08-26" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /aplicar às 2 pendentes/i }));
+    });
+
+    expect(onRedate).toHaveBeenCalledWith(TOKEN, "s-1", "2026-08-26");
+    expect(onList).toHaveBeenCalledTimes(2);
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("mostra a data lida e quem corrigiu", async () => {
+    const base = proposal();
+    setup({}, [
+      proposal({
+        source: {
+          ...base.source,
+          reference_date: "2026-08-25",
+          reference_date_read: "2024-08-25",
+          corrected_by: "maria@belovale",
+        },
+      }),
+    ]);
+
+    await card();
+    expect(screen.getByText(/lida como 25\/08\/2024.*maria@belovale/i)).toBeInTheDocument();
+  });
+
+  it("operador não troca a data", async () => {
+    setup({ canDecide: false });
+
+    await card();
+    expect(screen.queryByRole("button", { name: /trocar data do arquivo/i })).not.toBeInTheDocument();
   });
 });
