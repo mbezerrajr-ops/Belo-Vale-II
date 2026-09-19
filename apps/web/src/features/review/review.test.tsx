@@ -108,6 +108,19 @@ describe("ReviewInbox", () => {
     expect(within(item).getByText(/confiança baixa/i)).toBeInTheDocument();
   });
 
+  it("mostra as ordenhas lidas da folha de pesagem, para conferir a conta", async () => {
+    setup({}, [
+      proposal({
+        payload: { measured_on: "2026-08-25", producao: 9.5 },
+        raw_fields: { brinco: "016", nome: "BELMONTE", producao: "9,5", parcelas: "5 + 4" },
+        alerts: [{ code: "sum_mismatch", message: "As ordenhas não fecham: 5 + 4 = 9, mas o total lido é 9,5 L." }],
+      }),
+    ]);
+
+    const item = await card();
+    expect(within(item).getByText(/ordenhas 5 \+ 4/)).toBeInTheDocument();
+  });
+
   it("revisor corrige os litros e aprova", async () => {
     const { onApprove, onChanged } = setup();
 

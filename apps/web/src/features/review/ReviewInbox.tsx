@@ -262,6 +262,8 @@ function ProposalCard({
   const readText = [
     proposal.brinco_lido ? `brinco ${proposal.brinco_lido}` : null,
     proposal.nome_lido ? `nome ${proposal.nome_lido}` : null,
+    // Folha de pesagem: manhã + tarde, para conferir o total lido.
+    proposal.raw_fields.parcelas ? `ordenhas ${proposal.raw_fields.parcelas}` : null,
   ]
     .filter(Boolean)
     .join(" · ");

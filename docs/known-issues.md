@@ -311,6 +311,28 @@ Decisões de implementação:
 - **Painel e folha de coleta ignoram animais com baixa.** A produção que eles
   deram antes da saída continua no banco e na série histórica.
 
+## Leitor local de folhas (fase 2, passo 1) — decisões registradas
+
+Decisões do titular em 19/09/2026, a partir da primeira folha real:
+
+- **Brinco com prefixo:** o caderno traz "694", o cadastro tem "B2-694" (68
+  animais têm B1-/B2-). O sistema **sugere, nunca associa sozinho**
+  (alerta `brinco_variant`). Vale também para zero à esquerda ("011" ↔
+  "B2-11"). O cadastro não foi alterado.
+- **"→ SECAR" é uma ordem para secar**, não o registro de que secou: vira
+  proposta de secagem com a data da folha e o alerta `dry_off_order` para
+  confirmar a data real.
+- **"4 + 3 = 7" é manhã + tarde = total diário.** Grava-se o total; as
+  ordenhas só conferem a leitura (alerta `sum_mismatch`).
+- **Nome parecido é sugestão, não divergência.** "PAETENHA" no brinco da
+  PRETINHA não gera `name_mismatch` (semelhança ≥ 0,6); um nome diferente
+  gera, porque o brinco pode ter sido mal lido e cair noutra vaca.
+- **Data com mais de 6 meses** gera `old_date`: o modelo leu o ano do
+  cabeçalho errado na primeira folha.
+- **Ainda não feito:** envio da foto pelo app (hoje a leitura entra por
+  comando), corrigir a data de uma folha inteira de uma vez na revisão, e
+  mostrar a imagem ao lado das propostas.
+
 ## Caixa de revisão (fase 1, sem leitura automática) — decisões registradas
 
 - **Toda leitura vira proposta, nunca dado direto.** Foto, áudio e texto

@@ -59,3 +59,50 @@ e está isolado (`app/vision/provider.py::HttpVisionProvider`) — trocar de
 provedor não deveria exigir mudanças em `run_extraction`, `extraction_processing.py`
 ou em qualquer camada acima do adaptador, já que todos consomem apenas o
 contrato `VisionExtraction`/`VisionLine`.
+
+## Leitor local de folhas (Ollama) — fase 2, passo 1
+
+**Comprovado em uma folha real; ainda não ligado ao app.** Roda só na
+máquina da fazenda (decisão do titular: nenhuma foto sai para provedor
+externo). `ensure_local_url` recusa qualquer endereço que não seja loopback,
+rede privada ou nome de serviço interno.
+
+- Código: `app/vision/pages.py` (PDF/foto → páginas) e
+  `app/vision/sheet_reader.py` (transcrição pelo modelo + tradução em eventos
+  sem IA). A saída entra na caixa de Revisão pelo mesmo contrato da fase 1.
+- Modelo: `qwen2.5vl:7b` no Ollama 0.34, AMD RX 7600 (100% GPU, ~5,5 GB),
+  instrução `folha-v2`, página reduzida a 1200 px.
+- Nota: `python -m app.core.evaluate_reader --samples <pasta>` compara com os
+  gabaritos (`<nome>.gabarito.json`). Amostras em `docs/Treinamento-VC/`,
+  fora do Git.
+
+### Primeira folha real (19/09/2026)
+
+"PESAGEM DO LEITE 25/08/2026 3º LOTE", 18 linhas manuscritas. Gabarito
+ainda em rascunho (a confirmar pelo titular).
+
+| | v1 (1600 px) | v2 (1200 px) |
+|---|---|---|
+| tempo | 121 s | 43 s |
+| linhas perdidas / inventadas | 0 / 0 | 0 / 0 |
+| brinco | 11/18 | 13/18 |
+| nome | 5/18 | 8/18 |
+| manhã / tarde / total | 16 / 18 / 17 | 17 / 17 / 17 |
+| anotação | 15/18 | 16/18 |
+| data do cabeçalho | errada (2024) | errada |
+
+O que chega à revisão (leitura v2 + cruzamento com o cadastro): as 18
+produções têm a vaca certa associada ou entre as sugestões — 17 associadas ou
+em primeiro lugar —, e **nenhuma foi associada à vaca errada**. Os brincos mal
+lidos (4↔1, 4↔9) não existem no cadastro; o nome, mesmo torto, e o brinco a
+um dígito de distância recuperam a vaca como sugestão.
+
+**Limites conhecidos:**
+
+- A data do cabeçalho não é confiável (25/08/2026 lida como 2024 ou como
+  26/08). Data com mais de 6 meses gera alerta `old_date`; um dia trocado
+  não é detectável — o revisor confere a data da folha.
+- Leituras erradas mas coerentes (3 + 5 = 8 no lugar de 3 + 2 = 5) passam
+  pela conferência de soma; só o revisor vê.
+- Resultado de uma folha só: não serve para comparar modelos. Precisa de
+  mais amostras com gabarito.

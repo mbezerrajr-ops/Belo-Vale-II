@@ -202,7 +202,9 @@ Enquanto os leitores de foto e áudio (locais, sem provedor externo) não
 existem, uma extração em JSON entra pela mesma porta que eles vão usar:
 
 ```bash
-docker compose --env-file infra/.env -f infra/docker-compose.yml exec -T api   uv run --no-sync python -m app.core.load_proposals   --email revisor@fazenda --file - --kind photo --label "caderno de 25/08" < extracao.json
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec -T api \
+  uv run --no-sync python -m app.core.load_proposals \
+  --email revisor@fazenda --file - --kind photo --label "caderno de 25/08" < extracao.json
 ```
 
 `--file -` lê da entrada padrão; fora do contêiner, passe o caminho do
@@ -211,6 +213,40 @@ arquivo. O formato é o de `EventExtraction.to_raw`
 `events` com `event_type`, `brinco`, `nome`, `fields`, `evidence` e
 `confidence`. Um arquivo inválido é recusado inteiro (código de saída 2), sem
 gravar nada.
+
+### Leitor local de folhas (visão computacional, sem provedor externo)
+
+O modelo roda no Ollama da própria máquina. No Windows ele roda fora do
+Docker, porque o Docker não repassa GPU AMD:
+
+```powershell
+winget install --id Ollama.Ollama -e --source winget
+ollama pull qwen2.5vl:7b
+ollama ps        # PROCESSOR deve mostrar "100% GPU" durante uma leitura
+```
+
+O Ollama escuta só em `127.0.0.1:11434`. A API lê `READER_URL` (padrão
+`http://127.0.0.1:11434`) e `READER_MODEL` (padrão `qwen2.5vl:7b`), e
+recusa endereço que não seja da máquina ou da rede interna.
+
+**Dar nota ao leitor.** Coloque a foto ou o PDF em `docs/Treinamento-VC/`
+(fora do Git) com o gabarito ao lado (`<nome>.gabarito.json`, no formato da
+transcrição: `data`, `lote` e `linhas` com `seq`, `brinco`, `nome`, `manha`,
+`tarde`, `total`, `anotacao`):
+
+```bash
+cd apps/api
+uv run python -m app.core.evaluate_reader --samples ../../docs/Treinamento-VC
+```
+
+O comando mostra os acertos por campo e grava ao lado de cada amostra a
+transcrição (`.transcricao.json`) e os eventos (`.leitura.json`). Para ver a
+leitura na caixa de Revisão:
+
+```bash
+uv run python -m app.core.load_proposals --email revisor@fazenda \
+  --file "../../docs/Treinamento-VC/<nome>.leitura.json" --kind photo --label "<nome>"
+```
 
 ## 7. Rodar os testes de backend
 
