@@ -95,12 +95,22 @@ class Score:
     errors: list[tuple[str, str, Any, Any]] = field(default_factory=list)
 
 
+def _lote_number(value: Any) -> str | None:
+    """"3º LOTE", "3º" e "Lote 3" viram "3"."""
+    digits = "".join(c for c in str(value or "") if c.isdigit())
+    return digits or None
+
+
 def _key(line: dict[str, Any], index: int) -> str:
-    """Identidade da linha para alinhar leitura e gabarito. A página entra
-    porque cada folha recomeça a numeração em 1."""
+    """Identidade da linha para alinhar leitura e gabarito.
+
+    Cada folha recomeça a numeração em 1, então a página entra na chave — mas
+    pelo LOTE escrito nela, não pela posição: no PDF de 25/08 as páginas estão
+    fora de ordem (3º lote, 1º, 2º) e a planilha vem na ordem dos lotes.
+    """
     seq = line.get("seq")
     numero = str(seq).strip() if seq not in (None, "") else f"#{index + 1}"
-    pagina = line.get("pagina")
+    pagina = _lote_number(line.get("lote_pagina")) or line.get("pagina")
     return f"{pagina}.{numero}" if pagina else numero
 
 

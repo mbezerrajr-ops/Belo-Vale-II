@@ -174,6 +174,10 @@ Para chamadas diretas à API (sem passar pelo proxy do nginx):
   próxima. Quem entra como operador abre direto nesta área.
 - **Corrigir ou anular** um valor já lançado: revisor ou administrador, sempre
   com motivo. A versão anterior continua no banco (`superseded` ou `voided`).
+- **Tirar o brinco** (revisor ou administrador, na ficha do animal): para o
+  brinco que caiu da orelha ou que estava na vaca errada. Exige evidência, como
+  vincular. O número fica livre para a vaca certa, e esta deixa de receber
+  leitura automática até ganhar outro.
 - **Dar baixa** (venda, morte, descarte, doação): revisor ou administrador, na
   ficha do animal. Encerra o lote na data e tira o animal do painel; a
   produção já lançada fica. "Desfazer baixa" traz o animal de volta sem lote.

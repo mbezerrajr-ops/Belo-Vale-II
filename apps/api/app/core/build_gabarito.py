@@ -95,6 +95,7 @@ def rows_to_gabarito(rows: list[dict[str, Any]], *, data: str) -> dict[str, Any]
         lines.append(
             {
                 "pagina": page,
+                "lote_pagina": lote,
                 "seq": str(numbers[lote]),
                 "brinco": brinco,
                 "nome": nome,

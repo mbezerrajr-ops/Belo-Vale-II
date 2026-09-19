@@ -30,6 +30,34 @@ TRUTH = {
 }
 
 
+class TestPageAlignment:
+    """O PDF de 25/08 traz as páginas fora de ordem (3º lote, 1º, 2º), e a
+    planilha vem na ordem dos lotes. Alinhar por posição compararia o 3º lote
+    com o 1º; o lote escrito no cabeçalho de cada página resolve."""
+
+    def test_pages_are_matched_by_the_lote_of_each_page(self) -> None:
+        truth = {"data": "25/08/2026", "lote": "1º Lote", "linhas": [
+            {**_line("1", "518", "PRINCESA", "20", "17,5", "37,5"), "pagina": 1, "lote_pagina": "1º Lote"},
+            {**_line("1", "853", "PRETINHA", "4", "3", "7"), "pagina": 3, "lote_pagina": "3º Lote"},
+        ]}
+        reading = {"data": "25/08/26", "lote": "3º", "linhas": [
+            {**_line("1", "853", "PRETINHA", "4", "3", "7"), "pagina": 1, "lote_pagina": "3º"},
+            {**_line("1", "518", "PRINCESA", "20", "17,5", "37,5"), "pagina": 2, "lote_pagina": "1º"},
+        ]}
+
+        score = compare(reading, truth)
+
+        assert score.missed == 0
+        assert score.correct["nome"] == 2
+
+    def test_without_the_lote_the_page_number_is_used(self) -> None:
+        truth = {"data": "25/08/2026", "lote": None, "linhas": [
+            {**_line("1", "853", "PRETINHA", "4", "3", "7"), "pagina": 1},
+        ]}
+
+        assert compare(truth, truth).missed == 0
+
+
 class TestCompare:
     def test_a_perfect_reading_scores_everything(self) -> None:
         score = compare(TRUTH, TRUTH)

@@ -342,9 +342,15 @@ do Git):
     20/09/2026 — a produção de 22/07 foi anulada com motivo na ficha errada e
     lançada na vaca certa (`measurement_voided` + `manual_entry` em
     `audit_events`). A ficha duplicada continua no cadastro, vazia.
-  - **BRANQUINHA: pendente.** A planilha de 25/08 escreve 649, que no cadastro
-    é a REDONDA; a folha de 22/07 diz 549 ou 519. Falta o titular dizer qual é
-    o brinco dela antes de mover a produção de 22/07 (21,5 L).
+  - **BRANQUINHA: resolvido** em 20/09/2026, por decisão do titular. A folha
+    de 25/08 traz "649 BRANQUINHA" no 2º lote **e** "649 REDONDA" no 3º — o
+    mesmo número para duas vacas, no mesmo dia (a planilha copiou a folha
+    fielmente; o conflito é da anotação). O titular confirmou que o 649 é da
+    BRANQUINHA. Aplicado, nesta ordem: o 649 foi **tirado** da REDONDA (que
+    fica sem brinco até ser conferida no curral, com a produção dela
+    preservada), passou para a BRANQUINHA (antes B2-549), e os 21,5 L de
+    22/07 saíram da ficha duplicada sem brinco (nº antigo 519) para ela.
+    **Pendente:** ler no curral o brinco da REDONDA.
 - **Dígito ambíguo, não ficha duplicada:** o número escrito difere do brinco
   por um dígito (ARIZONA 1901 × 1001, BRUNA 473 × 433, FUMAÇA 491 × 441,
   PRINCESA 518 × 548). É a letra de quem anota.
@@ -353,6 +359,11 @@ Isto responde, com evidência independente, parte dos "27 pares candidatos por
 nome normalizado" registrados acima na reconciliação da baseline: lá eles
 ficaram separados por falta de prova; a planilha conferida de 25/08 é essa
 prova para SAIA BRANCA e MEIAS BRANCA.
+
+Números repetidos na própria folha não são raros: só em 25/08 apareceram
+cinco (016 em BORBOLETA e BELMONTE, 544 em XENA e PITUDA, 649 em BRANQUINHA e
+REDONDA, 652 em ASA BRANCA duas vezes, 732 em PRAUNA e PACIÊNCIA). Por isso o
+brinco lido nunca associa sozinho quando o nome desmente.
 
 Ainda falta um jeito de juntar duas fichas no sistema (histórico e auditoria);
 hoje a correção é anular e relançar, uma medição por vez.

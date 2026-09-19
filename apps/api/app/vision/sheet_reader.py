@@ -339,7 +339,10 @@ class OllamaSheetReader:
             "_formato": first.get("_formato"),
             # A página vai junto: cada folha recomeça a numeração em 1.
             "linhas": [
-                {"pagina": number, **line}
+                # O lote escrito na página acompanha a linha: é por ele que a
+                # leitura se alinha ao gabarito, já que as páginas de um PDF
+                # podem vir fora da ordem dos lotes.
+                {"pagina": number, "lote_pagina": reading.get("lote"), **line}
                 for number, reading in enumerate(readings, start=1)
                 for line in reading["linhas"]
             ],
