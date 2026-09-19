@@ -53,6 +53,7 @@ from app.services.event_proposals import (
 from app.services.production_files import parse_number_br
 from app.vision.sheet_reader import (
     OllamaSheetReader,
+    ReaderFormatError,
     ReaderUnavailable,
     sheet_to_events,
     tidy_transcription,
@@ -95,8 +96,12 @@ class Score:
 
 
 def _key(line: dict[str, Any], index: int) -> str:
+    """Identidade da linha para alinhar leitura e gabarito. A página entra
+    porque cada folha recomeça a numeração em 1."""
     seq = line.get("seq")
-    return str(seq).strip() if seq not in (None, "") else f"#{index + 1}"
+    numero = str(seq).strip() if seq not in (None, "") else f"#{index + 1}"
+    pagina = line.get("pagina")
+    return f"{pagina}.{numero}" if pagina else numero
 
 
 def compare(reading: dict[str, Any], truth: dict[str, Any]) -> Score:
@@ -418,6 +423,10 @@ def main(
         except ReaderUnavailable as error:
             print(f"erro: {error}", file=sys.stderr)
             return 2
+        except ReaderFormatError as error:
+            # Uma folha ilegível não pode derrubar a nota das outras.
+            print(f"-- {sample.name}: leitura recusada ({error})")
+            continue
         # A nota é do que chega à revisão: depois das correções óbvias.
         tidy = tidy_transcription(reading)
         if args.records_date is None:

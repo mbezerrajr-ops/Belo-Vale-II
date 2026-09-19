@@ -21,6 +21,7 @@ não seja a própria máquina ou a rede interna.
 from __future__ import annotations
 
 import base64
+import io
 import ipaddress
 import json
 import re
@@ -30,6 +31,8 @@ import urllib.request
 from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlsplit
+
+from PIL import Image
 
 from app.services.event_extraction import EventExtraction, ExtractedEvent
 from app.services.event_normalization import parse_event_date
@@ -41,7 +44,8 @@ EXTRACTOR_NAME = "leitor-local-folha"
 PROMPT_VERSION = "folha-v6"
 
 #: Contexto do modelo: imagem + instrução + a transcrição de uma folha cheia.
-CONTEXT_TOKENS = 8192
+#: Uma folha de 48 linhas não cabia em 8192 e a resposta vinha cortada.
+CONTEXT_TOKENS = 12288
 
 #: Semente fixa: com temperatura 0 a GPU ainda pode trocar um token entre
 #: rodadas e mudar a leitura inteira; a semente deixa a mesma foto dar a
@@ -51,12 +55,23 @@ SEED = 0
 #: Resolução da segunda leitura, quando a primeira sai incoerente.
 RETRY_MAX_SIDE = 1000
 
+#: Tempo de uma página inteira. Estourou: a folha é longa (48 linhas na do 1º
+#: lote) e a resposta inteira não sai; então ela é lida em faixas.
+PAGE_TIMEOUT = 240.0
+
+#: Sobreposição entre as faixas, para nenhuma linha cair no corte.
+BAND_OVERLAP = 0.08
+
 #: A primeira leitura carrega o modelo na memória de vídeo; pode demorar.
 DEFAULT_TIMEOUT = 600.0
 
 
 class ReaderUnavailable(RuntimeError):
     """O leitor local não respondeu (desligado, sem modelo, sem memória)."""
+
+
+class ReaderTimeout(ReaderUnavailable):
+    """A leitura passou do tempo: folha longa demais para uma resposta só."""
 
 
 class ReaderFormatError(ValueError):
@@ -228,7 +243,9 @@ class OllamaSheetReader:
     def version(self) -> str:
         return f"{self.model}/{PROMPT_VERSION}"
 
-    def _chat(self, *, prompt: str, schema: dict[str, Any], image: bytes) -> Any:
+    def _chat(
+        self, *, prompt: str, schema: dict[str, Any], image: bytes, timeout: float | None = None
+    ) -> Any:
         body = {
             "model": self.model,
             "stream": False,
@@ -247,8 +264,10 @@ class OllamaSheetReader:
             ],
         }
         try:
-            reply = self._post(f"{self.url}/api/chat", body, self.timeout)
-        except (OSError, urllib.error.URLError, TimeoutError) as error:
+            reply = self._post(f"{self.url}/api/chat", body, timeout or self.timeout)
+        except TimeoutError as error:
+            raise ReaderTimeout(f"O leitor passou do tempo em {self.url}: {error}") from error
+        except (OSError, urllib.error.URLError) as error:
             raise ReaderUnavailable(f"Leitor local indisponível em {self.url}: {error}") from error
         try:
             return json.loads(reply["message"]["content"])
@@ -262,15 +281,36 @@ class OllamaSheetReader:
         layout = answer.get("formato") if isinstance(answer, dict) else None
         return layout if layout in LAYOUTS else "impresso"
 
-    def transcribe_page(self, image_jpeg: bytes, layout: str | None = None) -> dict[str, Any]:
+    def transcribe_page(
+        self, image_jpeg: bytes, layout: str | None = None, *, timeout: float | None = None
+    ) -> dict[str, Any]:
         layout = layout or self.classify_page(image_jpeg)
-        transcription = self._chat(prompt=PROMPTS[layout], schema=SCHEMAS[layout], image=image_jpeg)
+        transcription = self._chat(
+            prompt=PROMPTS[layout], schema=SCHEMAS[layout], image=image_jpeg, timeout=timeout
+        )
         _check_transcription(transcription)
         return {
             **transcription,
             "_formato": layout,
             "linhas": [_from_model_keys(line) for line in transcription["linhas"]],
         }
+
+    def _bands(self, image_jpeg: bytes, layout: str) -> dict[str, Any]:
+        """Folha longa: lida em duas faixas com sobreposição. Cada resposta é
+        curta o bastante para sair no tempo; as linhas se juntam pelo número
+        impresso, que a sobreposição repete."""
+        readings = [
+            self.transcribe_page(band, layout) for band in _split_bands(image_jpeg)
+        ]
+        return merge_bands(readings)
+
+    def _page(self, image_jpeg: bytes, layout: str) -> dict[str, Any]:
+        try:
+            return self.transcribe_page(image_jpeg, layout, timeout=PAGE_TIMEOUT)
+        except (ReaderTimeout, ReaderFormatError):
+            # Tempo estourado ou resposta cortada: a folha é longa demais para
+            # uma resposta só.
+            return self._bands(image_jpeg, layout)
 
     def transcribe(self, content: bytes) -> dict[str, Any]:
         """Todas as páginas numa transcrição só, sob o cabeçalho da primeira.
@@ -284,11 +324,11 @@ class OllamaSheetReader:
         readings = []
         for index, page in enumerate(pages):
             layout = self.classify_page(page.content)
-            reading = self.transcribe_page(page.content, layout)
+            reading = self._page(page.content, layout)
             if _needs_retry(reading):
                 if retry_pages is None:
                     retry_pages = load_pages(content, max_side=RETRY_MAX_SIDE)
-                second = self.transcribe_page(retry_pages[index].content, layout)
+                second = self._page(retry_pages[index].content, layout)
                 if incoherence(second) < incoherence(reading):
                     reading = second
             readings.append(reading)
@@ -297,7 +337,12 @@ class OllamaSheetReader:
             "data": first.get("data") or next((r.get("data") for r in readings if r.get("data")), None),
             "lote": first.get("lote") or next((r.get("lote") for r in readings if r.get("lote")), None),
             "_formato": first.get("_formato"),
-            "linhas": [line for reading in readings for line in reading["linhas"]],
+            # A página vai junto: cada folha recomeça a numeração em 1.
+            "linhas": [
+                {"pagina": number, **line}
+                for number, reading in enumerate(readings, start=1)
+                for line in reading["linhas"]
+            ],
         }
 
     def extract(self, content: bytes, *, kind: str) -> EventExtraction:
@@ -396,6 +441,42 @@ def tidy_transcription(transcription: dict[str, Any]) -> dict[str, Any]:
             line = {**line, "anotacao": None}
         lines.append(line)
     return {**transcription, "linhas": lines}
+
+
+def _split_bands(image_jpeg: bytes, overlap: float = BAND_OVERLAP) -> list[bytes]:
+    """Metade de cima e metade de baixo, com sobreposição."""
+    with Image.open(io.BytesIO(image_jpeg)) as image:
+        height = image.height
+        cut = int(height * (0.5 + overlap))
+        bands = [(0, 0, image.width, cut), (0, height - cut, image.width, height)]
+        out = []
+        for box in bands:
+            buffer = io.BytesIO()
+            image.crop(box).save(buffer, format="JPEG", quality=90)
+            out.append(buffer.getvalue())
+        return out
+
+
+def merge_bands(readings: list[dict[str, Any]]) -> dict[str, Any]:
+    """Junta as faixas de uma página: a linha repetida na sobreposição entra
+    uma vez só, valendo a primeira leitura dela."""
+    lines: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for reading in readings:
+        for line in reading.get("linhas") or []:
+            key = _clean(line.get("seq")) or ""
+            if key and key in seen:
+                continue
+            if key:
+                seen.add(key)
+            lines.append(line)
+    first = readings[0] if readings else {}
+    return {
+        **first,
+        "data": next((r.get("data") for r in readings if r.get("data")), None),
+        "lote": next((r.get("lote") for r in readings if r.get("lote")), None),
+        "linhas": lines,
+    }
 
 
 def incoherence(transcription: dict[str, Any]) -> int:
