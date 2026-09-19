@@ -325,14 +325,37 @@ Decisões de implementação:
   associação continua pelo brinco, com alerta, e a vaca do nome aparece em
   "Ou é esta", a um toque. Nada é trocado sozinho.
 
-## Pendente: vacas duplicadas no cadastro
+## Nomes repetidos no cadastro: o que é duplicata e o que não é
 
-Ao comparar as folhas de 22/07/2026 com o banco apareceram vacas com duas
-fichas — uma com brinco e outra sem — e a medição do dia na ficha sem brinco:
-SAIA BRANCA (861), TIETA (964), BRANQUINHA (B2-549), FAÍSCA (434), entre
-outras. Uma leitura certa do brinco cai na ficha sem histórico. Resolver exige
-decidir, vaca a vaca, qual ficha fica (e juntar o histórico), com auditoria —
-decisão do titular.
+26 nomes aparecem em duas (ou mais) fichas, uma com brinco e outra sem. A
+planilha conferida de 25/08/2026 desempatou (ver `docs/Treinamento-VC/`, fora
+do Git):
+
+- **Na maioria são vacas diferentes com o mesmo nome.** Em 15 casos o número
+  da planilha é o brinco da ficha que tem brinco, e a outra ficha está seca ou
+  sem nenhuma medição (NEBLINA 767 × nº antigo 635, SURUBIM 846 × 474,
+  TIETA 964 × 10, MAÇA 663 × 702...). Nada a fazer.
+- **Duplicata de verdade** quando as duas fichas têm o mesmo nome e números
+  parecidos, e a medição caiu na ficha sem brinco porque o número escrito na
+  folha bateu com o "número antigo" da outra ficha:
+  - SAIA BRANCA (861 × 862) e MEIAS BRANCA (448 × 498): **resolvido** em
+    20/09/2026 — a produção de 22/07 foi anulada com motivo na ficha errada e
+    lançada na vaca certa (`measurement_voided` + `manual_entry` em
+    `audit_events`). A ficha duplicada continua no cadastro, vazia.
+  - **BRANQUINHA: pendente.** A planilha de 25/08 escreve 649, que no cadastro
+    é a REDONDA; a folha de 22/07 diz 549 ou 519. Falta o titular dizer qual é
+    o brinco dela antes de mover a produção de 22/07 (21,5 L).
+- **Dígito ambíguo, não ficha duplicada:** o número escrito difere do brinco
+  por um dígito (ARIZONA 1901 × 1001, BRUNA 473 × 433, FUMAÇA 491 × 441,
+  PRINCESA 518 × 548). É a letra de quem anota.
+
+Isto responde, com evidência independente, parte dos "27 pares candidatos por
+nome normalizado" registrados acima na reconciliação da baseline: lá eles
+ficaram separados por falta de prova; a planilha conferida de 25/08 é essa
+prova para SAIA BRANCA e MEIAS BRANCA.
+
+Ainda falta um jeito de juntar duas fichas no sistema (histórico e auditoria);
+hoje a correção é anular e relançar, uma medição por vez.
 
 ## Revisão por arquivo — decisões registradas
 
