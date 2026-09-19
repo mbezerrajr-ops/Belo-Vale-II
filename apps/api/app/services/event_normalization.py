@@ -32,6 +32,9 @@ from app.services.production_files import parse_number_br
 
 EVENT_TYPES = ("production", "calving", "dry_off", "exit", "lot_change", "note")
 
+#: Data mais antiga que isto (em dias) vira alerta para conferir o ano.
+OLD_DATE_DAYS = 180
+
 #: Palavras de baixa, sem acento e em minúsculas, para o motivo fechado.
 _EXIT_WORDS: tuple[tuple[str, str], ...] = (
     ("vend", "venda"),
@@ -128,13 +131,22 @@ def _date_field(
         if reference is None:
             alerts.add("missing_field", f"Sem {label}. Informe na revisão.", target)
             return None
-        return reference.isoformat()
-    parsed = parse_event_date(raw, reference=reference)
-    if parsed is None:
-        alerts.add("illegible_field", f"{label.capitalize()} ilegível: “{raw}”.", target)
-        return None
-    if parsed > farm_today():
+        parsed = reference
+    else:
+        parsed = parse_event_date(raw, reference=reference)
+        if parsed is None:
+            alerts.add("illegible_field", f"{label.capitalize()} ilegível: “{raw}”.", target)
+            return None
+    today = farm_today()
+    if parsed > today:
         alerts.add("future_date", f"{label.capitalize()} no futuro: {parsed:%d/%m/%Y}.", target)
+    elif (today - parsed).days > OLD_DATE_DAYS:
+        # O ano é o que o leitor mais erra no cabeçalho (2026 lido como 2024).
+        alerts.add(
+            "old_date",
+            f"{label.capitalize()} de mais de 6 meses atrás: {parsed:%d/%m/%Y}. Confira o ano.",
+            target,
+        )
     return parsed.isoformat()
 
 
@@ -155,7 +167,37 @@ def _production(fields, reference, alerts) -> dict[str, Any]:
             f"{raw} L está fora do plausível (0 a {MAX_LITERS:g}). Confira a leitura.",
             "producao",
         )
+    raw_parts = _first(fields, "parcelas")
+    if raw_parts is not None and producao is not None:
+        _check_milkings(raw_parts, producao, alerts)
     return {"measured_on": measured_on, "producao": producao}
+
+
+def _fmt_liters(value: float) -> str:
+    return f"{value:g}".replace(".", ",")
+
+
+def _check_milkings(raw_parts: str, total: float, alerts: _Alerts) -> None:
+    """Folha de pesagem: "manhã + tarde = total". Grava-se o total; as
+    parcelas só conferem a leitura. Soma que não fecha → alerta, sem escolher
+    qual dos números está certo."""
+    parts = [parse_number_br(part) for part in raw_parts.split("+")]
+    if len(parts) < 2 or any(part is None for part in parts):
+        alerts.add(
+            "sum_mismatch",
+            f"Ordenhas ilegíveis: “{raw_parts}”. Confira o total de {_fmt_liters(total)} L.",
+            "producao",
+        )
+        return
+    soma = sum(parts)  # type: ignore[arg-type]
+    if abs(soma - total) > 0.01:
+        conta = " + ".join(_fmt_liters(part) for part in parts)  # type: ignore[arg-type]
+        alerts.add(
+            "sum_mismatch",
+            f"As ordenhas não fecham: {conta} = {_fmt_liters(soma)}, "
+            f"mas o total lido é {_fmt_liters(total)} L. Confira a leitura.",
+            "producao",
+        )
 
 
 def _calving(fields, reference, alerts) -> dict[str, Any]:
@@ -184,12 +226,19 @@ def _calving(fields, reference, alerts) -> dict[str, Any]:
 
 
 def _dry_off(fields, reference, alerts) -> dict[str, Any]:
-    return {
-        "dried_on": _date_field(
-            fields, ("data",), reference=reference,
-            target="dried_on", alerts=alerts, label="data da secagem",
+    dried_on = _date_field(
+        fields, ("data",), reference=reference,
+        target="dried_on", alerts=alerts, label="data da secagem",
+    )
+    if _first(fields, "ordem") is not None:
+        # "→ SECAR" na folha é uma ordem, não o registro de que secou: a data
+        # da folha é só ponto de partida (decisão do titular, 19/09/2026).
+        alerts.add(
+            "dry_off_order",
+            "Ordem de secagem na folha. Confirme a data em que a vaca foi secada.",
+            "dried_on",
         )
-    }
+    return {"dried_on": dried_on}
 
 
 def _exit(fields, reference, alerts) -> dict[str, Any]:

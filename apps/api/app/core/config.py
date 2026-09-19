@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     vision_api_url: str | None = None
     vision_api_key: SecretStr | None = None
     vision_model_name: str = "unconfigured"
+    #: Leitor local de folhas (Ollama). Só aceita endereço da própria máquina
+    #: ou da rede interna — ver `app.vision.sheet_reader.ensure_local_url`.
+    reader_url: str = "http://127.0.0.1:11434"
+    reader_model: str = "qwen2.5vl:7b"
     auth_secret: SecretStr | None = None
     auth_token_ttl_seconds: int = Field(default=900, ge=60, le=86_400)
     #: Validade da sessão renovável, em segundos. Padrão de 30 dias.
