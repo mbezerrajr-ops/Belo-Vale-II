@@ -100,6 +100,33 @@ describe("App", () => {
     expect(await screen.findByRole("button", { name: /fichas/i })).toBeInTheDocument();
   });
 
+  it("sair só mostra o login depois que o servidor encerrou a sessão", async () => {
+    // Regressão: a revogação saía sem esperar resposta; recarregar a página
+    // logo depois cortava o pedido, e o cookie ainda válido reabria a sessão
+    // de quem tinha acabado de sair.
+    signedIn({ role: "operator" });
+    let finish: () => void = () => {};
+    api.logout.mockReturnValue(new Promise<void>((resolve) => (finish = resolve)));
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /sair/i }));
+
+    expect(api.logout).toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /entrar/i })).not.toBeInTheDocument();
+    finish();
+    expect(await screen.findByRole("button", { name: /entrar/i })).toBeInTheDocument();
+  });
+
+  it("sair funciona mesmo se o servidor não responder", async () => {
+    signedIn({ role: "operator" });
+    api.logout.mockRejectedValue(new Error("sem rede"));
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /sair/i }));
+
+    expect(await screen.findByRole("button", { name: /entrar/i })).toBeInTheDocument();
+  });
+
   it("senha provisória leva direto à troca, sem acesso ao resto", async () => {
     signedIn({ must_change_password: true });
     api.changeOwnPassword.mockResolvedValue(undefined);

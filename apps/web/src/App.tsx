@@ -37,6 +37,9 @@ type SessionState =
   | { status: "signed-out" }
   | { status: "signed-in"; token: string; user: CurrentUser };
 
+/** Quanto esperar o servidor encerrar a sessão antes de sair mesmo assim. */
+const LOGOUT_WAIT_MS = 5_000;
+
 export function App(): JSX.Element {
   const [session, setSession] = useState<SessionState>({ status: "checking" });
 
@@ -120,13 +123,18 @@ export function App(): JSX.Element {
     setSession({ status: "signed-in", token, user });
   };
 
-  const handleLogout = (): void => {
+  const handleLogout = async (): Promise<void> => {
     // Revoga no servidor: apagar o token só do navegador deixaria a sessão
-    // viva para quem tivesse o cookie.
-    void endSession().catch(() => {
-      // Mesmo se a chamada falhar, o acesso local é encerrado.
-    });
+    // viva para quem tivesse o cookie. E *espera* a revogação antes de mostrar
+    // o login: se a página recarregasse no meio, o pedido seria cortado e o
+    // cookie ainda válido reabriria a sessão de quem acabou de sair.
     clearStoredToken();
+    await Promise.race([
+      endSession().catch(() => {
+        // Sem resposta do servidor, o acesso local é encerrado mesmo assim.
+      }),
+      new Promise((resolve) => window.setTimeout(resolve, LOGOUT_WAIT_MS)),
+    ]);
     setSession({ status: "signed-out" });
   };
 
@@ -153,7 +161,7 @@ export function App(): JSX.Element {
             </span>
           </span>
           <div className="who">
-            <button type="button" className="link-btn" onClick={handleLogout}>
+            <button type="button" className="link-btn" onClick={() => void handleLogout()}>
               <Icons.logout /> Sair
             </button>
           </div>
@@ -215,7 +223,7 @@ export function App(): JSX.Element {
     <AuthenticatedApp
       token={session.token}
       user={session.user}
-      onLogout={handleLogout}
+      onLogout={() => void handleLogout()}
     />
   );
 }
