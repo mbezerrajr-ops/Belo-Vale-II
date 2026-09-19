@@ -19,6 +19,13 @@ from app.services.event_normalization import (
 REF = date(2026, 8, 25)
 
 
+@pytest.fixture(autouse=True)
+def _farm_today(monkeypatch):
+    """Hoje fixo: os alertas de data (futura, antiga) não podem depender do
+    dia em que a suíte roda."""
+    monkeypatch.setattr("app.services.event_normalization.farm_today", lambda: date(2026, 9, 19))
+
+
 def _codes(alerts) -> list[str]:
     return [alert["code"] for alert in alerts]
 
@@ -78,11 +85,55 @@ class TestProduction:
         assert payload["producao"] == 215.0
         assert "implausible_value" in _codes(alerts)
 
+    def test_a_date_years_ago_is_flagged(self) -> None:
+        """Na primeira folha real o modelo leu "25/08/2026" como 2024: as 18
+        produções iriam para dois anos atrás. Data velha vira alerta."""
+        payload, alerts = normalize_event(
+            "production", {"producao": "7"}, reference_date=date(2024, 8, 25)
+        )
+
+        assert payload["measured_on"] == "2024-08-25"
+        [alert] = [a for a in alerts if a["code"] == "old_date"]
+        assert "25/08/2024" in alert["message"]
+
+    def test_a_recent_date_is_not_flagged(self) -> None:
+        _, alerts = normalize_event("production", {"producao": "7"}, reference_date=REF)
+
+        assert alerts == []
+
     def test_without_any_date_the_field_is_empty(self) -> None:
         payload, alerts = normalize_event("production", {"producao": "20"}, reference_date=None)
 
         assert payload["measured_on"] is None
         assert "missing_field" in _codes(alerts)
+
+    def test_the_two_milkings_that_add_up_raise_no_alert(self) -> None:
+        """Folha de pesagem: "5,5 + 4 = 9,5" — manhã + tarde = total. Grava o
+        total; as parcelas servem para conferir a leitura."""
+        payload, alerts = normalize_event(
+            "production", {"producao": "9,5", "parcelas": "5,5 + 4"}, reference_date=REF
+        )
+
+        assert payload == {"measured_on": "2026-08-25", "producao": 9.5}
+        assert alerts == []
+
+    def test_milkings_that_do_not_add_up_are_flagged(self) -> None:
+        """4 + 3 = 9 não fecha: ou uma parcela ou o total foi mal lido."""
+        payload, alerts = normalize_event(
+            "production", {"producao": "9", "parcelas": "4 + 3"}, reference_date=REF
+        )
+
+        assert payload["producao"] == 9.0
+        [alert] = [a for a in alerts if a["code"] == "sum_mismatch"]
+        assert "4 + 3 = 7" in alert["message"]
+        assert alert["field"] == "producao"
+
+    def test_illegible_milkings_are_flagged(self) -> None:
+        _, alerts = normalize_event(
+            "production", {"producao": "7", "parcelas": "4 + ?"}, reference_date=REF
+        )
+
+        assert "sum_mismatch" in _codes(alerts)
 
 
 class TestCalving:
@@ -165,6 +216,14 @@ class TestDryOffAndNote:
         payload, _ = normalize_event("dry_off", {"data": "ontem"}, reference_date=REF)
 
         assert payload == {"dried_on": "2026-08-24"}
+
+    def test_dry_off_order_on_the_sheet_asks_to_confirm_the_date(self) -> None:
+        """"→ SECAR" na folha é uma ordem: a data da folha é só um ponto de
+        partida; quem revisa confirma quando a vaca foi de fato secada."""
+        payload, alerts = normalize_event("dry_off", {"ordem": "secar"}, reference_date=REF)
+
+        assert payload == {"dried_on": "2026-08-25"}
+        assert _codes(alerts) == ["dry_off_order"]
 
     def test_note_keeps_the_text(self) -> None:
         payload, alerts = normalize_event(

@@ -19,6 +19,8 @@ desfaz as duas.
 
 from __future__ import annotations
 
+import difflib
+import re
 import unicodedata
 import uuid
 from dataclasses import dataclass
@@ -152,12 +154,26 @@ async def create_proposals(
                 },
             )
         elif candidate is None:
-            alerts.insert(
-                0,
-                {"code": "animal_not_found", "message": f"Nenhum animal com o brinco {brinco}."},
-            )
+            variants = brinco_variants(animals, brinco, event.nome)
+            if variants:
+                listed = ", ".join(f"{a.brinco} · {a.name or '—'}" for a in variants)
+                alerts.insert(
+                    0,
+                    {
+                        "code": "brinco_variant",
+                        "message": f"Nenhum animal com o brinco {brinco}, mas no cadastro existe "
+                        f"{listed}. Confirme se é o mesmo animal.",
+                    },
+                )
+            else:
+                alerts.insert(
+                    0,
+                    {"code": "animal_not_found", "message": f"Nenhum animal com o brinco {brinco}."},
+                )
         else:
-            if event.nome and _fold(event.nome) != _fold(candidate.name):
+            # Grafia torta do mesmo nome ("PAETENHA" / PRETINHA) não é
+            # divergência; outro nome é — o brinco pode ter sido mal lido.
+            if event.nome and name_similarity(event.nome, candidate.name) < SIMILAR_NAME:
                 alerts.append(
                     {
                         "code": "name_mismatch",
@@ -196,16 +212,118 @@ async def create_proposals(
 # ---------------------------------------------------------------- listagem
 
 
+_PREFIX = re.compile(r"^B\d+-")
+
+
+def _brinco_core(brinco: str) -> str:
+    """"B2-011" → "11"; "694" → "694". Só para sugerir, nunca para associar."""
+    core = _PREFIX.sub("", brinco)
+    return core.lstrip("0") or core
+
+
+def brinco_variants(animals: list[Animal], brinco: str | None, nome: str | None = None) -> list[Animal]:
+    """Cadastros cujo brinco difere do lido só por prefixo (B1-, B2-) ou
+    zeros à esquerda: "694" ↔ "B2-694", "011" ↔ "B2-11".
+
+    O caderno costuma trazer só o número. Brinco é identidade, então isto é
+    só sugestão — quem revisa confirma (decisão do titular, 19/09/2026). O
+    nome lido, quando bate, põe o animal na frente.
+    """
+    if not brinco:
+        return []
+    wanted = _brinco_core(brinco)
+    if not wanted.isdigit():
+        return []
+    found = [
+        a for a in animals
+        if a.brinco and a.brinco != brinco and _brinco_core(a.brinco) == wanted
+    ]
+    folded = _fold(nome)
+    return sorted(found, key=lambda a: (_fold(a.name) != folded, a.exited_on is not None, a.brinco))
+
+
+#: A partir de quanto um nome lido "parece" o do cadastro (0 a 1). Medido na
+#: primeira folha real: os nomes mal lidos ficaram entre 0,67 e 0,89 do nome
+#: certo ("PAETENHA" → PRETINHA 0,75), e o certo foi sempre o mais parecido.
+SIMILAR_NAME = 0.6
+
+
+def name_similarity(read: str | None, registered: str | None) -> float:
+    a, b = _fold(read), _fold(registered)
+    if not a or not b:
+        return 0.0
+    return difflib.SequenceMatcher(None, a, b).ratio()
+
+
+def _one_digit_off(read: str | None, registered: str | None) -> bool:
+    """"619" e "B2-649": mesmo tamanho, um dígito diferente — o erro típico
+    de leitura de manuscrito (4↔1, 4↔9, 7↔8)."""
+    if not read or not registered:
+        return False
+    a, b = _brinco_core(read), _brinco_core(registered)
+    return (
+        len(a) == len(b)
+        and a.isdigit()
+        and b.isdigit()
+        and sum(x != y for x, y in zip(a, b, strict=True)) == 1
+    )
+
+
 def name_suggestions(animals: list[Animal], nome: str | None, *, limit: int = 5) -> list[Animal]:
-    """Animais cujo nome bate com o lido. Só sugestão: quem revisa escolhe."""
+    """Animais cujo nome bate com o lido — igual, contido ou parecido
+    ("SASIA" → SABIÁ). Só sugestão: quem revisa escolhe."""
     wanted = _fold(nome)
     if not wanted:
         return []
     exact = [a for a in animals if _fold(a.name) == wanted]
     partial = [a for a in animals if a not in exact and wanted in _fold(a.name)]
-    ranked = sorted(exact, key=lambda a: a.exited_on is not None) + sorted(
-        partial, key=lambda a: a.exited_on is not None
+    similar = sorted(
+        (
+            a for a in animals
+            if a not in exact and a not in partial and name_similarity(nome, a.name) >= SIMILAR_NAME
+        ),
+        key=lambda a: -name_similarity(nome, a.name),
     )
+    ranked = (
+        sorted(exact, key=lambda a: a.exited_on is not None)
+        + sorted(partial, key=lambda a: a.exited_on is not None)
+        + similar
+    )
+    return ranked[:limit]
+
+
+#: Nome só "meio parecido" conta quando o brinco também está a um dígito.
+_WEAK_NAME = 0.45
+
+
+def _suggestions(animals: list[Animal], proposal: EventProposal, *, limit: int = 5) -> list[Animal]:
+    """Ordem das sugestões, do sinal mais forte ao mais fraco:
+
+    1. mesmo número com outro prefixo ("694" → B2-694), se o nome lido não o
+       desmente;
+    2. nomes parecidos — e nome meio parecido com brinco a um dígito
+       ("619 NEODA" → B2-649 REDONDA) —, o brinco próximo desempatando;
+    3. variantes de prefixo que o nome lido desmente (B2-619 MARIPOZA).
+    """
+    brinco = normalize_brinco(proposal.brinco_lido)
+    nome = proposal.nome_lido
+
+    def score(animal: Animal) -> float:
+        return name_similarity(nome, animal.name) + (0.15 if _one_digit_off(brinco, animal.brinco) else 0)
+
+    pool = name_suggestions(animals, nome, limit=len(animals)) + [
+        a for a in animals
+        if _one_digit_off(brinco, a.brinco) and name_similarity(nome, a.name) >= _WEAK_NAME
+    ]
+    by_name = sorted(pool, key=lambda a: (-score(a), a.exited_on is not None))
+    variants = brinco_variants(animals, brinco, nome)
+    confirmed = [a for a in variants if not nome or name_similarity(nome, a.name) >= SIMILAR_NAME]
+    contradicted = [a for a in variants if a not in confirmed]
+
+    ranked: list[Animal] = []
+    for animal in confirmed + by_name + contradicted:
+        if animal not in ranked:
+            ranked.append(animal)
     return ranked[:limit]
 
 
@@ -244,7 +362,7 @@ async def list_proposals(
                 proposal=proposal,
                 source=source,
                 candidate=candidate,
-                suggestions=[] if candidate else name_suggestions(animals, proposal.nome_lido),
+                suggestions=[] if candidate else _suggestions(animals, proposal),
                 decided_by=email,
             )
         )

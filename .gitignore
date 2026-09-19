@@ -15,3 +15,6 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+
+# Amostras reais da fazenda (fotos, áudios, gabaritos e leituras): nunca no Git.
+docs/Treinamento-VC/

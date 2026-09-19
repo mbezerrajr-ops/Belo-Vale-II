@@ -40,6 +40,13 @@ from tests.pg_support import (  # noqa: F401 — fixtures
 REF = date(2026, 8, 25)
 
 
+@pytest.fixture(autouse=True)
+def _farm_today(monkeypatch):
+    """Hoje fixo: os alertas de data (futura, antiga) não podem depender do
+    dia em que a suíte roda."""
+    monkeypatch.setattr("app.services.event_normalization.farm_today", lambda: date(2026, 9, 19))
+
+
 @pytest.fixture()
 def farm(db) -> str:
     return make_farm()
@@ -142,6 +149,120 @@ class TestCreation:
         item = _inbox(api, reviewer).json()[0]
         assert item["candidate"] is None
         assert any(a["code"] == "animal_not_found" for a in item["alerts"])
+
+    def test_a_prefixed_brinco_is_suggested_but_never_associated(self, api, farm) -> None:
+        """No caderno está "694"; no cadastro, "B2-694". Pode ser o mesmo
+        animal — mas brinco é identidade: o sistema sugere, quem revisa
+        confirma (decisão do titular, 19/09/2026)."""
+        _, reviewer = make_user("reviewer")
+        cow = make_animal(farm, brinco="B2-694", name="ANDORINHA", lote="LOTE 3")
+
+        [proposal] = _load(farm, "reviewer@belovale", _event("production", "694", "Andorinha", producao="7"))
+
+        assert one("SELECT candidate_animal_id FROM event_proposals WHERE id = :p", p=proposal) == [(None,)]
+        item = _inbox(api, reviewer).json()[0]
+        assert item["candidate"] is None
+        assert [s["id"] for s in item["name_suggestions"]] == [cow]
+        [alert] = [a for a in item["alerts"] if a["code"] == "brinco_variant"]
+        assert "B2-694" in alert["message"]
+        assert not any(a["code"] == "animal_not_found" for a in item["alerts"])
+
+    def test_leading_zeros_also_find_the_prefixed_brinco(self, api, farm) -> None:
+        """"011" no caderno, "B2-11" no cadastro (DOMINÓ)."""
+        _, reviewer = make_user("reviewer")
+        cow = make_animal(farm, brinco="B2-11", name="DOMINÓ", lote="LOTE 3")
+
+        _load(farm, "reviewer@belovale", _event("production", "011", "Domino", producao="7"))
+
+        item = _inbox(api, reviewer).json()[0]
+        assert [s["id"] for s in item["name_suggestions"]] == [cow]
+        assert any(a["code"] == "brinco_variant" for a in item["alerts"])
+
+    def test_the_variant_whose_name_matches_comes_first(self, api, farm) -> None:
+        """Dois cadastros com o mesmo número: o nome lido desempata a ordem
+        das sugestões — e só a ordem."""
+        _, reviewer = make_user("reviewer")
+        other = make_animal(farm, brinco="B1-419", name="ESTRELA", lote="LOTE 1")
+        cow = make_animal(farm, brinco="B2-419", name="VIAJANTE", lote="LOTE 3")
+
+        _load(farm, "reviewer@belovale", _event("production", "419", "Viajante", producao="7"))
+
+        item = _inbox(api, reviewer).json()[0]
+        assert [s["id"] for s in item["name_suggestions"]][:2] == [cow, other]
+
+    def test_an_exact_brinco_is_not_confused_with_a_variant(self, api, farm) -> None:
+        _, reviewer = make_user("reviewer")
+        cow = make_animal(farm, brinco="389", name="ÁGATA", lote="LOTE 1")
+        make_animal(farm, brinco="B2-389", name="OUTRA", lote="LOTE 2")
+
+        _load(farm, "reviewer@belovale", _event("production", "389", "Ágata", producao="9"))
+
+        item = _inbox(api, reviewer).json()[0]
+        assert item["candidate"]["id"] == cow
+        assert not any(a["code"] == "brinco_variant" for a in item["alerts"])
+
+    def test_a_misread_name_still_suggests_the_right_cow(self, api, farm) -> None:
+        """Primeira folha real: "162 SASIA" era "462 SABIÁ". O brinco lido não
+        existe; o nome, mesmo torto, aponta a vaca — como sugestão."""
+        _, reviewer = make_user("reviewer")
+        cow = make_animal(farm, brinco="462", name="SABIÁ", lote="LOTE 3")
+        make_animal(farm, brinco="900", name="SAFIRA", lote="LOTE 3")
+        make_animal(farm, brinco="901", name="MIMOSA", lote="LOTE 3")
+
+        _load(farm, "reviewer@belovale", _event("production", "162", "SASIA", producao="15"))
+
+        item = _inbox(api, reviewer).json()[0]
+        assert item["candidate"] is None
+        assert [s["id"] for s in item["name_suggestions"]][0] == cow
+        assert "MIMOSA" not in [s["name"] for s in item["name_suggestions"]]
+
+    def test_a_brinco_one_digit_off_breaks_the_tie_between_similar_names(self, api, farm) -> None:
+        """"619 NEODORDA": REDONDA e PANDORA se parecem igual com o nome
+        lido; o brinco de REDONDA (B2-649) difere do lido em um dígito."""
+        _, reviewer = make_user("reviewer")
+        make_animal(farm, brinco="B2-417", name="PANDORA", lote="LOTE 3")
+        cow = make_animal(farm, brinco="B2-649", name="REDONDA", lote="LOTE 3")
+
+        _load(farm, "reviewer@belovale", _event("production", "619", "NEODORDA", producao="5"))
+
+        item = _inbox(api, reviewer).json()[0]
+        assert [s["id"] for s in item["name_suggestions"]][0] == cow
+
+    def test_a_prefixed_brinco_with_another_name_does_not_jump_the_queue(self, api, farm) -> None:
+        """Primeira folha real, linha 15: lido "619 NEODA", era REDONDA
+        (B2-649). B2-619 existe, mas é a MARIPOZA — o nome lido a desmente.
+        Nome meio parecido + brinco a um dígito são dois sinais fracos que,
+        juntos, põem REDONDA na frente."""
+        _, reviewer = make_user("reviewer")
+        other = make_animal(farm, brinco="B2-619", name="MARIPOZA", lote="LOTE 3")
+        cow = make_animal(farm, brinco="B2-649", name="REDONDA", lote="LOTE 3")
+
+        _load(farm, "reviewer@belovale", _event("production", "619", "NEODA", producao="5"))
+
+        item = _inbox(api, reviewer).json()[0]
+        assert [s["id"] for s in item["name_suggestions"]][:2] == [cow, other]
+
+    def test_a_misspelled_name_of_the_same_cow_is_not_a_mismatch(self, api, farm) -> None:
+        """"853 PAETENHA" é a PRETINHA mal lida, não outra vaca: alertar
+        divergência aqui só ensinaria o revisor a ignorar o alerta."""
+        _, reviewer = make_user("reviewer")
+        make_animal(farm, brinco="853", name="PRETINHA", lote="LOTE 3")
+
+        _load(farm, "reviewer@belovale", _event("production", "853", "PAETENHA", producao="7"))
+
+        item = _inbox(api, reviewer).json()[0]
+        assert not any(a["code"] == "name_mismatch" for a in item["alerts"])
+
+    def test_a_different_name_on_the_brinco_is_a_mismatch(self, api, farm) -> None:
+        """O brinco pode ter sido mal lido e cair noutra vaca: o nome é o
+        segundo sinal que avisa."""
+        _, reviewer = make_user("reviewer")
+        make_animal(farm, brinco="853", name="PRETINHA", lote="LOTE 3")
+
+        _load(farm, "reviewer@belovale", _event("production", "853", "MIMOSA", producao="7"))
+
+        item = _inbox(api, reviewer).json()[0]
+        assert any(a["code"] == "name_mismatch" for a in item["alerts"])
 
     def test_the_source_keeps_the_raw_output_and_is_immutable(self, api, farm) -> None:
         make_user("reviewer")
