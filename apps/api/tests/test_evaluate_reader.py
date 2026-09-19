@@ -109,3 +109,147 @@ def test_the_command_reads_every_sample_with_a_gabarito(tmp_path, capsys) -> Non
     saved = json.loads((tmp_path / "folha.leitura.json").read_text(encoding="utf-8"))
     assert saved["reference_date"] == "2026-08-25"
     assert len(saved["events"]) == 4  # 3 produções + 1 ordem de secagem
+
+
+# ------------------------------------------------ contra o que já foi lançado
+
+from app.core.evaluate_reader import compare_with_records  # noqa: E402
+
+RECORDS = [
+    {"brinco": "389", "nome": "ÁGATA", "total": 12.0},
+    {"brinco": "B2-117", "nome": "AZEITONA", "total": 15.0},
+    {"brinco": "497", "nome": "PONTA CURTA", "total": 11.0},
+    {"brinco": "B2-694", "nome": "ANDORINHA", "total": 12.5},
+]
+
+
+class TestCompareWithRecords:
+    """Folhas cujos dados já foram lançados: a verdade é o banco, sem
+    transcrição à mão. Brinco, nome e total lidos contra o registro do dia."""
+
+    def test_counts_brinco_total_and_name_against_the_records(self) -> None:
+        lines = [
+            _line("1", "389", "AGATA", "6", "6", "12"),
+            _line("2", "117", "AZEITONA", "8", "7", "15"),  # sem prefixo: é a B2-117
+            _line("13", "694", "ANDORINHA", "7,5", "5", "13"),  # total errado
+        ]
+
+        score = compare_with_records(lines, RECORDS)
+
+        assert score.lines == 3
+        assert score.brinco_found == 3
+        assert score.total_ok == 2
+        assert score.nome_ok == 3
+        assert [r["nome"] for r in score.missing] == ["PONTA CURTA"]
+        assert score.duplicated == []
+
+    def test_a_brinco_pulled_from_the_neighbour_shows_up_twice(self) -> None:
+        """Desalinhamento da margem: a linha sem brinco pega o de baixo, e o
+        mesmo animal aparece em duas linhas."""
+        lines = [
+            _line("12", "694", "PONTA CURTA", "6", "5", "11"),
+            _line("13", "694", "ANDORINHA", "7,5", "5", "12,5"),
+        ]
+
+        score = compare_with_records(lines, RECORDS)
+
+        assert [r["nome"] for r in score.duplicated] == ["ANDORINHA"]
+        assert score.nome_ok == 1
+
+    def test_lines_without_a_record_are_listed(self) -> None:
+        lines = [_line("3", "999", "FANTASMA", "1", "1", "2"), _line("4", None, "SEM BRINCO", "1", "1", "2")]
+
+        score = compare_with_records(lines, RECORDS)
+
+        assert score.brinco_found == 0
+        assert [l["nome"] for l in score.unmatched] == ["FANTASMA", "SEM BRINCO"]
+
+
+def test_the_command_scores_all_photos_of_a_date_against_the_records(tmp_path, capsys) -> None:
+    (tmp_path / "lote1.jpeg").write_bytes(b"\xff\xd8\xff")
+    (tmp_path / "lote3.jpeg").write_bytes(b"\xff\xd8\xff")
+    pages = iter([
+        {"data": "22/07/26", "lote": "1º", "linhas": [_line("1", "389", "AGATA", "6", "6", "12")]},
+        {"data": "22/07/26", "lote": "3º", "linhas": [_line("1", "117", "AZEITONA", "8", "7", "15")]},
+    ])
+
+    code = main(
+        ["--samples", str(tmp_path), "--records-date", "2026-07-22"],
+        transcriber=lambda content: next(pages),
+        records=RECORDS,
+    )
+
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "2 fotos" in out
+    assert "brinco" in out and "2/4" in out
+    assert (tmp_path / "lote1.transcricao.json").exists()
+
+
+from types import SimpleNamespace  # noqa: E402
+
+from app.core.evaluate_reader import review_reach  # noqa: E402
+
+
+def _animal(brinco, name):
+    return SimpleNamespace(id=f"a-{brinco}", brinco=brinco, name=name, exited_on=None)
+
+
+HERD = [
+    _animal("389", "ÁGATA"),
+    _animal("B2-117", "AZEITONA"),
+    _animal("497", "PONTA CURTA"),
+    _animal("B2-694", "ANDORINHA"),
+    _animal("B2-619", "MARIPOZA"),
+]
+
+
+class TestReviewReach:
+    """O que o revisor vê: a vaca certa já associada ou em primeiro lugar nas
+    sugestões — com as mesmas regras da caixa de Revisão."""
+
+    def test_counts_the_cows_of_the_day_that_reach_the_review(self) -> None:
+        lines = [
+            _line("1", "389", "AGATA", "6", "6", "12"),  # associada pelo brinco
+            _line("2", "117", "AZEITONA", "8", "7", "15"),  # sugestão B2-117
+            _line("12", None, "PONTA CURTA", "6", "5", "11"),  # sugestão pelo nome
+            _line("13", "691", "ANDORINHA", "7,5", "5", "12,5"),  # nome + 1 dígito
+        ]
+
+        reach = review_reach(lines, RECORDS, HERD)
+
+        assert reach.reached == 4
+        assert reach.repeated == 0
+        assert reach.outside_day == 0
+
+    def test_two_lines_on_the_same_cow_is_certainly_wrong(self) -> None:
+        lines = [
+            _line("1", "389", "AGATA", "6", "6", "12"),
+            _line("2", "389", "AGATHA", "8", "7", "15"),
+        ]
+
+        reach = review_reach(lines, RECORDS, HERD)
+
+        assert (reach.reached, reach.repeated) == (1, 1)
+
+    def test_a_cow_without_a_record_that_day_is_counted_apart(self) -> None:
+        """Pode ser erro de leitura — ou vaca cuja medição do dia está numa
+        ficha duplicada sem brinco (achado em 22/07: SAIA BRANCA, TIETA...).
+        Sem gabarito por linha, não dá para chamar de erro."""
+        lines = [_line("1", "B2-619", "MARIPOZA", "6", "6", "12")]
+
+        reach = review_reach(lines, RECORDS, HERD)
+
+        assert (reach.reached, reach.repeated, reach.outside_day) == (0, 0, 1)
+
+
+class TestReviewReachWithMismatchedName:
+    def test_a_brinco_from_the_neighbour_row_is_fixed_with_one_tap(self) -> None:
+        """Brinco da ÁGATA na linha da AZEITONA: a caixa associa pela brinco,
+        avisa do nome divergente e oferece "Ou é esta: AZEITONA". Conta como
+        alcançada, à parte, com um toque."""
+        lines = [_line("2", "389", "AZEITONA", "8", "7", "15")]
+
+        reach = review_reach(lines, RECORDS, HERD)
+
+        assert (reach.reached, reach.one_tap) == (1, 1)

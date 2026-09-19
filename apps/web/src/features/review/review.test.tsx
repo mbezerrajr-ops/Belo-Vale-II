@@ -125,6 +125,32 @@ describe("ReviewInbox", () => {
     expect(within(item).getByText(/ordenhas 5 \+ 4/)).toBeInTheDocument();
   });
 
+  it("brinco de uma vaca com nome de outra oferece trocar num toque", async () => {
+    const sariema = animal({ id: "a-447", brinco: "447", name: "SARIEMA" });
+    const { onApprove } = setup({}, [
+      proposal({
+        brinco_lido: "B2-016",
+        nome_lido: "SARIEMA",
+        candidate: animal({ id: "a-016", brinco: "B2-016", name: "BELMONTE" }),
+        name_suggestions: [sariema],
+        payload: { measured_on: "2026-07-22", producao: 21 },
+        alerts: [{ code: "name_mismatch", message: "Nome lido: SARIEMA; no cadastro: BELMONTE." }],
+      }),
+    ]);
+
+    const item = await card();
+    fireEvent.click(within(item).getByRole("button", { name: /ou é esta.*447.*sariema/i }));
+    await act(async () => {
+      fireEvent.click(within(item).getByRole("button", { name: /aprovar/i }));
+    });
+
+    expect(onApprove).toHaveBeenCalledWith(
+      TOKEN,
+      "p-1",
+      expect.objectContaining({ animal_id: "a-447" }),
+    );
+  });
+
   it("revisor corrige os litros e aprova", async () => {
     const { onApprove, onChanged } = setup();
 

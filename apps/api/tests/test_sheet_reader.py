@@ -28,7 +28,9 @@ from app.vision.sheet_reader import (
     ReaderFormatError,
     ReaderUnavailable,
     ensure_local_url,
+    incoherence,
     sheet_to_events,
+    tidy_transcription,
 )
 
 
@@ -145,16 +147,67 @@ class TestSheetToEvents:
 
         assert (event.brinco, event.nome) == ("B2-419", "VIAJANTE")
 
-    def test_the_prompt_tells_the_model_what_day_it_is(self) -> None:
-        """Sem isso o modelo leu "25/08/2026" como 2024 na primeira folha real."""
+    def test_the_prompt_does_not_suggest_a_date(self) -> None:
+        """Dizer "hoje é 19/09/2026" fez o modelo escrever 19/09/2026 no
+        formulário de 22/07/26. A data vem só da folha; errada, o revisor
+        corrige o arquivo inteiro de uma vez."""
         transport = _Transport(_reply(SHEET))
-        reader = OllamaSheetReader(
-            url="http://127.0.0.1:11434", model="m", post=transport, today=date(2026, 9, 19)
-        )
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
 
         reader.extract(_png(), kind="photo")
 
-        assert "19/09/2026" in transport.requests[0]["body"]["messages"][-1]["content"]
+        prompt = transport.requests[0]["body"]["messages"][-1]["content"]
+        assert "hoje" not in prompt.lower()
+
+    def test_empty_rows_of_the_printed_form_are_dropped(self) -> None:
+        """O formulário tem 28 linhas; as que ficaram em branco não são leitura."""
+        empty = {"seq": "22", "brinco": None, "nome": None, "manha": None, "tarde": None,
+                 "total": None, "anotacao": None, "trecho": ""}
+        sheet = {**SHEET, "linhas": [SHEET["linhas"][0], empty]}
+
+        assert len(tidy_transcription(sheet)["linhas"]) == 1
+
+    def test_a_row_with_only_a_margin_number_is_dropped(self) -> None:
+        """Número na margem de uma linha vazia (ou riscada) não é leitura."""
+        margin_only = {"seq": "24", "brinco": "6804", "nome": None, "manha": None,
+                       "tarde": None, "total": None, "anotacao": None, "trecho": "6804"}
+        sheet = {**SHEET, "linhas": [SHEET["linhas"][0], margin_only]}
+
+        assert len(tidy_transcription(sheet)["linhas"]) == 1
+
+    @pytest.mark.parametrize("tick", ["1", "/", "✓", "1."])
+    def test_a_tick_beside_the_total_is_not_an_annotation(self, tick) -> None:
+        """Alguém marcou "1" ao lado de cada total conferido; o modelo leu como
+        anotação nas 28 linhas. Viraria 28 observações "1" na revisão."""
+        sheet = {**SHEET, "linhas": [_line("1", "862", "SAIA BRANCA", "9", "8", "17", tick)]}
+
+        [line] = tidy_transcription(sheet)["linhas"]
+
+        assert line["anotacao"] is None
+
+    def test_a_zero_brinco_is_no_brinco(self) -> None:
+        """O modelo preencheu "0" onde não havia brinco. Zero não identifica vaca."""
+        sheet = {**SHEET, "linhas": [_line("1", "0", "CHIQUINHA", "18", "20", "38")]}
+
+        [line] = tidy_transcription(sheet)["linhas"]
+
+        assert line["brinco"] is None
+
+    @pytest.mark.parametrize(
+        ("anotacao", "expected"),
+        [
+            ("→ 2º LOT", [("lot_change", {"lote": "2"})]),
+            ("3º LOT", [("lot_change", {"lote": "3"})]),
+            ("→ SECA", [("dry_off", {"ordem": "secar"})]),
+            ("DOENTE", [("note", {"texto": "Na folha de pesagem: DOENTE"})]),
+        ],
+    )
+    def test_margin_notes_of_the_printed_form(self, anotacao, expected) -> None:
+        sheet = {**SHEET, "linhas": [_line("5", "695", "RIO NEGRO", "12", "12", "24", anotacao)]}
+
+        events = sheet_to_events(sheet, extractor_version="teste").events
+
+        assert [(e.event_type, e.fields) for e in events[1:]] == expected
 
     def test_an_illegible_header_date_stays_empty(self) -> None:
         extraction = sheet_to_events({**SHEET, "data": "2?/08"}, extractor_version="teste")
@@ -205,16 +258,25 @@ def _png(width=40, height=30) -> bytes:
 
 
 class _Transport:
-    """Faz o papel do Ollama: guarda o pedido e devolve a resposta dada."""
+    """Faz o papel do Ollama. Responde a pergunta do formato com `layout` e as
+    transcrições com `answer` (uma resposta, ou uma lista, na ordem)."""
 
-    def __init__(self, answer):
+    def __init__(self, answer, layout="manuscrito"):
+        self.answers = list(answer) if isinstance(answer, list) else None
         self.answer = answer
+        self.layout = layout
         self.requests: list[dict] = []
+        self.classified = 0
 
     def __call__(self, url: str, body: dict, timeout: float) -> dict:
-        self.requests.append({"url": url, "body": body})
         if isinstance(self.answer, Exception):
             raise self.answer
+        if "formato" in body["format"]["properties"]:
+            self.classified += 1
+            return _reply({"formato": self.layout})
+        self.requests.append({"url": url, "body": body})
+        if self.answers is not None:
+            return self.answers.pop(0)
         return self.answer
 
 
@@ -236,10 +298,55 @@ class TestOllamaSheetReader:
         assert body["stream"] is False
         assert body["options"]["temperature"] == 0
         assert body["options"]["num_ctx"] >= 8192
+        # Semente fixa: a mesma foto dá a mesma leitura de uma rodada para outra.
+        assert body["options"]["seed"] == 0
         assert body["format"]["type"] == "object"
         assert len(body["messages"][-1]["images"]) == 1
         assert len(_by_type(extraction, "production")) == 5
         assert extraction.extractor_version.startswith("qwen2.5vl:7b/")
+
+    @pytest.mark.parametrize(
+        ("layout", "first_keys", "mentions"),
+        [
+            ("impresso", ["brinco", "numero_da_linha"], "MARGEM ESQUERDA"),
+            ("manuscrito", ["numero_da_linha", "brinco"], "PESAGEM DO LEITE"),
+        ],
+    )
+    def test_each_layout_has_its_own_instruction_and_key_order(
+        self, layout, first_keys, mentions
+    ) -> None:
+        """O modelo preenche as chaves na ordem do esquema, da esquerda para a
+        direita da folha. No formulário impresso o brinco (margem) vem antes do
+        número da linha; na folha manuscrita, depois. Um esquema só para os
+        dois fez um formato piorar quando o outro melhorava."""
+        transport = _Transport(_reply(SHEET), layout=layout)
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reader.extract(_png(), kind="photo")
+
+        body = transport.requests[0]["body"]
+        line_schema = body["format"]["properties"]["linhas"]["items"]
+        assert list(line_schema["properties"])[:2] == first_keys
+        assert mentions in body["messages"][-1]["content"]
+        assert transport.classified == 1
+
+    def test_the_model_keys_become_the_internal_transcription(self) -> None:
+        answer = {
+            "data": "22/07/26",
+            "lote": "3º",
+            "linhas": [
+                {"brinco": "389", "numero_da_linha": "1", "nome": "AGATA", "manha": "6",
+                 "tarde": "6", "total": "12", "anotacao": None, "trecho": "389 1. AGATA 6 6 12"}
+            ],
+        }
+        reader = OllamaSheetReader(
+            url="http://127.0.0.1:11434", model="m", post=_Transport(_reply(answer))
+        )
+
+        [line] = reader.transcribe(_png())["linhas"]
+
+        assert (line["seq"], line["brinco"]) == ("1", "389")
+        assert "numero_da_linha" not in line
 
     def test_a_reply_that_is_not_the_schema_is_an_error(self) -> None:
         reader = OllamaSheetReader(
@@ -277,9 +384,8 @@ class TestOllamaSheetReader:
 
     def test_pages_of_a_pdf_are_read_in_order_under_the_first_header(self) -> None:
         second = {"data": None, "lote": None, "linhas": [_line("19", "701", "PIQUENA", "4,5", "2", "6,5")]}
-        answers = iter([_reply(SHEET), _reply(second)])
         reader = OllamaSheetReader(
-            url="http://127.0.0.1:11434", model="m", post=lambda url, body, timeout: next(answers)
+            url="http://127.0.0.1:11434", model="m", post=_Transport([_reply(SHEET), _reply(second)])
         )
         pdf = io.BytesIO()
         Image.new("RGB", (40, 30), "white").save(
@@ -315,3 +421,61 @@ class TestPages:
     def test_anything_else_is_refused(self) -> None:
         with pytest.raises(UnsupportedPage):
             load_pages(b"isto nao e uma imagem")
+
+
+def _dup_sheet(brinco="016"):
+    """Leitura incoerente: o modelo repetiu o mesmo brinco em várias linhas."""
+    return {
+        "data": "22/07/26",
+        "lote": "1",
+        "linhas": [_line(str(i), brinco, f"VACA {i}", "5", "5", "10") for i in range(1, 6)],
+    }
+
+
+class TestSelfCheck:
+    """O modelo às vezes entra em repetição (o mesmo brinco em várias linhas)
+    ou desalinha a margem. O leitor confere a própria leitura, sem IA, e lê de
+    novo em outra resolução quando ela sai incoerente."""
+
+    def test_incoherence_counts_repeated_brincos_and_sums_that_do_not_close(self) -> None:
+        sheet = {
+            **SHEET,
+            "linhas": [
+                _line("1", "853", "PRETINHA", "4", "3", "7"),
+                _line("2", "853", "ANDORINHA", "3", "4", "7"),  # brinco repetido
+                _line("3", "389", "AGATA", "4", "5", "10"),  # 4 + 5 não dá 10
+                _line("4", None, "SEM BRINCO", "1", "1", "2"),
+                _line("5", None, "OUTRA", "1", "1", "2"),  # dois vazios não contam
+            ],
+        }
+
+        assert incoherence(sheet) == 2
+
+    def test_a_coherent_reading_is_read_only_once(self) -> None:
+        transport = _Transport(_reply(SHEET))
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reader.transcribe(_png(3000, 4000))
+
+        assert len(transport.requests) == 1
+
+    def test_an_incoherent_reading_is_read_again_and_the_better_one_wins(self) -> None:
+        transport = _Transport([_reply(_dup_sheet()), _reply(SHEET)])
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reading = reader.transcribe(_png(3000, 4000))
+
+        assert len(transport.requests) == 2
+        first, second = (r["body"]["messages"][-1]["images"][0] for r in transport.requests)
+        assert first != second  # outra resolução
+        assert [line["brinco"] for line in reading["linhas"]] == ["853", "016", "633", "462", "649"]
+
+    def test_when_both_are_incoherent_the_less_incoherent_wins(self) -> None:
+        worse = _dup_sheet()
+        better = {**_dup_sheet(), "linhas": _dup_sheet()["linhas"][:3]}
+        transport = _Transport([_reply(worse), _reply(better)])
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reading = reader.transcribe(_png(3000, 4000))
+
+        assert len(reading["linhas"]) == 3

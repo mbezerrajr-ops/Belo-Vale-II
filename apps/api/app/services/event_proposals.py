@@ -179,7 +179,8 @@ async def create_proposals(
                     {
                         "code": "name_mismatch",
                         "message": f"Nome lido: {event.nome}; no cadastro: {candidate.name or '—'}. "
-                        "A associação é pelo brinco.",
+                        "A associação é pelo brinco — se o brinco foi lido da linha de "
+                        "cima ou de baixo, toque em Trocar animal.",
                     }
                 )
             if candidate.exited_on is not None:
@@ -297,7 +298,9 @@ def name_suggestions(animals: list[Animal], nome: str | None, *, limit: int = 5)
 _WEAK_NAME = 0.45
 
 
-def _suggestions(animals: list[Animal], proposal: EventProposal, *, limit: int = 5) -> list[Animal]:
+def suggest_animals(
+    animals: list[Animal], brinco_lido: str | None, nome_lido: str | None, *, limit: int = 5
+) -> list[Animal]:
     """Ordem das sugestões, do sinal mais forte ao mais fraco:
 
     1. mesmo número com outro prefixo ("694" → B2-694), se o nome lido não o
@@ -306,8 +309,8 @@ def _suggestions(animals: list[Animal], proposal: EventProposal, *, limit: int =
        ("619 NEODA" → B2-649 REDONDA) —, o brinco próximo desempatando;
     3. variantes de prefixo que o nome lido desmente (B2-619 MARIPOZA).
     """
-    brinco = normalize_brinco(proposal.brinco_lido)
-    nome = proposal.nome_lido
+    brinco = normalize_brinco(brinco_lido)
+    nome = nome_lido
 
     def score(animal: Animal) -> float:
         return name_similarity(nome, animal.name) + (0.15 if _one_digit_off(brinco, animal.brinco) else 0)
@@ -326,6 +329,19 @@ def _suggestions(animals: list[Animal], proposal: EventProposal, *, limit: int =
         if animal not in ranked:
             ranked.append(animal)
     return ranked[:limit]
+
+
+def _suggestions_for(
+    animals: list[Animal], proposal: EventProposal, candidate: Animal | None
+) -> list[Animal]:
+    """Sem vaca pelo brinco: as sugestões de sempre. Com vaca pelo brinco mas
+    de nome bem diferente do lido: as vacas do nome lido — o brinco pode ter
+    vindo da linha vizinha (margem do formulário impresso)."""
+    if candidate is None:
+        return suggest_animals(animals, proposal.brinco_lido, proposal.nome_lido)
+    if proposal.nome_lido and name_similarity(proposal.nome_lido, candidate.name) < SIMILAR_NAME:
+        return [a for a in name_suggestions(animals, proposal.nome_lido) if a.id != candidate.id]
+    return []
 
 
 @dataclass
@@ -367,7 +383,7 @@ async def list_proposals(
                 proposal=proposal,
                 source=source,
                 candidate=candidate,
-                suggestions=[] if candidate else _suggestions(animals, proposal),
+                suggestions=_suggestions_for(animals, proposal, candidate),
                 decided_by=email,
                 corrected_by=corrected_by,
             )

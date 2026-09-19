@@ -247,8 +247,20 @@ uv run python -m app.core.evaluate_reader --samples ../../docs/Treinamento-VC
 ```
 
 O comando mostra os acertos por campo e grava ao lado de cada amostra a
-transcrição (`.transcricao.json`) e os eventos (`.leitura.json`). Para ver a
-leitura na caixa de Revisão:
+transcrição (`.transcricao.json`) e os eventos (`.leitura.json`).
+
+**Folhas já lançadas, sem gabarito.** Quando os dados das fotos já estão no
+sistema, a verdade é o banco: o comando compara brinco, nome e total lidos com
+as medições do dia e diz quantas vacas chegam à revisão com a vaca certa:
+
+```bash
+uv run python -m app.core.evaluate_reader --samples ../../docs/Treinamento-VC \
+  --pattern "cont_*" --records-date 2026-07-22
+```
+
+`--reuse` aproveita as transcrições já salvas da mesma versão do leitor (sem
+gastar GPU), útil para mexer só na conferência. Para ver a leitura na caixa
+de Revisão:
 
 ```bash
 uv run python -m app.core.load_proposals --email revisor@fazenda \

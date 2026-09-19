@@ -255,6 +255,24 @@ class TestCreation:
         item = _inbox(api, reviewer).json()[0]
         assert not any(a["code"] == "name_mismatch" for a in item["alerts"])
 
+    def test_a_brinco_from_the_wrong_row_still_offers_the_cow_named_on_the_line(
+        self, api, farm
+    ) -> None:
+        """Formulário de 22/07: o brinco da margem desceu uma linha, e a linha
+        da SARIEMA veio com o 016 da BELMONTE. A associação continua pelo
+        brinco (com alerta), mas a SARIEMA aparece como sugestão para trocar."""
+        _, reviewer = make_user("reviewer")
+        belmonte = make_animal(farm, brinco="B2-016", name="BELMONTE", lote="LOTE 2")
+        sariema = make_animal(farm, brinco="447", name="SARIEMA", lote="LOTE 2")
+
+        _load(farm, "reviewer@belovale", _event("production", "B2-016", "SARIEMA", producao="21"))
+
+        item = _inbox(api, reviewer).json()[0]
+        assert item["candidate"]["id"] == belmonte
+        assert [s["id"] for s in item["name_suggestions"]] == [sariema]
+        [alert] = [a for a in item["alerts"] if a["code"] == "name_mismatch"]
+        assert "Trocar animal" in alert["message"]
+
     def test_a_different_name_on_the_brinco_is_a_mismatch(self, api, farm) -> None:
         """O brinco pode ter sido mal lido e cair noutra vaca: o nome é o
         segundo sinal que avisa."""

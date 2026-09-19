@@ -106,3 +106,41 @@ um dígito de distância recuperam a vaca como sugestão.
   pela conferência de soma; só o revisor vê.
 - Resultado de uma folha só: não serve para comparar modelos. Precisa de
   mais amostras com gabarito.
+
+### Formulário impresso "CONTROLE LEITEIRO" (20/09/2026)
+
+Cinco fotos de celular dos lotes 1 a 3 de 22/07/2026 (114 linhas). Os dados
+já estavam lançados, então a nota é contra o banco (`--records-date`): 101
+vacas com brinco e medição no dia.
+
+O formato é outro: brinco escrito na **margem esquerda**, fora da tabela;
+anotações na margem direita ("→ 2º LOT", "→ SECA", "DOENTE"); tiques de
+conferência ao lado do total. O leitor agora pergunta primeiro qual é o
+formato e usa instrução e ordem de chaves próprias para cada um.
+
+| versão | brinco (vacas do dia achadas) | total certo | na revisão (vaca certa associada ou 1ª) | erro certo* |
+|---|---|---|---|---|
+| v2 (só folha manuscrita) | — | — | — | data lida como a de hoje |
+| v3 (dois formatos, uma instrução) | 71% | 51% | — | — |
+| v4 (brinco antes do nº da linha) | 90% / 68%** | 74% / 48%** | 89% / 86%** | 8 / 11** |
+| v6 (formato detectado, semente fixa, releitura) | 87% | 53% | 82%, 10 com um toque em "Ou é esta" | 12 |
+
+\* linhas que apontam uma vaca já apontada por outra linha.
+\*\* duas rodadas da mesma instrução: sem semente fixa a leitura variava
+muito entre rodadas (numa delas o modelo entrou em repetição na foto do
+lote 1). A v6 fixa a semente e relê em outra resolução quando a leitura sai
+incoerente (brincos repetidos, somas que não fecham).
+
+Folha manuscrita de 25/08 com a v6: brinco 12/18, total 16/18, anotação 16/18
+(a v4, com a ordem de chaves do formulário, tinha caído para 0/18 de brinco).
+
+**O que ainda erra:** o brinco da margem desce ou sobe uma linha em blocos
+da folha. Nome e litros continuam alinhados entre si, então a caixa de
+Revisão avisa do nome divergente e oferece a vaca do nome lido ("Ou é esta")
+a um toque. Com 6 folhas, diferenças de poucos pontos entre versões são
+ruído; mais amostras dirão se vale trocar de modelo.
+
+**Achado no cadastro:** há vacas duplicadas — uma ficha com brinco e outra
+sem, com a medição de 22/07 na ficha sem brinco (SAIA BRANCA, TIETA,
+BRANQUINHA, FAÍSCA...). Por isso parte das linhas "sem vaca do dia" está
+certa; a nota as conta à parte, "a conferir".
