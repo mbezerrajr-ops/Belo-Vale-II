@@ -302,6 +302,21 @@ function ProposalCard({
                 Trocar animal
               </button>
             )}
+            {/* Brinco de uma vaca, nome de outra: o brinco pode ter vindo da
+                linha vizinha. As vacas do nome lido ficam a um toque. */}
+            {canDecide &&
+              proposal.name_suggestions
+                .filter((option) => option.id !== animal.id)
+                .map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className="secondary suggestion"
+                    onClick={() => setAnimal(option)}
+                  >
+                    Ou é esta: {option.brinco ?? "sem brinco"} · {option.name ?? "sem nome"}
+                  </button>
+                ))}
           </>
         ) : (
           <>

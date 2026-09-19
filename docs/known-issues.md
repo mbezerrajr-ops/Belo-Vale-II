@@ -311,6 +311,29 @@ Decisões de implementação:
 - **Painel e folha de coleta ignoram animais com baixa.** A produção que eles
   deram antes da saída continua no banco e na série histórica.
 
+## Leitor do formulário impresso — decisões registradas (20/09/2026)
+
+- **"→ DOENTE" vira observação** na ficha, por enquanto (decisão do titular).
+- **"→ 2º LOT"** (abreviado) é troca de lote; **"→ SECA"** é ordem de secagem,
+  como "SECAR" na folha manuscrita.
+- **Tiques ao lado do total** ("1", "/", "✓") não são anotação.
+- **Sem dica de data na instrução.** "Hoje é ..." fez o modelo escrever a
+  data de hoje no formulário de 22/07/26. A data vem só da folha; errada, o
+  revisor troca a do arquivo inteiro.
+- **Nome divergente oferece a vaca do nome lido.** Quando o brinco lido é de
+  uma vaca e o nome de outra (brinco da margem deslocado uma linha), a
+  associação continua pelo brinco, com alerta, e a vaca do nome aparece em
+  "Ou é esta", a um toque. Nada é trocado sozinho.
+
+## Pendente: vacas duplicadas no cadastro
+
+Ao comparar as folhas de 22/07/2026 com o banco apareceram vacas com duas
+fichas — uma com brinco e outra sem — e a medição do dia na ficha sem brinco:
+SAIA BRANCA (861), TIETA (964), BRANQUINHA (B2-549), FAÍSCA (434), entre
+outras. Uma leitura certa do brinco cai na ficha sem histórico. Resolver exige
+decidir, vaca a vaca, qual ficha fica (e juntar o histórico), com auditoria —
+decisão do titular.
+
 ## Revisão por arquivo — decisões registradas
 
 - **Filtro por arquivo** na caixa de Revisão, pedido do titular (19/09/2026).
