@@ -28,21 +28,28 @@ import unicodedata
 import urllib.error
 import urllib.request
 from collections.abc import Callable
-from datetime import date
 from typing import Any
 from urllib.parse import urlsplit
 
-from app.core.farm_clock import farm_today
 from app.services.event_extraction import EventExtraction, ExtractedEvent
 from app.services.event_normalization import parse_event_date
+from app.services.production_files import parse_number_br
 from app.vision.pages import load_pages
 
 EXTRACTOR_NAME = "leitor-local-folha"
 #: Muda quando a instrução ou o esquema mudam: a nota do leitor é por versão.
-PROMPT_VERSION = "folha-v2"
+PROMPT_VERSION = "folha-v6"
 
 #: Contexto do modelo: imagem + instrução + a transcrição de uma folha cheia.
 CONTEXT_TOKENS = 8192
+
+#: Semente fixa: com temperatura 0 a GPU ainda pode trocar um token entre
+#: rodadas e mudar a leitura inteira; a semente deixa a mesma foto dar a
+#: mesma leitura.
+SEED = 0
+
+#: Resolução da segunda leitura, quando a primeira sai incoerente.
+RETRY_MAX_SIDE = 1000
 
 #: A primeira leitura carrega o modelo na memória de vídeo; pode demorar.
 DEFAULT_TIMEOUT = 600.0
@@ -90,59 +97,100 @@ def ensure_local_url(url: str) -> str:
 
 _TEXT = {"type": ["string", "null"]}
 
-TRANSCRIPTION_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "data": _TEXT,
-        "lote": _TEXT,
-        "linhas": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "seq": _TEXT,
-                    "brinco": _TEXT,
-                    "nome": _TEXT,
-                    "manha": _TEXT,
-                    "tarde": _TEXT,
-                    "total": _TEXT,
-                    "anotacao": _TEXT,
-                    "trecho": {"type": "string"},
+#: Formatos de folha que o leitor conhece.
+LAYOUTS = ("impresso", "manuscrito")
+
+_LINE_FIELDS = ("nome", "manha", "tarde", "total", "anotacao")
+
+
+def _schema(first: tuple[str, str]) -> dict[str, Any]:
+    """Esquema da transcrição. A ordem das chaves importa: o modelo as
+    preenche nessa ordem, e ela tem de seguir a folha da esquerda para a
+    direita — senão ele põe o número da margem no campo errado."""
+    keys = (*first, *_LINE_FIELDS)
+    return {
+        "type": "object",
+        "properties": {
+            "data": _TEXT,
+            "lote": _TEXT,
+            "linhas": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {**{key: _TEXT for key in keys}, "trecho": {"type": "string"}},
+                    "required": [*keys, "trecho"],
                 },
-                "required": ["seq", "brinco", "nome", "manha", "tarde", "total", "anotacao", "trecho"],
             },
         },
-    },
-    "required": ["data", "lote", "linhas"],
+        "required": ["data", "lote", "linhas"],
+    }
+
+
+SCHEMAS: dict[str, dict[str, Any]] = {
+    # Formulário impresso: o brinco está na margem esquerda, antes do nº impresso.
+    "impresso": _schema(("brinco", "numero_da_linha")),
+    # Folha manuscrita: "nº - brinco nome".
+    "manuscrito": _schema(("numero_da_linha", "brinco")),
 }
 
-PROMPT = """\
-Você está transcrevendo uma folha manuscrita de pesagem de leite de uma fazenda.
-Hoje é {hoje}. A folha é recente: o ano escrito costuma ser o atual ou o anterior.
+_COMMON_RULES = """Regras:
+- Brinco: todos os dígitos como escritos, inclusive zeros à esquerda ("016").
+- Litros com vírgula decimal como escritos ("5,5").
+- Data e lote: copie exatamente como escritos no cabeçalho.
+- Leia linha por linha, alinhando pela altura: brinco, nome, litros e
+  anotação de uma entrada têm de estar na mesma linha da folha.
+- Não corrija contas, não complete números, não troque nomes por parecidos.
+- Campo ilegível: null. Nunca invente linhas nem valores.
+- Cada linha é independente: não repita a anotação ou o brinco de outra linha.
+- Em "trecho", copie a linha como você a leu.
+"""
+
+PROMPTS: dict[str, str] = {
+    "impresso": """Você está transcrevendo o formulário impresso de pesagem de leite
+"CONTROLE LEITEIRO BELO VALE II", preenchido à mão.
+
+- Cabeçalho: "LOTE: ___" e "DATA: __/__/__".
+- Tabela com as colunas VACA/Nº, MANHÃ, TARDE e TOTAL, e linhas numeradas
+  (1, 2, 3...) já impressas. O número impresso vai em "numero_da_linha";
+  ele NÃO é o brinco.
+- Na coluna VACA/Nº está o NOME da vaca.
+- O BRINCO está escrito à mão na MARGEM ESQUERDA, fora da tabela, na mesma
+  altura da linha. Algumas linhas não têm brinco na margem: nesse caso o
+  brinco é null. Nunca use o número da margem de uma linha vizinha.
+- ANOTAÇÃO fica na MARGEM DIREITA, na mesma altura da linha, geralmente depois
+  de uma seta: "→ 2º LOT", "→ SECA", "DOENTE". Ignore os tiques (✓, /, 1)
+  que às vezes aparecem ao lado do total.
+- Linhas da tabela que ficaram em branco não entram em "linhas".
+
+""" + _COMMON_RULES,
+    "manuscrito": """Você está transcrevendo uma folha pautada de pesagem de leite, escrita à mão.
 
 Cabeçalho: "PESAGEM DO LEITE", a data (dd/mm/aaaa) e o lote (ex.: "3º LOTE").
 
 Cada linha segue o formato:
   nº - BRINCO NOME → MANHÃ + TARDE = TOTAL → ANOTAÇÃO (opcional)
 Exemplo: "3 - 389 ÁGATA → 4 + 5 = 9"   ou   "8 - 633 GIGANTE → 2 + 2 = 4 → SECAR"
-- "nº" é a contagem da linha (1, 2, 3...), NÃO é o brinco.
+- "nº" é a contagem da linha e vai em "numero_da_linha"; NÃO é o brinco.
 - BRINCO é o número logo depois do traço. Às vezes vem depois do nome
-  (ex.: "18 - QUARTINHA 406"). Transcreva todos os dígitos como escritos,
-  inclusive zeros à esquerda ("016", "011").
-- MANHÃ e TARDE são os litros das duas ordenhas; TOTAL é o que vem depois do "=".
-  Use vírgula decimal como está escrito ("5,5").
+  (ex.: "18 - QUARTINHA 406").
+- MANHÃ e TARDE são os litros das duas ordenhas; TOTAL vem depois do "=".
 - ANOTAÇÃO é o que vem depois da última seta: "SECAR", "1º LOTE", "SECAR 7 MES.".
-  Ela fica à direita, na MESMA altura da linha a que pertence. A maioria das
-  linhas não tem anotação: nesse caso use null. Não passe a anotação de uma
-  linha para a linha de cima ou de baixo.
+  A maioria das linhas não tem anotação: use null.
 
-Regras:
-- Transcreva exatamente o que está escrito. Não corrija contas, não complete
-  números, não troque nomes por outros parecidos.
-- Se um campo estiver ilegível, use null. Nunca invente.
-- Uma entrada em "linhas" para cada linha escrita, na ordem da folha. Não crie
-  linhas que não existem.
-- Em "trecho", copie a linha inteira como você a leu.
+""" + _COMMON_RULES,
+}
+
+_LAYOUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {"formato": {"type": "string", "enum": list(LAYOUTS)}},
+    "required": ["formato"],
+}
+
+_LAYOUT_PROMPT = """Esta imagem é uma folha de pesagem de leite. Qual o formato?
+- "impresso": formulário impresso "CONTROLE LEITEIRO", com tabela de colunas
+  VACA/Nº, MANHÃ, TARDE e TOTAL e linhas numeradas já impressas.
+- "manuscrito": folha pautada toda escrita à mão, "PESAGEM DO LEITE", com
+  linhas como "3 - 389 ÁGATA → 4 + 5 = 9".
 """
 
 
@@ -170,10 +218,8 @@ class OllamaSheetReader:
         model: str,
         post: Post | None = None,
         timeout: float = DEFAULT_TIMEOUT,
-        today: date | None = None,
     ) -> None:
         self.url = ensure_local_url(url)
-        self._today = today
         self.model = model
         self.timeout = timeout
         self._post = post or _default_post
@@ -182,19 +228,21 @@ class OllamaSheetReader:
     def version(self) -> str:
         return f"{self.model}/{PROMPT_VERSION}"
 
-    def transcribe_page(self, image_jpeg: bytes) -> dict[str, Any]:
+    def _chat(self, *, prompt: str, schema: dict[str, Any], image: bytes) -> Any:
         body = {
             "model": self.model,
             "stream": False,
-            "format": TRANSCRIPTION_SCHEMA,
+            "format": schema,
             # A imagem ocupa boa parte do contexto; o padrão do Ollama (4096)
             # corta a resposta de uma folha cheia no meio do JSON.
-            "options": {"temperature": 0, "num_ctx": CONTEXT_TOKENS},
+            "options": {"temperature": 0, "seed": SEED, "num_ctx": CONTEXT_TOKENS},
             "messages": [
                 {
                     "role": "user",
-                    "content": PROMPT.format(hoje=f"{self._today or farm_today():%d/%m/%Y}"),
-                    "images": [base64.b64encode(image_jpeg).decode("ascii")],
+                    # Sem "hoje é ...": a dica fez o modelo escrever a data de hoje
+                    # num formulário de 22/07/26. A data vem só da folha.
+                    "content": prompt,
+                    "images": [base64.b64encode(image).decode("ascii")],
                 }
             ],
         }
@@ -203,29 +251,68 @@ class OllamaSheetReader:
         except (OSError, urllib.error.URLError, TimeoutError) as error:
             raise ReaderUnavailable(f"Leitor local indisponível em {self.url}: {error}") from error
         try:
-            content = reply["message"]["content"]
-            transcription = json.loads(content)
+            return json.loads(reply["message"]["content"])
         except (KeyError, TypeError, json.JSONDecodeError) as error:
             raise ReaderFormatError(f"Resposta do leitor fora do esquema: {error}") from error
+
+    def classify_page(self, image_jpeg: bytes) -> str:
+        """Formulário impresso ou folha manuscrita. Resposta estranha: impresso,
+        o formato em uso na fazenda."""
+        answer = self._chat(prompt=_LAYOUT_PROMPT, schema=_LAYOUT_SCHEMA, image=image_jpeg)
+        layout = answer.get("formato") if isinstance(answer, dict) else None
+        return layout if layout in LAYOUTS else "impresso"
+
+    def transcribe_page(self, image_jpeg: bytes, layout: str | None = None) -> dict[str, Any]:
+        layout = layout or self.classify_page(image_jpeg)
+        transcription = self._chat(prompt=PROMPTS[layout], schema=SCHEMAS[layout], image=image_jpeg)
         _check_transcription(transcription)
-        return transcription
+        return {
+            **transcription,
+            "_formato": layout,
+            "linhas": [_from_model_keys(line) for line in transcription["linhas"]],
+        }
 
     def transcribe(self, content: bytes) -> dict[str, Any]:
-        """Todas as páginas numa transcrição só, sob o cabeçalho da primeira."""
-        pages = [self.transcribe_page(page.content) for page in load_pages(content)]
-        first = pages[0]
-        header_date = next((p.get("data") for p in pages if p.get("data")), None)
-        header_lot = next((p.get("lote") for p in pages if p.get("lote")), None)
+        """Todas as páginas numa transcrição só, sob o cabeçalho da primeira.
+
+        Cada página é conferida (`incoherence`): se a leitura sai incoerente
+        — o mesmo brinco em várias linhas, somas que não fecham —, é lida de
+        novo em outra resolução, e fica a mais coerente das duas.
+        """
+        pages = load_pages(content)
+        retry_pages: list[Any] | None = None
+        readings = []
+        for index, page in enumerate(pages):
+            layout = self.classify_page(page.content)
+            reading = self.transcribe_page(page.content, layout)
+            if _needs_retry(reading):
+                if retry_pages is None:
+                    retry_pages = load_pages(content, max_side=RETRY_MAX_SIDE)
+                second = self.transcribe_page(retry_pages[index].content, layout)
+                if incoherence(second) < incoherence(reading):
+                    reading = second
+            readings.append(reading)
+        first = readings[0]
         return {
-            "data": first.get("data") or header_date,
-            "lote": first.get("lote") or header_lot,
-            "linhas": [line for page in pages for line in page["linhas"]],
+            "data": first.get("data") or next((r.get("data") for r in readings if r.get("data")), None),
+            "lote": first.get("lote") or next((r.get("lote") for r in readings if r.get("lote")), None),
+            "_formato": first.get("_formato"),
+            "linhas": [line for reading in readings for line in reading["linhas"]],
         }
 
     def extract(self, content: bytes, *, kind: str) -> EventExtraction:
         if kind != "photo":
             raise ValueError(f"O leitor de folhas lê fotos e PDFs, não {kind!r}.")
         return sheet_to_events(self.transcribe(content), extractor_version=self.version)
+
+
+def _from_model_keys(line: dict[str, Any]) -> dict[str, Any]:
+    """Chaves do esquema do modelo → transcrição interna (`seq`)."""
+    if "numero_da_linha" not in line:
+        return line
+    converted = {k: v for k, v in line.items() if k != "numero_da_linha"}
+    converted["seq"] = line["numero_da_linha"]
+    return converted
 
 
 def _check_transcription(data: Any) -> None:
@@ -252,7 +339,8 @@ def _fold(text: str) -> str:
 
 
 _SECAR = re.compile(r"\bsecar?\b|\bsecagem\b")
-_LOT = re.compile(r"(\d+)\s*[ºo°ª]?\s*lote\b|\blote\s*(\d+)")
+#: "1º LOTE", "LOTE 2" e a abreviação da margem do formulário, "2º LOT".
+_LOT = re.compile(r"(\d+)\s*[ºo°ª]?\s*lote?\b|\blote?\s*(\d+)")
 
 
 def _annotation_events(anotacao: str) -> list[tuple[str, dict[str, str | None]]]:
@@ -280,8 +368,14 @@ def _looks_like_name(value: str | None) -> bool:
     return bool(value) and not any(c.isdigit() for c in value)
 
 
+#: O que faz de uma linha uma leitura. Brinco sozinho não: é o número da
+#: margem ao lado de uma linha vazia ou riscada.
+_CONTENT_FIELDS = ("nome", "manha", "tarde", "total", "anotacao")
+
+
 def tidy_transcription(transcription: dict[str, Any]) -> dict[str, Any]:
-    """Correções óbvias, sem adivinhar: hoje só a troca brinco ↔ nome.
+    """Correções óbvias, sem adivinhar: descarta linha em branco do
+    formulário, desfaz a troca brinco ↔ nome e apaga brinco "0".
 
     "18 - QUARTINHA 406" tem o nome antes do número, e o modelo às vezes
     devolve os dois na ordem da folha. Número no nome e palavra no brinco é
@@ -290,10 +384,45 @@ def tidy_transcription(transcription: dict[str, Any]) -> dict[str, Any]:
     lines = []
     for line in transcription.get("linhas") or []:
         brinco, nome = _clean(line.get("brinco")), _clean(line.get("nome"))
+        if not any(_clean(line.get(k)) for k in _CONTENT_FIELDS):
+            continue  # linha do formulário que ficou em branco
         if _looks_like_name(brinco) and _looks_like_brinco(nome):
             line = {**line, "brinco": nome, "nome": brinco}
+        if brinco and re.fullmatch(r"0+", brinco):
+            line = {**line, "brinco": None}  # o modelo pôs "0" onde não havia brinco
+        anotacao = _clean(line.get("anotacao"))
+        if anotacao and not re.search(r"[^\W\d_]", anotacao):
+            # Só números ou sinais: o tique de conferência ao lado do total.
+            line = {**line, "anotacao": None}
         lines.append(line)
     return {**transcription, "linhas": lines}
+
+
+def incoherence(transcription: dict[str, Any]) -> int:
+    """Quanto a leitura se contradiz, sem olhar a folha: brincos repetidos na
+    mesma página (repetição do modelo ou margem desalinhada) e linhas em que
+    manhã + tarde não dá o total. Zero não prova que está certa; muito prova
+    que não está."""
+    lines = tidy_transcription(transcription)["linhas"]
+    seen: set[str] = set()
+    score = 0
+    for line in lines:
+        brinco = _clean(line.get("brinco"))
+        if brinco:
+            key = brinco.upper()
+            if key in seen:
+                score += 1
+            seen.add(key)
+        parts = [parse_number_br(line.get(k)) for k in ("manha", "tarde", "total")]
+        if all(value is not None for value in parts) and abs(parts[0] + parts[1] - parts[2]) > 0.01:
+            score += 1
+    return score
+
+
+def _needs_retry(transcription: dict[str, Any]) -> bool:
+    """Uma ou outra soma errada é da própria folha; mais que isso, relê."""
+    lines = len(tidy_transcription(transcription)["linhas"])
+    return incoherence(transcription) > max(1, lines // 10)
 
 
 def sheet_to_events(transcription: dict[str, Any], *, extractor_version: str) -> EventExtraction:
