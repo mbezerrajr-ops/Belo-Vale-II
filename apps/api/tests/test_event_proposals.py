@@ -63,7 +63,9 @@ def _event(event_type, brinco=None, nome=None, **fields) -> ExtractedEvent:
     )
 
 
-def _load(farm_id: str, user_email: str, *events: ExtractedEvent, kind="text") -> list[str]:
+def _load(
+    farm_id: str, user_email: str, *events: ExtractedEvent, kind="text", reference: date | None = REF
+) -> list[str]:
     """Cria as propostas pelo serviço, como o leitor fará, e devolve os ids."""
 
     async def run():
@@ -82,7 +84,7 @@ def _load(farm_id: str, user_email: str, *events: ExtractedEvent, kind="text") -
                         events=list(events),
                         extractor_name="teste",
                         extractor_version="1",
-                        reference_date=REF,
+                        reference_date=reference,
                     ),
                 )
                 await session.commit()
@@ -575,3 +577,146 @@ class TestRegistryDates:
         assert one(
             "SELECT new_value->>'ultimo_parto' FROM audit_events WHERE action = 'animal_updated'"
         ) == [("2026-08-10",)]
+
+
+def _redate(api, token, source_id, value):
+    return api.post(
+        f"/api/proposals/sources/{source_id}/date", headers=auth(token), json={"reference_date": value}
+    )
+
+
+class TestSourceDate:
+    """Trocar a data de um arquivo inteiro de uma vez: o leitor errou o
+    cabeçalho (25/08/2026 lido como 2024) e as 18 produções vieram com a data
+    errada. Corrigir uma a uma não é trabalho de gente."""
+
+    def _sheet(self, farm):
+        make_animal(farm, brinco="853", name="PRETINHA", lote="LOTE 3")
+        make_animal(farm, brinco="B2-694", name="ANDORINHA", lote="LOTE 3")
+        ids = _load(
+            farm,
+            "reviewer@belovale",
+            _event("production", "853", "PRETINHA", producao="7"),
+            _event("production", "694", "ANDORINHA", producao="7"),
+            _event("calving", "853", None, **{"del": "10"}),
+            _event("production", "853", None, producao="6", data="20/08/2024"),
+            reference=date(2024, 8, 25),
+        )
+        source = one("SELECT id::text FROM event_proposal_sources")[0][0]
+        return ids, source
+
+    def test_moves_every_pending_proposal_to_the_new_date(self, api, farm) -> None:
+        _, reviewer = make_user("reviewer")
+        ids, source = self._sheet(farm)
+
+        response = _redate(api, reviewer, source, "2026-08-25")
+
+        assert response.status_code == 200
+        assert response.json() == {"updated": 4, "kept_decided": 0}
+        rows = one(
+            "SELECT payload, alerts, version FROM event_proposals ORDER BY position"
+        )
+        assert rows[0][0] == {"measured_on": "2026-08-25", "producao": 7.0}
+        assert rows[0][2] == 2
+        assert not any(a["code"] == "old_date" for a in rows[0][1])
+        # DEL conta a partir da nova data.
+        assert rows[2][0] == {"calved_on": "2026-08-15"}
+
+    def test_keeps_what_identifies_the_animal(self, api, farm) -> None:
+        """O alerta de brinco com prefixo não depende da data: continua."""
+        _, reviewer = make_user("reviewer")
+        _, source = self._sheet(farm)
+
+        _redate(api, reviewer, source, "2026-08-25")
+
+        alerts = one("SELECT alerts FROM event_proposals WHERE position = 2")[0][0]
+        assert [a["code"] for a in alerts] == ["brinco_variant"]
+
+    def test_a_date_written_on_the_line_is_not_overwritten(self, api, farm) -> None:
+        """Só muda o que veio do cabeçalho; data escrita na linha é da linha."""
+        _, reviewer = make_user("reviewer")
+        _, source = self._sheet(farm)
+
+        _redate(api, reviewer, source, "2026-08-25")
+
+        payload = one("SELECT payload FROM event_proposals WHERE position = 4")[0][0]
+        assert payload["measured_on"] == "2024-08-20"
+
+    def test_decided_proposals_stay_as_they_were(self, api, farm) -> None:
+        _, reviewer = make_user("reviewer")
+        ids, source = self._sheet(farm)
+        rejected = api.post(
+            f"/api/proposals/{ids[0]}/reject",
+            headers=auth(reviewer),
+            json={"expected_version": 1, "reason": "linha repetida"},
+        )
+        assert rejected.status_code == 200
+
+        response = _redate(api, reviewer, source, "2026-08-25")
+
+        assert response.json() == {"updated": 3, "kept_decided": 1}
+        assert one("SELECT payload->>'measured_on' FROM event_proposals WHERE position = 1") == [
+            ("2024-08-25",)
+        ]
+
+    def test_the_read_date_is_kept_and_the_correction_is_signed(self, api, farm) -> None:
+        _, reviewer = make_user("reviewer")
+        _, source = self._sheet(farm)
+
+        _redate(api, reviewer, source, "2026-08-25")
+
+        item = _inbox(api, reviewer).json()[0]
+        assert item["source"]["reference_date"] == "2026-08-25"
+        assert item["source"]["reference_date_read"] == "2024-08-25"
+        assert item["source"]["corrected_by"] == "reviewer@belovale"
+        assert one(
+            "SELECT previous_value->>'reference_date', new_value->>'reference_date' "
+            "FROM audit_events WHERE action = 'source_date_corrected'"
+        ) == [("2024-08-25", "2026-08-25")]
+
+    def test_a_reviewer_holding_the_old_version_is_refused(self, api, farm) -> None:
+        """Quem estava com o cartão aberto antes da troca não aprova a data velha."""
+        _, reviewer = make_user("reviewer")
+        ids, source = self._sheet(farm)
+        animal = one("SELECT id::text FROM animals WHERE brinco = '853'")[0][0]
+        _redate(api, reviewer, source, "2026-08-25")
+
+        response = _approve(
+            api, reviewer, ids[0], animal, {"measured_on": "2024-08-25", "producao": 7}, version=1
+        )
+
+        assert response.status_code == 409
+
+    def test_a_future_date_is_refused(self, api, farm) -> None:
+        _, reviewer = make_user("reviewer")
+        _, source = self._sheet(farm)
+
+        assert _redate(api, reviewer, source, "2099-01-01").status_code == 422
+
+    def test_an_operator_cannot_change_the_date(self, api, farm) -> None:
+        make_user("reviewer")
+        _, operator = make_user("operator")
+        _, source = self._sheet(farm)
+
+        assert _redate(api, operator, source, "2026-08-25").status_code == 403
+
+    def test_an_unknown_source_is_not_found(self, api, farm) -> None:
+        _, reviewer = make_user("reviewer")
+
+        response = _redate(api, reviewer, "00000000-0000-0000-0000-000000000000", "2026-08-25")
+
+        assert response.status_code == 404
+
+    def test_the_database_accepts_only_the_date_correction(self, api, farm) -> None:
+        """O resto da fonte continua imutável, e a correção não se apaga."""
+        _, reviewer = make_user("reviewer")
+        _, source = self._sheet(farm)
+        _redate(api, reviewer, source, "2026-08-25")
+
+        with pytest.raises(DBAPIError, match="immutable"):
+            one("UPDATE event_proposal_sources SET reference_date = '2026-08-25' RETURNING id")
+        with pytest.raises(DBAPIError, match="cannot be erased"):
+            one(
+                "UPDATE event_proposal_sources SET corrected_reference_date = NULL, "
+                "corrected_by_user_id = NULL, corrected_at = NULL RETURNING id"
+            )

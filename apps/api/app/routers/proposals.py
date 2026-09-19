@@ -8,6 +8,7 @@ em vez de sobrescrever.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -30,6 +31,7 @@ from app.services.event_proposals import (
     animal_summary,
     approve_proposal,
     list_proposals,
+    redate_source,
     reject_proposal,
 )
 from app.services.production_entry import producao_of
@@ -59,6 +61,16 @@ class RejectIn(BaseModel):
         if len(value.strip()) < 3:
             raise ValueError("Explique em poucas palavras por que rejeitar.")
         return value.strip()
+
+
+class SourceDateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reference_date: date
+
+
+def _iso(value: date | None) -> str | None:
+    return value.isoformat() if value else None
 
 
 def _http_error(error: Exception) -> HTTPException:
@@ -113,9 +125,10 @@ async def inbox(
                     "id": str(source.id),
                     "kind": source.kind,
                     "label": source.label,
-                    "reference_date": source.reference_date.isoformat()
-                    if source.reference_date
-                    else None,
+                    # A data que vale (corrigida, se alguém corrigiu) e a lida.
+                    "reference_date": _iso(source.effective_reference_date),
+                    "reference_date_read": _iso(source.reference_date),
+                    "corrected_by": item.corrected_by,
                     "extractor_name": source.extractor_name,
                     "created_at": source.created_at.isoformat(),
                 },
@@ -193,3 +206,24 @@ async def reject(
         await session.rollback()
         raise failure from error
     return {"id": str(proposal_id), "status": "rejected"}
+
+
+@router.post("/sources/{source_id}/date")
+async def correct_source_date(
+    source_id: UUID,
+    body: SourceDateIn,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    farm: Annotated[Farm, Depends(resolve_current_farm)],
+    user: Annotated[User, Depends(require_minimum_role("reviewer"))],
+) -> dict[str, Any]:
+    """Troca a data de um arquivo inteiro: todas as propostas pendentes dele."""
+    try:
+        result = await redate_source(
+            session, farm_id=farm.id, user=user, source_id=source_id, new_date=body.reference_date
+        )
+        await session.commit()
+    except ProposalError as error:
+        failure = _http_error(error)
+        await session.rollback()
+        raise failure from error
+    return {"updated": result.updated, "kept_decided": result.kept_decided}
