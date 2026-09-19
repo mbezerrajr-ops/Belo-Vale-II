@@ -339,6 +339,76 @@ class TestLinkBrincoEndpoint:
 
         assert response.status_code in (400, 422)
 
+    def test_removes_the_brinco_when_it_was_the_wrong_cow(self, api, db) -> None:
+        """Brinco atribuído à vaca errada (ou que caiu da orelha): o animal
+        volta a ficar sem brinco, com evidência, e o número fica livre para a
+        vaca certa. Achado real: o 649 estava na REDONDA e é da BRANQUINHA."""
+        _farm(db)
+        token = _user(db, "revisor@belovale", "reviewer")
+        redonda = api.post(
+            "/api/animals", headers=_auth(token), json={"name": "REDONDA", "brinco": "B2-649"}
+        ).json()
+        branquinha = api.post(
+            "/api/animals", headers=_auth(token), json={"name": "BRANQUINHA", "brinco": "B2-549"}
+        ).json()
+
+        removed = api.request(
+            "DELETE",
+            f"/api/animals/{redonda['id']}/brinco",
+            headers=_auth(token),
+            json={"evidence": "O 649 é da BRANQUINHA (folha de 25/08); conferir no curral"},
+        )
+
+        assert removed.status_code == 200
+        assert removed.json()["brinco"] is None
+        # O número ficou livre para quem é de direito.
+        relinked = api.post(
+            f"/api/animals/{branquinha['id']}/brinco",
+            headers=_auth(token),
+            json={"brinco": "B2-649", "evidence": "Folha de 25/08, 2º lote, linha 15"},
+        )
+        assert relinked.status_code == 200
+        assert db(
+            [
+                (
+                    "SELECT previous_value->>'brinco' FROM audit_events "
+                    "WHERE action = 'animal_brinco_unlinked'",
+                    {},
+                )
+            ]
+        )[0] == ["B2-649"]
+
+    def test_removing_a_brinco_needs_evidence(self, api, db) -> None:
+        _farm(db)
+        token = _user(db, "revisor@belovale", "reviewer")
+        created = api.post(
+            "/api/animals", headers=_auth(token), json={"name": "VACA", "brinco": "B1-902"}
+        ).json()
+
+        response = api.request(
+            "DELETE", f"/api/animals/{created['id']}/brinco", headers=_auth(token), json={"evidence": " "}
+        )
+
+        assert response.status_code in (400, 422)
+        assert db([("SELECT brinco FROM animals WHERE name = 'VACA'", {})])[0] == ["B1-902"]
+
+    def test_operator_cannot_remove_the_brinco(self, api, db) -> None:
+        _farm(db)
+        reviewer = _user(db, "revisor@belovale", "reviewer")
+        operator = _user(db, "operador@belovale", "operator")
+        created = api.post(
+            "/api/animals", headers=_auth(reviewer), json={"name": "VACA OP", "brinco": "B1-903"}
+        ).json()
+
+        response = api.request(
+            "DELETE",
+            f"/api/animals/{created['id']}/brinco",
+            headers=_auth(operator),
+            json={"evidence": "sem permissão"},
+        )
+
+        assert response.status_code == 403
+
     def test_operator_cannot_link_brinco(self, api, db) -> None:
         _farm(db)
         reviewer = _user(db, "revisor@belovale", "reviewer")
