@@ -308,6 +308,8 @@ class _Transport:
             self.margins.append({"url": url, "body": body})
             if isinstance(self.margin, Exception):
                 raise self.margin
+            if isinstance(self.margin, list):
+                return _reply(self.margin[min(len(self.margins) - 1, len(self.margin) - 1)])
             return _reply(self.margin)
         if "linhas" not in properties:
             self.headers.append({"url": url, "body": body})
@@ -931,7 +933,7 @@ class TestAnnotationSpelling:
     pode virar observação só por causa disso — na caixa de Revisão uma é um
     campo preenchido, a outra é texto solto para alguém ler."""
 
-    @pytest.mark.parametrize("escrito", ["2º LOT", "2: LOT", "2o LOTE", "2. LOTE", "2 LOTE"])
+    @pytest.mark.parametrize("escrito", ["2º LOT", "2: LOT", "2o LOTE", "2. LOTE", "2 LOTE", "2= LOT", "2- LOTE"])
     def test_a_lot_change_survives_how_the_degree_sign_was_read(self, escrito) -> None:
         sheet = {**SHEET, "linhas": [_line("1", "323", "CHIQUINHA", "18", "20", "38", escrito)]}
 
@@ -970,3 +972,48 @@ class TestMarginRuns:
         lidas = {"5": "2º LOT", "6": "DOENTE", "7": "SECA", "8": "1º LOT"}
 
         assert drop_margin_runs(lidas) == lidas
+
+
+class TestMarginReadTheWrongColumn:
+    """A tira da direita é uma fração fixa da largura, e cada foto enquadra a
+    folha de um jeito: numa delas a tira caiu sobre a coluna TOTAL, e o modelo
+    respondeu 26, 34, 33, 30 — os litros, não anotações.
+
+    Resposta feita de números é sinal de coluna errada, e a folha é perguntada
+    de novo numa tira mais estreita, colada à borda direita."""
+
+    def test_an_answer_made_of_numbers_is_asked_again_closer_to_the_edge(self) -> None:
+        numeros = {"anotacoes": [{"linha": str(i), "texto": str(20 + i)} for i in range(1, 6)]}
+        anotacoes = {"anotacoes": [{"linha": "5", "texto": "2º LOTE"}]}
+        transport = _Transport(_reply(SHEET), layout="impresso", margin=[numeros, anotacoes])
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reading = reader.transcribe(_png(1200, 1600))
+
+        assert len(transport.margins) == 2
+        # A segunda pergunta vê uma tira mais estreita que a primeira.
+        primeira, _ = _image_size(transport.margins[0])
+        segunda, _ = _image_size(transport.margins[1])
+        assert segunda < primeira
+        assert [linha["anotacao"] for linha in reading["linhas"]][0] is None
+
+    def test_an_answer_with_words_is_not_asked_again(self) -> None:
+        transport = _Transport(
+            _reply(SHEET),
+            layout="impresso",
+            margin={"anotacoes": [{"linha": "5", "texto": "2º LOTE"}]},
+        )
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reader.transcribe(_png(1200, 1600))
+
+        assert len(transport.margins) == 1
+
+    def test_if_the_narrow_strip_also_answers_numbers_nothing_is_annotated(self) -> None:
+        numeros = {"anotacoes": [{"linha": str(i), "texto": str(20 + i)} for i in range(1, 6)]}
+        transport = _Transport(_reply(SHEET), layout="impresso", margin=[numeros, numeros])
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reading = reader.transcribe(_png(1200, 1600))
+
+        assert all(linha["anotacao"] is None for linha in reading["linhas"])

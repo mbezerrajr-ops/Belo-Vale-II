@@ -321,3 +321,58 @@ Prompt deriva; código não. Na ordem em que agem:
 2. a mesma anotação em 6+ linhas cobrindo 60% da página é repetição;
 3. a mesma anotação em 4 linhas SEGUIDAS é invenção em fila — foi assim que
    o modelo preencheu as linhas 21 a 27, em branco, de uma folha.
+
+## Onde o leitor está (20/09/2026, fim do dia)
+
+**Formulário impresso** — cinco fotos de celular de 22/07, contra as medições
+já lançadas no banco (103 vacas):
+
+| versão | cabeçalho | brinco | total | na revisão | erro certo |
+|---|---|---|---|---|---|
+| v6 | 2 de 5 | 87% | 53% | 82%, 10 toques | 12 |
+| **v9** | **5 de 5** | 81% | **79%** | **90%**, 4 toques | 9 |
+
+**Folha manuscrita** — 113 linhas de 25/08 contra o gabarito da planilha:
+brinco 63%, nome 30%, manhã 76%, tarde 74%, total 68%, anotação 75%, com 7
+linhas perdidas e 1 inventada. Identidade e contagem iguais às da v7; os
+litros, ~5 pontos abaixo, sem explicação (ver known-issues).
+
+**Margem do formulário impresso**, contra gabarito feito olhando as cinco
+fotos (16 anotações reais): **6 linhas certas com o evento certo, 7 falsas**.
+Começou o dia com uma seta virando 23 trocas de lote.
+
+### A leitura de uma folha hoje
+
+Cinco perguntas ao modelo, cada uma sobre um pedaço:
+
+| pergunta | imagem | custo medido |
+|---|---|---|
+| formato (impresso ou manuscrito) | página | 3 s |
+| cabeçalho (data e lote) | 32% do alto | 5 s |
+| transcrição da tabela | página | 183 s |
+| brincos | faixa esquerda | 22 s |
+| margem | números + margem, colados | 7 s |
+
+A transcrição da tabela é 83% do tempo. As quatro perguntas pequenas somam
+menos de 40 s e são responsáveis pelos ganhos do dia.
+
+### Três coisas que o modelo faz e o código precisa segurar
+
+1. **Copia o exemplo da instrução.** A instrução listava "SECA" e "DOENTE"; o
+   modelo devolveu as duas numa folha que não tem nenhuma. Instrução agora
+   descreve a forma, não o conteúdo — e há teste para isso.
+2. **Escreve "null" em vez de deixar vazio.** Virava produção fantasma.
+   `_clean` trata vazio escrito por extenso como vazio.
+3. **Inventa em fila.** Quando não sabe, repete: a mesma anotação em linhas
+   seguidas, no rabo em branco do formulário. Duas guardas pegam isso (60%
+   da página, ou 4 linhas seguidas iguais).
+
+### O que ainda não funciona, com a causa medida
+
+A tira da margem é fração fixa da largura, e cada foto enquadra a folha de um
+jeito. Numa delas a tira caiu sobre a coluna TOTAL e o modelo respondeu os
+litros; o leitor reconhece resposta numérica e pergunta de novo numa tira
+colada à borda, mas naquela foto nem a segunda acerta. Tentar por geometria
+(projeção de escuridão por coluna) esbarrou no fundo escuro da mesa e do
+espiral do caderno, que dominam as colunas das pontas: seria preciso
+endireitar a folha antes.

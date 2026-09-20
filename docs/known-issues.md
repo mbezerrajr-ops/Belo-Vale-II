@@ -692,3 +692,74 @@ Duas correções:
    conteúdo. Era provavelmente o que ensinava o modelo a escrevê-la.
 
 A guarda no código é o que garante: prompt deriva, código não.
+
+## A pergunta dos brincos ajuda — medida com e sem (20/09/2026)
+
+A chamada da faixa esquerda foi acrescentada por raciocínio, não por
+medição. Medida depois, nas mesmas cinco fotos de 22/07, com o mesmo código
+e a mesma comparação com o banco, mudando só se a pergunta acontece:
+
+| | sem a pergunta | com a pergunta |
+|---|---|---|
+| **chega à revisão com a vaca certa associada ou em 1º** | 83% (7 toques em "Ou é esta") | **91%** (5 toques) |
+| vacas do dia achadas pelo brinco | 87% | 82% |
+| linhas que apontam vaca já apontada | 8 | 7 |
+
+O contraste diz algo útil sobre o que cada número significa. Sem a pergunta,
+o leitor **encontra** mais vacas do dia — mas associa pior. Com ela, encontra
+um pouco menos e põe o brinco certo **na linha certa**, que é o que faz a
+vaca certa aparecer no cartão de quem revisa.
+
+Como o produto é a caixa de Revisão, a métrica que manda é a segunda, e a
+pergunta fica. Custo medido: 22 s por folha.
+
+## A leitura é determinística, e isso é uma ferramenta
+
+A mesma folha, lida duas vezes com o mesmo código, deu **exatamente** os
+mesmos 113 campos — inclusive os errados. Isso não é detalhe: sem
+determinismo, comparar duas versões do leitor não significaria nada, porque
+a diferença poderia ser sorte.
+
+Foi assim que uma regressão na folha manuscrita foi atribuída a uma mudança
+nossa em vez de "variação do modelo": repetida, a leitura não mudou nada.
+Vale o registro para quem for medir de novo — se dois resultados diferem, a
+causa está no código ou na instrução, não no acaso.
+
+## Uma frase de instrução custou 10 pontos na folha manuscrita (20/09/2026)
+
+Ao consertar a palavra "null" escrita por extenso, a instrução passou de
+*"Campo ilegível: null"* para *"Campo ilegível: deixe vazio"* — nos **dois**
+formatos de folha. A medição do formulário impresso melhorou; a da folha
+manuscrita, que não foi medida na hora, piorou:
+
+| campo | v7 | com o texto novo | com o texto revertido |
+|---|---|---|---|
+| brinco | 63% | 58% | **63%** |
+| nome | 30% | 23% | **30%** |
+| manhã | 78% | 66% | 76% |
+| tarde | 78% | 72% | 74% |
+| total | 73% | 63% | 68% |
+| anotação | 75% | 77% | 75% |
+| perdidas / inventadas | 7 / 1 | 6 / 0 | **7 / 1** |
+
+O texto voltou a ser o da v7 nas regras comuns e na folha manuscrita; o
+aviso sobre a palavra "null" ficou só no formulário impresso, onde foi
+medido. Custo no impresso: 1 ponto (91% → 90% de chegada à revisão). Ganho na
+manuscrita: 5 a 10 pontos.
+
+**A lição é de método:** mudança em instrução compartilhada tem de ser medida
+nos dois formatos antes de entrar. A guarda que realmente resolve o "null" é
+a do código (`_clean`), que não depende de o modelo obedecer.
+
+### O que sobrou sem explicação
+
+Os litros ficaram ~5 pontos abaixo da v7 (total 68% contra 73%), com
+identidade e contagem de linhas idênticas. Três candidatos foram
+**eliminados por medição**, e ficam registrados para quem continuar:
+
+- **não é variação entre rodadas**: a mesma folha, lida duas vezes com o
+  mesmo código, deu os mesmos 113 campos, inclusive os errados;
+- **não é a limpeza de campos vazios**: os 29 totais errados são todos
+  números mal lidos ("37,5" lido "33,5"), nenhum vazio;
+- **não são as guardas de anotação**: com elas desligadas, a folha dá
+  exatamente os mesmos números.
