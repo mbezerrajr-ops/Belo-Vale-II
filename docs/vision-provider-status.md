@@ -144,3 +144,53 @@ ruído; mais amostras dirão se vale trocar de modelo.
 sem, com a medição de 22/07 na ficha sem brinco (SAIA BRANCA, TIETA,
 BRANQUINHA, FAÍSCA...). Por isso parte das linhas "sem vaca do dia" está
 certa; a nota as conta à parte, "a conferir".
+
+### Folhas manuscritas de 25/08, em escala (113 linhas, 20/09/2026)
+
+A planilha conferida pelo titular virou gabarito das 3 páginas do PDF
+completo (`build_gabarito`) — o primeiro teste do leitor num volume real, não
+numa folha só.
+
+**Achado e corrigido: colisão de página por cabeçalho mal lido.** O PDF traz
+as páginas fora da ordem dos lotes (3º, 1º, 2º), e o alinhamento passou a
+usar o lote escrito em cada página, não a posição. Mas a página física do
+2º lote foi lida com o cabeçalho **"3º LOTE"** — igual à página do 3º lote de
+verdade — em duas leituras independentes. Sem defesa, as duas viravam a
+mesma chave, e a nota cotejava vacas de páginas diferentes entre si,
+inflando erros que não existiam (a primeira medição saiu com brinco 29%,
+nome 5%). Corrigido: cada página ganha um rótulo único dentro da mesma
+leitura; se dois cabeçalhos colidem, a segunda cai para um rótulo que nunca
+se confunde com um número de lote. A página ambígua fica sem casar — nunca
+casada com a errada.
+
+**Números depois da correção, duas leituras limpas independentes:**
+
+| | leitura 1 | leitura 2 |
+|---|---|---|
+| tempo | 684 s | 424 s |
+| linhas perdidas / inventadas | 50 / 44 | 51 / 45 |
+| brinco | 37% | 38% |
+| nome | 13% | 19% |
+| manhã / tarde | 42% / 47% | 46% / 47% |
+| total | 39% | 43% |
+| anotação | 45% | 44% |
+
+Consistentes entre si — não é ruído de uma rodada. **Bem abaixo** da folha
+manuscrita única de 25/08 medida antes (brinco 12/18 ≈ 67%): em volume, com
+páginas de até 51 linhas lidas em faixas, o leitor erra mais do que numa
+folha de 18 linhas lida de uma vez.
+
+**A causa mais provável do cabeçalho errado:** a página do 2º lote tem 45
+linhas e é lida em faixas; se o cabeçalho cair perto do corte da primeira
+faixa, pode sair cortado ou comprimido na imagem, e o modelo "completa"
+errado. A escrita em si é legível — "2º LOTE" claro, sem rasura relevante.
+Ainda não corrigido; hipóteses para a próxima rodada: repetir o cabeçalho
+em todas as faixas de uma página (hoje só a primeira o recebe por inteiro),
+ou aumentar a sobreposição no topo.
+
+**Não é uma regressão de código:** a comparação honesta expôs um problema
+de leitura que já existia, mas a comparação anterior (por posição, cega ao
+lote) o escondia misturando ele com outro. A caixa de Revisão já corrige a
+*data* de um arquivo inteiro de uma vez (`redate_source`); ainda não existe
+o equivalente para o *lote* — quem revisa hoje corrigiria linha a linha se
+o lote saísse errado. Registrado como próximo passo, não implementado agora.
