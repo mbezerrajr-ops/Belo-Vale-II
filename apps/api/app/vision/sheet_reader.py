@@ -43,6 +43,8 @@ from app.services.production_files import parse_number_br
 from app.vision.pages import (
     DEFAULT_MAX_SIDE,
     crop_bands,
+    crop_left,
+    crop_sides,
     crop_top,
     fit,
     load_pages,
@@ -52,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 EXTRACTOR_NAME = "leitor-local-folha"
 #: Muda quando a instrução ou o esquema mudam: a nota do leitor é por versão.
-PROMPT_VERSION = "folha-v8"
+PROMPT_VERSION = "folha-v9"
 
 #: Contexto do modelo: imagem + instrução + a transcrição de uma folha cheia.
 #: Uma folha de 48 linhas não cabia em 8192 e a resposta vinha cortada.
@@ -72,6 +74,9 @@ PAGE_TIMEOUT = 240.0
 
 #: O cabeçalho é uma resposta de dez palavras: não precisa de tempo de folha.
 HEADER_TIMEOUT = 90.0
+
+#: A margem é uma resposta de poucas linhas, mas olha a folha inteira.
+MARGIN_TIMEOUT = 120.0
 
 #: A primeira leitura carrega o modelo na memória de vídeo; pode demorar.
 DEFAULT_TIMEOUT = 600.0
@@ -173,7 +178,8 @@ _COMMON_RULES = """Regras:
 - Leia linha por linha, alinhando pela altura: brinco, nome, litros e
   anotação de uma entrada têm de estar na mesma linha da folha.
 - Não corrija contas, não complete números, não troque nomes por parecidos.
-- Campo ilegível: null. Nunca invente linhas nem valores.
+- Campo ilegível: deixe vazio. Nunca invente linhas nem valores, e nunca
+  escreva a palavra "null" como se fosse conteúdo.
 - Cada linha é independente: não repita a anotação ou o brinco de outra linha.
 - Em "trecho", copie a linha como você a leu.
 """
@@ -189,14 +195,14 @@ PROMPTS: dict[str, str] = {
 - Na coluna VACA/Nº está o NOME da vaca.
 - O BRINCO está escrito à mão na MARGEM ESQUERDA, fora da tabela, na mesma
   altura da linha. Algumas linhas não têm brinco na margem: nesse caso o
-  brinco é null. Nunca use o número da margem de uma linha vizinha.
-- ANOTAÇÃO fica na MARGEM DIREITA, na mesma altura da linha, geralmente depois
-  de uma seta: "→ 2º LOT", "→ SECA", "DOENTE". Ignore os tiques (✓, /, 1)
-  que às vezes aparecem ao lado do total.
+  brinco fica vazio. Nunca use o número da margem de uma linha vizinha.
+- ANOTAÇÃO fica na MARGEM DIREITA, na mesma altura da linha, em geral depois
+  de uma seta. Copie o que estiver escrito, sem trocar por uma anotação
+  parecida. Ignore os tiques (✓, /, 1) que às vezes aparecem ao lado do total.
 - ANOTAÇÃO É RARA: a folha inteira costuma ter uma ou duas, e a maioria das
-  linhas tem null. Só escreva anotação na linha em que HÁ tinta na margem
-  direita naquela altura. Se você só vê uma seta na folha, só uma linha
-  recebe anotação — não repita a mesma nas outras.
+  linhas fica com o campo vazio. Só escreva anotação na linha em que HÁ tinta
+  na margem direita naquela altura. Se você só vê uma seta na folha, só uma
+  linha recebe anotação — não repita a mesma nas outras.
 - Linhas da tabela que ficaram em branco não entram em "linhas".
 
 """ + _COMMON_RULES,
@@ -212,7 +218,7 @@ Exemplo: "3 - 389 ÁGATA → 4 + 5 = 9"   ou   "8 - 633 GIGANTE → 2 + 2 = 4 �
   (ex.: "18 - QUARTINHA 406").
 - MANHÃ e TARDE são os litros das duas ordenhas; TOTAL vem depois do "=".
 - ANOTAÇÃO é o que vem depois da última seta: "SECAR", "1º LOTE", "SECAR 7 MES.".
-  A maioria das linhas não tem anotação: use null.
+  A maioria das linhas não tem anotação: deixe o campo vazio.
 
 """ + _COMMON_RULES,
 }
@@ -232,7 +238,79 @@ Transcreva só duas coisas:
 - LOTE: o lote escrito no cabeçalho (ex.: "1º LOTE", "2º LOTE", "3º LOTE").
   Olhe bem o dígito: 2 e 3 se parecem nesta letra.
 
-Campo que não aparecer ou não der para ler: null. Nunca invente.
+Campo que não aparecer ou não der para ler: deixe vazio. Nunca invente.
+"""
+
+MARGIN_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "anotacoes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"linha": _TEXT, "texto": _TEXT},
+                "required": ["linha", "texto"],
+            },
+        }
+    },
+    "required": ["anotacoes"],
+}
+
+MARGIN_PROMPT = """\
+Esta imagem junta DUAS TIRAS recortadas da mesma folha de pesagem de leite e
+coladas lado a lado, na mesma altura:
+
+- à ESQUERDA, a coluna dos números das linhas da tabela (1., 2., 3., ...);
+- à DIREITA, a margem da folha, onde às vezes há algo escrito à mão.
+
+O que está na mesma ALTURA pertence à mesma linha. Responda quais linhas têm
+alguma coisa escrita na margem — em geral uma seta seguida de duas ou três
+palavras.
+
+Não há uma lista de anotações possíveis: copie o que estiver escrito. Se você
+não consegue ler o que há numa altura, deixe aquela linha de fora; não
+substitua por uma anotação parecida nem por uma que você imagine provável.
+
+- Anotação é RARA: a folha inteira costuma ter uma ou duas, e muitas folhas
+  não têm nenhuma. Se a margem estiver limpa, responda com a lista vazia.
+- Liste só as linhas que TÊM escrita na margem. Não liste as outras.
+- Não repita a mesma anotação em várias linhas: só se ela estiver escrita
+  várias vezes, uma em cada altura.
+- Em "linha", o número impresso que está na mesma altura, na tira da
+  esquerda.
+- Em "texto", o que está escrito, como está escrito.
+- Os tiques de conferência ao lado do total (✓, /, 1) não são anotação.
+"""
+
+BRINCO_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "brincos": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"linha": _TEXT, "brinco": _TEXT},
+                "required": ["linha", "brinco"],
+            },
+        }
+    },
+    "required": ["brincos"],
+}
+
+BRINCO_PROMPT = """\
+Esta é a faixa esquerda de um formulário impresso de pesagem de leite.
+
+Você vê duas colunas de números:
+- à direita, o número da LINHA, impresso e seguido de ponto (1., 2., 3.);
+- à esquerda, fora da tabela, o BRINCO da vaca, escrito à mão.
+
+Para cada linha que TEM um brinco escrito à mão na sua altura, responda o
+número da linha e o brinco.
+
+- Copie todos os dígitos como estão escritos, inclusive zeros à esquerda.
+- Linha sem nada escrito à esquerda não entra na lista.
+- Nunca use o brinco de uma linha vizinha, e nunca invente dígitos.
+- Se não der para ler o número de uma linha, deixe essa linha de fora.
 """
 
 _LAYOUT_SCHEMA: dict[str, Any] = {
@@ -337,6 +415,72 @@ class OllamaSheetReader:
             return {}
         return answer if isinstance(answer, dict) else {}
 
+    def read_margin(self, image_jpeg: bytes) -> dict[str, str] | None:
+        """As anotações da margem, perguntadas sozinhas: número da linha → texto.
+
+        No meio da transcrição de uma folha inteira, a margem é o campo que o
+        modelo mais generaliza — uma seta vira anotação em todas as linhas.
+        Perguntada sozinha, a resposta é curta: só as linhas que têm escrita.
+
+        `None` quer dizer "não deu para perguntar" (leitor fora do ar, resposta
+        fora do esquema): aí vale o que a transcrição trouxer. Lista vazia
+        quer dizer "a margem está limpa", e isso apaga o que a transcrição
+        inventou.
+        """
+        try:
+            answer = self._chat(
+                prompt=MARGIN_PROMPT,
+                schema=MARGIN_SCHEMA,
+                image=image_jpeg,
+                timeout=MARGIN_TIMEOUT,
+            )
+        except (ReaderUnavailable, ReaderFormatError):
+            logger.warning("margem não pôde ser lida à parte; vale a anotação da transcrição")
+            return None
+        items = answer.get("anotacoes") if isinstance(answer, dict) else None
+        if not isinstance(items, list):
+            return None
+        found: dict[str, str] = {}
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            linha, texto = _line_key(item.get("linha")), _clean(item.get("texto"))
+            if linha and texto:
+                found[linha] = texto
+        return drop_margin_runs(found)
+
+    def read_brincos(self, image_jpeg: bytes) -> dict[str, str] | None:
+        """Os brincos da margem esquerda, perguntados sozinhos: linha → brinco.
+
+        Só o formulário impresso: nele o brinco é escrito fora da tabela, numa
+        coluna própria, ao lado do número impresso da linha. Perguntar só essa
+        faixa dá ao modelo o dobro de pixels por dígito sem perder a âncora.
+
+        `None` quer dizer "não deu para perguntar": vale o que a transcrição
+        trouxer.
+        """
+        try:
+            answer = self._chat(
+                prompt=BRINCO_PROMPT,
+                schema=BRINCO_SCHEMA,
+                image=image_jpeg,
+                timeout=MARGIN_TIMEOUT,
+            )
+        except (ReaderUnavailable, ReaderFormatError):
+            logger.warning("faixa esquerda não pôde ser lida; vale o brinco da transcrição")
+            return None
+        items = answer.get("brincos") if isinstance(answer, dict) else None
+        if not isinstance(items, list):
+            return None
+        found: dict[str, str] = {}
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            linha, brinco = _line_key(item.get("linha")), _clean(item.get("brinco"))
+            if linha and brinco:
+                found[linha] = brinco
+        return found
+
     def classify_page(self, image_jpeg: bytes) -> str:
         """Formulário impresso ou folha manuscrita. Resposta estranha: impresso,
         o formato em uso na fazenda."""
@@ -401,6 +545,21 @@ class OllamaSheetReader:
                 second = self._page(page, layout, RETRY_MAX_SIDE)
                 if incoherence(second) < incoherence(reading):
                     reading = second
+            # Só o formulário impresso tem margens: o brinco numa coluna à
+            # esquerda, fora da tabela, e a anotação solta à direita. São elas
+            # que o modelo confunde no meio da transcrição, e cada uma ganha
+            # pergunta própria. Na folha manuscrita brinco e anotação estão
+            # dentro da própria linha ("3 - 389 ÁGATA → 4 + 5 = 9 → SECAR"):
+            # perguntar "o que há na margem" ali não significa nada.
+            if layout == "impresso":
+                brincos = self.read_brincos(fit(crop_left(page), DEFAULT_MAX_SIDE).content)
+                if brincos:
+                    reading = apply_brincos(reading, brincos)
+                # A margem manda na anotação: linha que ela não cita fica sem
+                # anotação nenhuma.
+                composta = fit(crop_sides(page), DEFAULT_MAX_SIDE).content
+                if (margin := self.read_margin(composta)) is not None:
+                    reading = apply_margin(reading, margin)
             # O cabeçalho lido à parte vale mais que o que veio no meio das linhas.
             readings.append({
                 **reading,
@@ -449,11 +608,20 @@ def _check_transcription(data: Any) -> None:
 # ------------------------------------------------------ etapa B: eventos (sem IA)
 
 
+#: O modelo às vezes ESCREVE a palavra em vez de deixar o campo vazio. Numa
+#: foto real ele pôs "null" nas 14 linhas em branco do formulário, e elas
+#: viraram 14 produções fantasma com litros "null". Vazio é vazio, escrito
+#: por extenso ou não.
+_WRITTEN_EMPTY = frozenset({"null", "none", "nulo", "nula", "n/a", "na", "-", "--", "---"})
+
+
 def _clean(value: Any) -> str | None:
     if value is None:
         return None
     text = re.sub(r"\s+", " ", str(value)).strip()
-    return text or None
+    if not text or _fold(text) in _WRITTEN_EMPTY:
+        return None
+    return text
 
 
 def _fold(text: str) -> str:
@@ -463,7 +631,10 @@ def _fold(text: str) -> str:
 
 _SECAR = re.compile(r"\bsecar?\b|\bsecagem\b")
 #: "1º LOTE", "LOTE 2" e a abreviação da margem do formulário, "2º LOT".
-_LOT = re.compile(r"(\d+)\s*[ºo°ª]?\s*lote?\b|\blote?\s*(\d+)")
+#: O "º" manuscrito sai do modelo como ":", "o" ou ".": "2: LOT" é a mesma
+#: troca de lote, e não pode virar observação só por causa da grafia — na
+#: caixa de Revisão uma é campo preenchido, a outra é texto solto.
+_LOT = re.compile(r"(\d+)\s*[ºo°ª:.]?\s*lote?\b|\blote?\s*(\d+)")
 
 
 def _annotation_events(anotacao: str) -> list[tuple[str, dict[str, str | None]]]:
@@ -557,6 +728,75 @@ def _drop_repeated_annotation(lines: list[dict[str, Any]]) -> list[dict[str, Any
         else line
         for line in lines
     ]
+
+
+#: Quantas linhas SEGUIDAS com a mesma anotação já são invenção. Duas ou três
+#: vacas vizinhas mudando de lote juntas acontece na folha; sete linhas
+#: seguidas no rabo em branco do formulário, não.
+_RUN_LIMIT = 4
+
+
+def drop_margin_runs(annotations: dict[str, str]) -> dict[str, str]:
+    """Tira da resposta da margem as corridas de linhas seguidas iguais.
+
+    A anotação de verdade é esparsa: numa folha com seis delas, estavam nas
+    linhas 2, 8, 10, 11, 13 e 20. Quando o modelo inventa, inventa em fila —
+    na mesma folha ele listou 21, 22, 23, 24, 25, 26 e 27 com o mesmo texto,
+    todas linhas em branco.
+    """
+    numeradas = sorted(((int(linha), texto) for linha, texto in annotations.items()), key=lambda p: p[0])
+    manter: dict[str, str] = {}
+    corrida: list[tuple[int, str]] = []
+
+    def fecha() -> None:
+        if len(corrida) < _RUN_LIMIT:
+            manter.update({str(linha): texto for linha, texto in corrida})
+
+    for linha, texto in numeradas:
+        if corrida and linha == corrida[-1][0] + 1 and _fold(texto) == _fold(corrida[-1][1]):
+            corrida.append((linha, texto))
+            continue
+        fecha()
+        corrida = [(linha, texto)]
+    fecha()
+    return manter
+
+
+def _line_key(value: Any) -> str:
+    """Número da linha como chave, venha "6", "6." ou "nº 6".
+
+    O formulário imprime "6." e o modelo devolve o ponto junto; casar exato
+    não colaria a resposta em linha nenhuma.
+    """
+    return re.sub(r"\D", "", _clean(value) or "")
+
+
+def apply_margin(reading: dict[str, Any], annotations: dict[str, str]) -> dict[str, Any]:
+    """Põe na transcrição as anotações lidas na chamada própria da margem.
+
+    Quem manda é a margem: a linha que ela não cita fica sem anotação, mesmo
+    que a transcrição tenha trazido alguma. É o que impede uma seta de virar
+    anotação na folha inteira.
+    """
+    lines = [
+        {**line, "anotacao": annotations.get(_line_key(line.get("seq")))}
+        for line in reading.get("linhas") or []
+    ]
+    return {**reading, "linhas": lines}
+
+
+def apply_brincos(reading: dict[str, Any], brincos: dict[str, str]) -> dict[str, Any]:
+    """Troca o brinco das linhas que a faixa esquerda soube ler.
+
+    Ao contrário da margem, aqui a linha que a faixa não cita fica com o que a
+    transcrição trouxe: o problema do brinco é dígito trocado, não brinco
+    inventado, e apagar o que já se tinha seria perder leitura boa.
+    """
+    lines = [
+        {**line, "brinco": brincos.get(_line_key(line.get("seq"))) or line.get("brinco")}
+        for line in reading.get("linhas") or []
+    ]
+    return {**reading, "linhas": lines}
 
 
 def merge_bands(readings: list[dict[str, Any]]) -> dict[str, Any]:

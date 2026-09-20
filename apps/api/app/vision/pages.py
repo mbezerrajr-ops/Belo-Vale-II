@@ -20,7 +20,20 @@ from app.services.image_sniffing import sniff_image_media_type
 DEFAULT_MAX_SIDE = 1200
 
 #: Quanto do alto da folha vai na pergunta do cabeçalho (data e lote).
-HEADER_FRACTION = 0.18
+#: 18% bastavam no PDF escaneado, em que a folha começa no pixel zero. Na foto
+#: de celular a mesa entra no enquadramento e esses 18% acabavam ANTES da linha
+#: "LOTE: __ DATA: __": o modelo recebia papel em branco e inventava a data.
+#: Medido nas cinco fotos de 22/07, 32% enquadra todas; 45% não melhora.
+HEADER_FRACTION = 0.32
+
+#: Quanto da largura vai na pergunta dos brincos do formulário impresso: a
+#: margem escrita à mão mais a coluna de números impressos, que a ancora.
+LEFT_FRACTION = 0.34
+
+#: As duas tiras que a pergunta da margem junta: a coluna dos números
+#: impressos da tabela e a margem direita, onde ficam as anotações.
+NUMBER_STRIP = (0.08, 0.30)
+MARGIN_STRIP = (0.70, 1.0)
 
 #: Sobreposição entre as faixas, para nenhuma linha cair no corte.
 BAND_OVERLAP = 0.08
@@ -65,6 +78,50 @@ def crop_top(page: PreprocessedImage, fraction: float = HEADER_FRACTION) -> Prep
     letra depois de reduzidos.
     """
     return _crop(page, (0, 0, page.width, max(1, int(page.height * fraction))))
+
+
+def crop_left(page: PreprocessedImage, fraction: float = LEFT_FRACTION) -> PreprocessedImage:
+    """A faixa esquerda da folha inteira, de cima a baixo.
+
+    No formulário impresso o brinco é escrito à mão na margem esquerda, fora
+    da tabela, na mesma altura do número impresso da linha. A faixa leva os
+    dois: mais pixels por dígito, sem perder a âncora que diz de qual linha
+    aquele brinco é.
+    """
+    return _crop(page, (0, 0, max(1, int(page.width * fraction)), page.height))
+
+
+def crop_sides(
+    page: PreprocessedImage,
+    numbers: tuple[float, float] = NUMBER_STRIP,
+    margin: tuple[float, float] = MARGIN_STRIP,
+) -> PreprocessedImage:
+    """Cola a coluna dos números das linhas ao lado da margem direita.
+
+    Na folha as duas ficam a meia página de distância, e medindo se viu que o
+    modelo lê a anotação mas erra a linha a que ela pertence: numa foto com
+    setas nas linhas 5 e 14, respondeu 25 e 26. A pergunta dos brincos, onde
+    as colunas já são vizinhas, acerta a sequência inteira — é a proximidade
+    que ancora.
+
+    Recortadas e coladas, as duas tiras viram uma imagem estreita em que cada
+    anotação fica na mesma altura do seu número, lado a lado.
+    """
+    with Image.open(io.BytesIO(page.content)) as image:
+        esquerda = image.crop(
+            (int(image.width * numbers[0]), 0, int(image.width * numbers[1]), image.height)
+        )
+        direita = image.crop(
+            (int(image.width * margin[0]), 0, int(image.width * margin[1]), image.height)
+        )
+        junta = Image.new("RGB", (esquerda.width + direita.width, image.height), "white")
+        junta.paste(esquerda, (0, 0))
+        junta.paste(direita, (esquerda.width, 0))
+        buffer = io.BytesIO()
+        junta.save(buffer, format="JPEG", quality=90)
+        return PreprocessedImage(
+            content=buffer.getvalue(), width=junta.width, height=junta.height, format="JPEG"
+        )
 
 
 def crop_bands(page: PreprocessedImage, overlap: float = BAND_OVERLAP) -> list[PreprocessedImage]:
