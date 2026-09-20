@@ -521,3 +521,83 @@ A leitura termina em segundo plano, e a tela não escuta o servidor. Enquanto
 não há notificação, a Revisão traz um botão **Atualizar**: clicar na aba já
 escolhida não recarregaria nada. Empurrar a atualização (SSE, WebSocket ou
 sondagem) fica para quando houver mais de um revisor ao mesmo tempo.
+
+## A anotação da margem contaminava a folha inteira (20/09/2026)
+
+Achado na **primeira prova com o leitor de verdade** ligado ao app: uma foto
+de 22/07 (14 vacas, lote 1) entrou pela Revisão e produziu 14 produções e
+**13 ordens de secagem que não existem na folha**. A folha tem duas setas na
+margem, ambas "→ 2º LOTE"; nenhuma diz "SECA".
+
+Não era regressão da fase 2c: a leitura saiu idêntica à que o CLI já
+produzia. A fiação nova apenas expôs, em uso real, um defeito de leitura que
+a medição por campo não pegava — ela conferia brinco, nome e litros, não
+quantas anotações foram inventadas.
+
+Medido nas cinco fotos de 22/07, antes:
+
+| foto | linhas | anotações na folha | eventos de anotação lidos |
+|---|---|---|---|
+| lote1-2 | 14 | 2 | 14 (13 "secar" falsas) |
+| lote1 | 28 | ? | 28 (27 "secar" falsas) |
+| lote2-2 | 28 | ? | 28 (todas "3º lote") |
+| lote2 | 23 | 4 | 23 (todas "3º lote") |
+| lote3 | 21 | 0 | 0 |
+
+A assinatura é clara: onde não há anotação nenhuma, sai limpo; onde há uma,
+ela é copiada para a folha inteira. A anotação fica solta na margem direita,
+longe da linha a que pertence — é o campo mais fácil de o modelo generalizar.
+
+### O que foi feito
+
+1. **Guarda no código** (`_drop_repeated_annotation`): a mesma anotação em
+   seis linhas ou mais, cobrindo 60% da página, é repetição do modelo, não
+   leitura — e é apagada. Seis linhas porque um lote pequeno pode mudar de
+   lote junto de verdade; 60% porque margem anotada de ponta a ponta não
+   acontece na folha.
+2. **Prompt do formulário impresso** (`folha-v8`): diz que anotação é rara e
+   que só se escreve onde há tinta na margem naquela altura.
+
+Depois, nas mesmas cinco fotos: **91 eventos de anotação viraram 3**. As
+ordens de secagem falsas sumiram inteiras.
+
+### O que se perde, e por que vale a pena
+
+**A guarda é que resolve; o prompt quase não.** As transcrições cruas do v8
+ainda trazem "→ SECA" em 13 e 27 linhas e "→ 3º LOT" em 28 — quem limpa é o
+código. Por isso a guarda ficou no código e não na instrução: prompt deriva,
+código não.
+
+E o leitor agora **lê anotação de menos**: no lote 2, das 4 anotações reais
+("→ 3º LOTE" em três linhas e "DOENTE" numa), sai 1. A troca é deliberada —
+uma troca de lote que não aparece é uma correção pequena na caixa; vinte e
+três ordens de secagem falsas afogam quem revisa e, aprovadas sem conferir,
+secam um lote inteiro.
+
+A leitura crua fica guardada em `extraction_runs.raw_response`: nada é
+perdido em silêncio, e a foto está ao lado das propostas.
+
+**Próximo passo natural** (não feito): perguntar a margem em **chamada
+própria**, como já se faz com o cabeçalho — "quais linhas têm escrita na
+margem direita, e o quê" —, que foi o que resolveu o cabeçalho.
+
+## O cabeçalho lido à parte pode falhar em silêncio
+
+A data e o lote são perguntados numa chamada só deles, com prazo de 90 s,
+porque no meio de 48 linhas saíam errados. Se essa chamada estoura o prazo —
+com a GPU carregada, acontece: uma folha do 1º lote levou 216 s —, o leitor
+volta para a data que veio no meio da transcrição, que é a fonte pior, **sem
+dizer nada**. Nas cinco fotos de 22/07, três leram a data como 25/08.
+
+Agora fica registrado no log (`cabeçalho não pôde ser lido à parte`). O
+revisor corrige a data do arquivo inteiro de uma vez, então o estrago é
+pequeno — mas era invisível.
+
+## O lote do cabeçalho não vira dado nenhum
+
+Registrado porque a lacuna "corrigir o lote do arquivo inteiro, como já se
+corrige a data" estava na lista de próximos passos com prioridade alta, e a
+conferência do código mostrou que ela vale pouco: `sheet_to_events` usa só a
+`data` do cabeçalho. O lote lido serve para conferir a leitura contra o
+gabarito; não entra em proposta nenhuma. Troca de lote só existe quando está
+escrita na margem, linha a linha, e essa o revisor corrige no próprio cartão.

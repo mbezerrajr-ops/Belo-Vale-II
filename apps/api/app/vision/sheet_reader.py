@@ -24,10 +24,12 @@ import base64
 import io
 import ipaddress
 import json
+import logging
 import re
 import unicodedata
 import urllib.error
 import urllib.request
+from collections import Counter
 from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlsplit
@@ -46,9 +48,11 @@ from app.vision.pages import (
     load_pages,
 )
 
+logger = logging.getLogger(__name__)
+
 EXTRACTOR_NAME = "leitor-local-folha"
 #: Muda quando a instrução ou o esquema mudam: a nota do leitor é por versão.
-PROMPT_VERSION = "folha-v7"
+PROMPT_VERSION = "folha-v8"
 
 #: Contexto do modelo: imagem + instrução + a transcrição de uma folha cheia.
 #: Uma folha de 48 linhas não cabia em 8192 e a resposta vinha cortada.
@@ -189,6 +193,10 @@ PROMPTS: dict[str, str] = {
 - ANOTAÇÃO fica na MARGEM DIREITA, na mesma altura da linha, geralmente depois
   de uma seta: "→ 2º LOT", "→ SECA", "DOENTE". Ignore os tiques (✓, /, 1)
   que às vezes aparecem ao lado do total.
+- ANOTAÇÃO É RARA: a folha inteira costuma ter uma ou duas, e a maioria das
+  linhas tem null. Só escreva anotação na linha em que HÁ tinta na margem
+  direita naquela altura. Se você só vê uma seta na folha, só uma linha
+  recebe anotação — não repita a mesma nas outras.
 - Linhas da tabela que ficaram em branco não entram em "linhas".
 
 """ + _COMMON_RULES,
@@ -321,7 +329,12 @@ class OllamaSheetReader:
                 timeout=HEADER_TIMEOUT,
             )
         except (ReaderUnavailable, ReaderFormatError):
-            return {}  # sem cabeçalho, vale o que a transcrição trouxer
+            # Sem cabeçalho vale o que a transcrição trouxer — que é a fonte
+            # pior, e foi por isso que o cabeçalho ganhou chamada própria.
+            # Com a GPU carregada essa chamada estoura o prazo, e a data do
+            # arquivo sai errada sem ninguém perceber: fica registrado.
+            logger.warning("cabeçalho não pôde ser lido à parte; vale a data da transcrição")
+            return {}
         return answer if isinstance(answer, dict) else {}
 
     def classify_page(self, image_jpeg: bytes) -> str:
@@ -505,7 +518,45 @@ def tidy_transcription(transcription: dict[str, Any]) -> dict[str, Any]:
             # Só números ou sinais: o tique de conferência ao lado do total.
             line = {**line, "anotacao": None}
         lines.append(line)
-    return {**transcription, "linhas": lines}
+    return {**transcription, "linhas": _drop_repeated_annotation(lines)}
+
+
+#: A partir de quantas linhas iguais, e de que fatia da página, a anotação
+#: deixa de ser leitura e passa a ser repetição do modelo. Seis linhas porque
+#: um lote pequeno pode mudar junto de verdade; 60% porque a margem anotada
+#: de ponta a ponta não acontece na folha, e acontece no modelo.
+_REPEAT_LINES = 6
+_REPEAT_SHARE = 0.6
+
+
+def _drop_repeated_annotation(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Apaga a anotação que aparece na folha inteira.
+
+    A anotação fica na margem direita, solta, longe da linha a que pertence.
+    O modelo às vezes copia a mesma para todas as linhas: numa foto real uma
+    seta "→ 3º LOTE" virou 23 trocas de lote, e um "SECA" virou 27 ordens de
+    secagem. Uma ordem de secar falsa é o erro mais caro que pode chegar na
+    caixa de Revisão, e vinte e três delas afogam quem revisa.
+
+    O que se perde: a folha em que muitas vacas realmente foram marcadas
+    igual entra sem a marca. O que não se perde: a produção da tabela, a
+    leitura crua (guardada no `raw_response` da execução) e a foto, que fica
+    ao lado das propostas para conferência.
+    """
+    counts = Counter(_fold(anotacao) for line in lines if (anotacao := _clean(line.get("anotacao"))))
+    repeated = {
+        text
+        for text, count in counts.items()
+        if count >= _REPEAT_LINES and count >= _REPEAT_SHARE * len(lines)
+    }
+    if not repeated:
+        return lines
+    return [
+        {**line, "anotacao": None}
+        if (anotacao := _clean(line.get("anotacao"))) and _fold(anotacao) in repeated
+        else line
+        for line in lines
+    ]
 
 
 def merge_bands(readings: list[dict[str, Any]]) -> dict[str, Any]:
