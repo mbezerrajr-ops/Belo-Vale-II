@@ -101,17 +101,43 @@ def _lote_number(value: Any) -> str | None:
     return digits or None
 
 
-def _key(line: dict[str, Any], index: int) -> str:
-    """Identidade da linha para alinhar leitura e gabarito.
+def _page_labels(lines: list[dict[str, Any]]) -> dict[int, str]:
+    """Rótulo de cada página física, pelo lote escrito nela — mas pela
+    posição quando esse lote colide com o de uma página anterior.
 
-    Cada folha recomeça a numeração em 1, então a página entra na chave — mas
-    pelo LOTE escrito nela, não pela posição: no PDF de 25/08 as páginas estão
-    fora de ordem (3º lote, 1º, 2º) e a planilha vem na ordem dos lotes.
+    Cada folha recomeça a numeração em 1, então a página entra na chave; usar
+    o LOTE escrito nela (em vez da posição) resolve o PDF de 25/08, cujas
+    páginas vêm fora de ordem (3º lote, 1º, 2º). Mas o leitor às vezes erra o
+    cabeçalho — uma página do 2º lote foi lida como "3º LOTE", igual à
+    página do 3º lote de verdade — e duas páginas com o mesmo rótulo
+    misturariam suas linhas na comparação. A segunda a reivindicar um lote já
+    visto cai para o próprio número da página, que nunca colide.
     """
+    labels: dict[int, str] = {}
+    seen: set[str] = set()
+    for line in lines:
+        pagina = line.get("pagina")
+        if pagina is None or pagina in labels:
+            continue
+        lote = _lote_number(line.get("lote_pagina"))
+        # "p{página}" nunca colide com um número de lote (sempre dígitos
+        # puros) — nem quando a página física é a 3 e o lote colidido também
+        # é "3", como aconteceu na leitura real de 25/08.
+        label = lote if lote and lote not in seen else f"p{pagina}"
+        labels[pagina] = label
+        seen.add(label)
+    return labels
+
+
+def _key(line: dict[str, Any], index: int, page_labels: dict[int, str] | None = None) -> str:
+    """Identidade da linha para alinhar leitura e gabarito."""
     seq = line.get("seq")
     numero = str(seq).strip() if seq not in (None, "") else f"#{index + 1}"
-    pagina = _lote_number(line.get("lote_pagina")) or line.get("pagina")
-    return f"{pagina}.{numero}" if pagina else numero
+    pagina = line.get("pagina")
+    label = (page_labels or {}).get(pagina) if pagina is not None else None
+    if label is None:
+        label = _lote_number(line.get("lote_pagina")) or pagina
+    return f"{label}.{numero}" if label else numero
 
 
 def compare(reading: dict[str, Any], truth: dict[str, Any]) -> Score:
@@ -122,8 +148,12 @@ def compare(reading: dict[str, Any], truth: dict[str, Any]) -> Score:
     ) and parse_event_date(truth.get("data"), reference=None) is not None
     score.header_lot_ok = _fold(reading.get("lote")) == _fold(truth.get("lote"))
 
-    expected = {_key(line, i): line for i, line in enumerate(truth.get("linhas") or [])}
-    got = {_key(line, i): line for i, line in enumerate(reading.get("linhas") or [])}
+    truth_lines = truth.get("linhas") or []
+    reading_lines = reading.get("linhas") or []
+    truth_labels = _page_labels(truth_lines)
+    reading_labels = _page_labels(reading_lines)
+    expected = {_key(line, i, truth_labels): line for i, line in enumerate(truth_lines)}
+    got = {_key(line, i, reading_labels): line for i, line in enumerate(reading_lines)}
     score.lines_expected = len(expected)
     score.invented = len(set(got) - set(expected))
     for key, truth_line in expected.items():

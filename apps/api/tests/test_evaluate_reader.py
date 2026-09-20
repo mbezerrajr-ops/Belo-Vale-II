@@ -57,6 +57,53 @@ class TestPageAlignment:
 
         assert compare(truth, truth).missed == 0
 
+    def test_two_pages_misread_as_the_same_lote_do_not_contaminate_each_other(self) -> None:
+        """O modelo às vezes erra o cabeçalho: a página 3 (2º lote de
+        verdade) saiu lida como "3º LOTE", igual à página 1 de verdade. Sem
+        defesa, as duas viram a mesma chave "3.1" e a comparação mistura os
+        lotes — a produção da PRETINHA (página 1) seria cotejada com a
+        MOCINHA (página 3). Ninguém sabe, só pela leitura, qual das duas é
+        mesmo o 3º lote; o que importa é que a página 1 (sem ambiguidade)
+        continua pontuando certo, e a página 3 fica sem casar — nunca
+        casada com a linha errada."""
+        truth = {"data": "25/08/2026", "lote": "3º Lote", "linhas": [
+            {**_line("1", "853", "PRETINHA", "4", "3", "7"), "pagina": 1, "lote_pagina": "3º Lote"},
+            {**_line("1", "661", "MOCINHA", "7,5", "7,5", "15"), "pagina": 2, "lote_pagina": "2º Lote"},
+        ]}
+        # A leitura errou o cabeçalho da página 2: leu "3º" também.
+        reading = {"data": "25/08/26", "lote": "3º", "linhas": [
+            {**_line("1", "853", "PRETINHA", "4", "3", "7"), "pagina": 1, "lote_pagina": "3º"},
+            {**_line("1", "661", "MOCINHA", "7,5", "7,5", "15"), "pagina": 2, "lote_pagina": "3º"},
+        ]}
+
+        score = compare(reading, truth)
+
+        # A página sem ambiguidade (1) casou certo.
+        assert score.correct["nome"] == 1
+        assert not any(field == "nome" and truth_v == "PRETINHA" for _, field, truth_v, _ in score.errors)
+        # A página ambígua (2) não casa — mas nunca é comparada com a errada.
+        assert score.missed == 1
+        assert score.invented == 1
+
+    def test_the_fallback_page_number_does_not_collide_with_a_lote_number(self) -> None:
+        """Achado real: a página física 3 colidiu de lote com a página 1 (as
+        duas lidas como "3º"). O rótulo de reserva da página 3 não pode ser a
+        string "3" — coincidiria com o próprio número do lote colidido, e a
+        colisão continuaria, só que por outro caminho."""
+        truth = {"data": "25/08/2026", "lote": "3º Lote", "linhas": [
+            {**_line("1", "853", "PRETINHA", "4", "3", "7"), "pagina": 1, "lote_pagina": "3º Lote"},
+            {**_line("1", "661", "MOCINHA", "7,5", "7,5", "15"), "pagina": 3, "lote_pagina": "2º Lote"},
+        ]}
+        reading = {"data": "25/08/26", "lote": "3º", "linhas": [
+            {**_line("1", "853", "PRETINHA", "4", "3", "7"), "pagina": 1, "lote_pagina": "3º"},
+            {**_line("1", "661", "MOCINHA", "7,5", "7,5", "15"), "pagina": 3, "lote_pagina": "3º"},
+        ]}
+
+        score = compare(reading, truth)
+
+        assert score.correct["nome"] == 1
+        assert not any(field == "nome" and truth_v == "PRETINHA" for _, field, truth_v, _ in score.errors)
+
 
 class TestCompare:
     def test_a_perfect_reading_scores_everything(self) -> None:
