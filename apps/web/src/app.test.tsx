@@ -81,23 +81,17 @@ describe("App", () => {
     expect(api.listProposals).toHaveBeenCalledWith("token-de-teste", "pending");
   });
 
-  it("esconde Fichas quando não há OCR real", async () => {
+  it("não há mais área Fichas: a foto é enviada pela Revisão", async () => {
+    // Duas telas faziam a mesma coisa — enviar folha e revisar o que saiu
+    // dela. O envio foi para dentro da Revisão, que é onde o resultado
+    // aparece; as fichas antigas continuam no banco.
     signedIn({ role: "admin", email: "dono@belovale" });
 
     render(<App />);
 
     await screen.findByRole("button", { name: /produção/i });
-    await waitFor(() => expect(api.getFeatures).toHaveBeenCalled());
     expect(screen.queryByRole("button", { name: /fichas/i })).not.toBeInTheDocument();
-  });
-
-  it("mostra Fichas quando a instalação tem OCR", async () => {
-    signedIn({ role: "admin", email: "dono@belovale" });
-    api.getFeatures.mockResolvedValue({ photo_sheets: true });
-
-    render(<App />);
-
-    expect(await screen.findByRole("button", { name: /fichas/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /revisão/i })).toBeInTheDocument();
   });
 
   it("sair só mostra o login depois que o servidor encerrou a sessão", async () => {

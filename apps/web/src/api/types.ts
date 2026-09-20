@@ -491,6 +491,8 @@ export interface Proposal {
     reference_date_read: string | null;
     /** Quem corrigiu a data do arquivo, se alguém corrigiu. */
     corrected_by: string | null;
+    /** A folha de onde a leitura saiu, com link curto (15 min). */
+    photo_url: string | null;
     extractor_name: string;
     created_at: string;
   };

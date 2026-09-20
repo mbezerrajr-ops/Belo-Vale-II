@@ -233,3 +233,33 @@ lote) o escondia misturando ele com outro. A caixa de Revisão já corrige a
 *data* de um arquivo inteiro de uma vez (`redate_source`); ainda não existe
 o equivalente para o *lote* — quem revisa hoje corrigiria linha a linha se
 o lote saísse errado. Registrado como próximo passo, não implementado agora.
+
+## Qual caminho é o oficial (20/09/2026)
+
+Existem dois caminhos de leitura no repositório. **O oficial é o novo.**
+
+| | Fichas (legado) | Revisão (oficial) |
+|---|---|---|
+| Entrada | área "Fichas", fora do menu | **Revisão → Enviar foto** |
+| Leitor | `VisionProvider` (`app/vision/provider.py`) | `EventExtractor` (`app/vision/reader.py`) |
+| Modelo | nunca houve provedor real ligado | Ollama local, `qwen2.5vl:7b` |
+| Resultado | linhas, `provenance=ocr_review` | eventos tipados, `proposal_review` |
+| Situação | congelado, serve o que já foi importado | em uso |
+
+O legado continua no lugar porque as fichas já importadas dependem dele.
+Nada novo deve ser construído sobre ele.
+
+### O que o app sabe sobre o modelo
+
+Só o endereço (`READER_URL`) e o nome do modelo. Não há SDK de provedor, não
+há chave de API, e `ensure_local_url` recusa endereço público — a regra de
+"nada sai para provedor externo" vale por construção, não por disciplina.
+É isso que permite mudar de máquina (Windows do titular → servidor com GPU →
+servidor próprio na VPN) sem tocar no código.
+
+### O que ainda é conhecido como fraco
+
+O brinco continua na casa dos 60% na folha manuscrita (ver a medição acima).
+Ele é sugestão, não decisão: nada entra no rebanho sem alguém aprovar na
+caixa de Revisão. Subir esse número (segmentar linha a linha, outros modelos)
+é trabalho separado.

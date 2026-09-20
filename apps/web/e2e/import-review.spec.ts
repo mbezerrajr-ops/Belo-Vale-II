@@ -12,11 +12,14 @@ import {
 } from "./seed";
 import { uniqueFixtureCopy } from "./testFiles";
 
-// Fluxo de ficha por foto, de ponta a ponta: upload, worker real (Celery sobre
-// Redis), provedor de OCR falso, revisão, aprovação e leitura oficial.
+// Foto da folha até a medição oficial, de ponta a ponta, na pilha real:
+// envio pela Revisão, worker de verdade (Celery sobre Redis), leitor **falso**
+// (o CI não tem GPU nem modelo), proposta na caixa, aprovação e leitura
+// oficial com proveniência de revisão.
 //
-// A área "Fichas" só aparece com OCR real; aqui ela está visível porque o
-// ambiente E2E liga PHOTO_SHEETS_DEMO de propósito (infra/.env.e2e).
+// O leitor falso devolve sempre a mesma vaca (497 PONTA CURTA, 18 L), que é a
+// mesma que o seed cadastra — é o que permite exercitar o caminho inteiro sem
+// depender de reconhecimento de imagem.
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE_SHEET = path.join(currentDir, "fixtures", "sheet.jpg");
@@ -24,43 +27,48 @@ const FIXTURE_SHEET = path.join(currentDir, "fixtures", "sheet.jpg");
 // colide com a FIXTURE_SHEET já usada.
 const FIXTURE_SHEET_2 = path.join(currentDir, "fixtures", "sheet2.jpg");
 
-test.describe("ficha por foto até a medição oficial", () => {
+test.describe("foto da folha até a medição oficial", () => {
   test.beforeAll(() => {
     ensureAdminExists();
     ensurePhotoSheetAnimal();
   });
 
-  test("envio, leitura pelo worker, revisão, aprovação e medição oficial", async ({ page }) => {
+  test("envio pela Revisão, leitura pelo worker, aprovação e medição oficial", async ({ page }) => {
     await loginAsAdmin(page);
-    await openArea(page, "Fichas");
+    await openArea(page, /Revisão/);
 
+    await page.getByRole("button", { name: "Enviar foto" }).click();
     // Uma cópia com sufixo único: Postgres e MinIO persistem entre execuções,
     // e os mesmos bytes cairiam na proteção contra foto duplicada.
-    await page.getByLabel("Foto da ficha").setInputFiles(uniqueFixtureCopy(FIXTURE_SHEET));
-    await page.getByRole("button", { name: "Enviar foto" }).click();
-    await expect(page.getByText(/Importação enviada/i)).toBeVisible();
+    await page.getByLabel(/foto da folha/i).setInputFiles(uniqueFixtureCopy(FIXTURE_SHEET));
+    await page.getByRole("button", { name: "Enviar", exact: true }).click();
+    await expect(page.getByText(/lendo a folha/i)).toBeVisible();
 
-    // O worker processa de forma assíncrona: a tela é atualizada pela própria
-    // ação de "Atualizar revisão", sem espera fixa.
-    const line = page.getByRole("article", { name: /Linha 1/i });
+    // O worker lê em segundo plano: a caixa é relida pelo botão "Atualizar"
+    // até a proposta aparecer, sem espera fixa. É o mesmo gesto que a pessoa
+    // faz na fazenda enquanto a leitura não termina.
+    const card = page.getByRole("article", { name: new RegExp(`Produção — 497`) }).first();
+    const refresh = page.getByRole("button", { name: "Atualizar", exact: true });
     await expect(async () => {
-      await page.getByRole("button", { name: "Atualizar revisão" }).click();
-      await expect(line).toBeVisible();
+      await refresh.click();
+      await expect(card).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 45_000, intervals: [500, 1000, 2000] });
 
-    await expect(line.getByText("18")).toBeVisible();
-    await expect(line).toContainText(E2E_ANIMAL_NAME, { ignoreCase: true });
+    await expect(card).toContainText(E2E_ANIMAL_NAME, { ignoreCase: true });
 
-    // O OCR falso devolve sempre o mesmo animal e data: uma execução anterior
-    // pode já ter criado essa medição, e aí o backend exige motivo.
-    await line.getByRole("button", { name: "Aprovar" }).click();
-    const replacementReason = line.getByLabel(/motivo da substituição/i);
-    if (await replacementReason.isVisible()) {
-      await replacementReason.fill("E2E: confirmando substituição de execução anterior");
+    // O leitor falso devolve sempre o mesmo animal e data: uma execução
+    // anterior pode já ter lançado essa produção, e aí a API exige motivo.
+    await card.getByRole("button", { name: "Aprovar" }).click();
+    const replaceReason = card.getByLabel(/motivo para substituir/i);
+    if (await replaceReason.isVisible()) {
+      await replaceReason.fill("E2E: confirmando substituição de execução anterior");
+      await card.getByRole("button", { name: /substituir e aprovar/i }).click();
     }
-    await line.getByRole("button", { name: "Confirmar aprovação" }).click();
+    // Não se afirma que o cartão some: o leitor falso devolve sempre a mesma
+    // vaca, e execuções anteriores deixam pendências iguais na caixa. O que
+    // prova a aprovação é a medição oficial, conferida logo abaixo.
 
-    // A medição aprovada aparece na leitura oficial, não só na tela de revisão.
+    // A medição aprovada aparece na leitura oficial, não só na revisão.
     await openArea(page, "Medições");
     const official = page.getByRole("region", { name: "Medições oficiais" });
     await expect(async () => {
@@ -70,26 +78,27 @@ test.describe("ficha por foto até a medição oficial", () => {
     await expect(official).toContainText(E2E_ANIMAL_NAME);
   });
 
-  test("a mesma foto enviada duas vezes é recusada, com reprocessamento deliberado", async ({ page }) => {
+  test("a mesma foto enviada duas vezes é lida de novo, sem duplicar", async ({ page }) => {
     await loginAsAdmin(page);
-    await openArea(page, "Fichas");
+    await openArea(page, /Revisão/);
 
-    const uniqueSheet = uniqueFixtureCopy(FIXTURE_SHEET_2);
-    await page.getByLabel("Foto da ficha").setInputFiles(uniqueSheet);
+    const sheet = uniqueFixtureCopy(FIXTURE_SHEET_2);
     await page.getByRole("button", { name: "Enviar foto" }).click();
-    await expect(page.getByText(/Importação enviada/i)).toBeVisible();
+    await page.getByLabel(/foto da folha/i).setInputFiles(sheet);
+    await page.getByRole("button", { name: "Enviar", exact: true }).click();
+    await expect(page.getByText(/lendo a folha/i)).toBeVisible();
 
-    // Mesmos bytes: o backend reconhece pelo hash e não cria outra importação.
-    await page.getByLabel("Foto da ficha").setInputFiles(uniqueSheet);
+    // Mesmos bytes: o backend reconhece pelo hash e não cria outra cópia.
     await page.getByRole("button", { name: "Enviar foto" }).click();
-    await expect(page.getByText(/já foi enviada anteriormente/i)).toBeVisible();
+    await page.getByLabel(/foto da folha/i).setInputFiles(sheet);
+    await page.getByRole("button", { name: "Enviar", exact: true }).click();
+    await expect(page.getByText(/já foi enviada/i)).toBeVisible();
 
-    // Reprocessar é uma ação separada e deliberada, sobre a importação original.
-    // Se a leitura da primeira foto ainda estiver rodando no worker, a API
-    // recusa e a tela pede para tentar de novo — como faria uma pessoa.
+    // Ler de novo é deliberado. Se a primeira leitura ainda estiver rodando,
+    // a API recusa e a tela pede para tentar de novo — como faria uma pessoa.
     await expect(async () => {
-      await page.getByRole("button", { name: "Reprocessar mesmo assim" }).click();
-      await expect(page.getByText(/Importação enviada/i)).toBeVisible({ timeout: 2_000 });
+      await page.getByRole("button", { name: "Ler de novo" }).click();
+      await expect(page.getByText(/lendo a folha/i)).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 45_000, intervals: [1_000, 2_000, 3_000] });
   });
 });
