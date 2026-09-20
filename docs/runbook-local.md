@@ -174,6 +174,10 @@ Para chamadas diretas à API (sem passar pelo proxy do nginx):
   próxima. Quem entra como operador abre direto nesta área.
 - **Corrigir ou anular** um valor já lançado: revisor ou administrador, sempre
   com motivo. A versão anterior continua no banco (`superseded` ou `voided`).
+- **Tirar o brinco** (revisor ou administrador, na ficha do animal): para o
+  brinco que caiu da orelha ou que estava na vaca errada. Exige evidência, como
+  vincular. O número fica livre para a vaca certa, e esta deixa de receber
+  leitura automática até ganhar outro.
 - **Dar baixa** (venda, morte, descarte, doação): revisor ou administrador, na
   ficha do animal. Encerra o lote na data e tira o animal do painel; a
   produção já lançada fica. "Desfazer baixa" traz o animal de volta sem lote.
@@ -248,6 +252,18 @@ uv run python -m app.core.evaluate_reader --samples ../../docs/Treinamento-VC
 
 O comando mostra os acertos por campo e grava ao lado de cada amostra a
 transcrição (`.transcricao.json`) e os eventos (`.leitura.json`).
+
+**Planilha conferida vira gabarito.** Quando a coleta já foi digitada numa
+planilha (uma linha por vaca, com lote, nº, nome, manhã, tarde, total e
+observação), ela é a resposta certa da foto:
+
+```bash
+uv run python -m app.core.build_gabarito   --xlsx "../../docs/Treinamento-VC/PLANILHA ATUALIZADA BELO VALE 25-08.xlsx"   --para "../../docs/Treinamento-VC/Peso leite 25-08.pdf" --data 25/08/2026
+```
+
+Cada lote da planilha vira uma página do gabarito, com a numeração da folha
+(a planilha numera seguido; a folha recomeça em 1 a cada página). Linhas
+marcadas "Linha em branco" ocupam número, mas não são leitura.
 
 **Folhas já lançadas, sem gabarito.** Quando os dados das fotos já estão no
 sistema, a verdade é o banco: o comando compara brinco, nome e total lidos com

@@ -144,3 +144,92 @@ ruído; mais amostras dirão se vale trocar de modelo.
 sem, com a medição de 22/07 na ficha sem brinco (SAIA BRANCA, TIETA,
 BRANQUINHA, FAÍSCA...). Por isso parte das linhas "sem vaca do dia" está
 certa; a nota as conta à parte, "a conferir".
+
+### Folhas manuscritas de 25/08, em escala (113 linhas, 20/09/2026)
+
+A planilha conferida pelo titular virou gabarito das 3 páginas do PDF
+completo (`build_gabarito`) — o primeiro teste do leitor num volume real, não
+numa folha só.
+
+**Achado e corrigido: colisão de página por cabeçalho mal lido.** O PDF traz
+as páginas fora da ordem dos lotes (3º, 1º, 2º), e o alinhamento passou a
+usar o lote escrito em cada página, não a posição. Mas a página física do
+2º lote foi lida com o cabeçalho **"3º LOTE"** — igual à página do 3º lote de
+verdade — em duas leituras independentes. Sem defesa, as duas viravam a
+mesma chave, e a nota cotejava vacas de páginas diferentes entre si,
+inflando erros que não existiam (a primeira medição saiu com brinco 29%,
+nome 5%). Corrigido: cada página ganha um rótulo único dentro da mesma
+leitura; se dois cabeçalhos colidem, a segunda cai para um rótulo que nunca
+se confunde com um número de lote. A página ambígua fica sem casar — nunca
+casada com a errada.
+
+**Números depois da correção, duas leituras limpas independentes:**
+
+| | leitura 1 | leitura 2 |
+|---|---|---|
+| tempo | 684 s | 424 s |
+| linhas perdidas / inventadas | 50 / 44 | 51 / 45 |
+| brinco | 37% | 38% |
+| nome | 13% | 19% |
+| manhã / tarde | 42% / 47% | 46% / 47% |
+| total | 39% | 43% |
+| anotação | 45% | 44% |
+
+Consistentes entre si — não é ruído de uma rodada. **Bem abaixo** da folha
+manuscrita única de 25/08 medida antes (brinco 12/18 ≈ 67%): em volume, com
+páginas de até 51 linhas lidas em faixas, o leitor erra mais do que numa
+folha de 18 linhas lida de uma vez.
+
+**A causa do cabeçalho errado** era disputa de atenção: data e lote eram
+pedidos **dentro** da transcrição de 48 linhas. A escrita em si é legível —
+"2º LOTE" claro, sem rasura relevante.
+
+### v7: cabeçalho à parte e faixas na resolução original (20/09/2026)
+
+Duas mudanças, medidas juntas no mesmo PDF de 113 linhas:
+
+1. **O topo da folha (18% da altura) vai numa chamada própria**, com esquema
+   de duas chaves e instrução curta — inclusive o aviso de que "2 e 3 se
+   parecem nesta letra". A resposta tem dez palavras em vez de quatro mil
+   tokens, e o valor lido ali prevalece sobre o que vier no meio das linhas
+   (se o recorte não for legível, o antigo vale como reserva).
+2. **Os recortes saem da página original.** Antes a página era reduzida para
+   1200 px e **depois** cortada em faixas — cada faixa chegava com 1200×600
+   de uma imagem já encolhida. Agora a página fica em resolução cheia, os
+   recortes saem dela, e só então cada um é reduzido: o dobro de pixels por
+   letra em cada faixa.
+
+| | v6 | v7 |
+|---|---|---|
+| linhas perdidas / inventadas | 51 / 45 | **7 / 1** |
+| manhã / tarde | 46% / 47% | **78% / 78%** |
+| total | 43% | **73%** |
+| anotação | 44% | **75%** |
+| brinco | 38% | **63%** |
+| nome | 19% | **30%** |
+| tempo (3 páginas) | 424 s | 535 s |
+
+O cabeçalho saiu certo nas três páginas, inclusive o "2º LOTE" que errara
+nas duas leituras anteriores — era ele que derrubava o agregado, porque uma
+página inteira deixava de casar.
+
+Por lote, com a v7:
+
+| lote | linhas | brinco | manhã/tarde | total | anotação |
+|---|---|---|---|---|---|
+| 1º (48 linhas, em faixas) | 45 lidas | 66% | 72% / 72% | 66% | 89% |
+| 2º (47 linhas, em faixas) | 45 lidas | 59% | 76% / 74% | 72% | 74% |
+| 3º (18 linhas, 1 chamada) | 18 lidas | 61% | 94% / 100% | 94% | 38% |
+
+**O que ainda erra:** o ano da data (25/08/**2024** em vez de 2026) — o
+revisor corrige o arquivo inteiro de uma vez. O brinco continua na casa dos
+60%: é o campo mais difícil, porque um dígito trocado não tem contexto que o
+denuncie. Nome baixo (30%) importa menos: ele serve de sugestão, e a caixa
+de Revisão já casa por semelhança.
+
+**Não é uma regressão de código:** a comparação honesta expôs um problema
+de leitura que já existia, mas a comparação anterior (por posição, cega ao
+lote) o escondia misturando ele com outro. A caixa de Revisão já corrige a
+*data* de um arquivo inteiro de uma vez (`redate_source`); ainda não existe
+o equivalente para o *lote* — quem revisa hoje corrigiria linha a linha se
+o lote saísse errado. Registrado como próximo passo, não implementado agora.

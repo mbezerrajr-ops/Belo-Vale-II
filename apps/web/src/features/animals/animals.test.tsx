@@ -7,7 +7,7 @@
  * brinco, e nenhum campo de fazenda para o usuário preencher.
  */
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AnimalDetailPanel } from "./AnimalDetailPanel";
@@ -193,6 +193,65 @@ describe("AnimalDetailPanel — vincular brinco", () => {
 
     expect(await screen.findByText(/informe a evid[êe]ncia/i)).toBeInTheDocument();
     expect(link).not.toHaveBeenCalled();
+  });
+
+  it("tira o brinco da vaca errada, com evidência", async () => {
+    const unlink = vi.fn().mockResolvedValue(animal({ brinco: null }));
+    const onChanged = vi.fn();
+
+    render(
+      <AnimalDetailPanel
+        token={TOKEN}
+        animal={animal({ brinco: "B2-649", name: "REDONDA" })}
+        canEdit
+        onChanged={onChanged}
+        onUnlinkBrinco={unlink}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /tirar o brinco/i }));
+    fireEvent.change(screen.getByLabelText(/evid[êe]ncia/i), {
+      target: { value: "O 649 é da BRANQUINHA (folha de 25/08)" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /confirmar e tirar o brinco/i }));
+    });
+
+    expect(unlink).toHaveBeenCalledWith(TOKEN, "a-1", "O 649 é da BRANQUINHA (folha de 25/08)");
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("não tira o brinco sem evidência", async () => {
+    const unlink = vi.fn();
+
+    render(
+      <AnimalDetailPanel
+        token={TOKEN}
+        animal={animal({ brinco: "B2-649" })}
+        canEdit
+        onChanged={vi.fn()}
+        onUnlinkBrinco={unlink}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /tirar o brinco/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirmar e tirar o brinco/i }));
+
+    expect(await screen.findByText(/informe a evid[êe]ncia/i)).toBeInTheDocument();
+    expect(unlink).not.toHaveBeenCalled();
+  });
+
+  it("vaca sem brinco não oferece tirar o brinco", () => {
+    render(
+      <AnimalDetailPanel
+        token={TOKEN}
+        animal={animal({ brinco: null })}
+        canEdit
+        onChanged={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /tirar o brinco/i })).not.toBeInTheDocument();
   });
 
   it("envia brinco e evidência quando ambos estão preenchidos", async () => {

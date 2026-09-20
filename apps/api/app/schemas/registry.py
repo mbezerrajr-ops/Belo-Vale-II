@@ -69,6 +69,16 @@ class BrincoLink(BaseModel):
     )
 
 
+class BrincoUnlink(BaseModel):
+    evidence: str = Field(
+        min_length=1,
+        description=(
+            "Justificativa de tirar o brinco (caiu da orelha, estava na vaca "
+            "errada). Muda a identidade operacional, então fica na auditoria."
+        ),
+    )
+
+
 class LotAssign(BaseModel):
     lote: str = Field(min_length=1, max_length=64)
     valid_from: date

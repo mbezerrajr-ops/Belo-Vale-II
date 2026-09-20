@@ -3,7 +3,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { createAnimal, searchAnimals } from "../../api/client";
 import { EXIT_REASON_LABEL, type Animal, type AnimalPage, type AnimalSearch } from "../../api/types";
 import { Icons } from "../../ui/Brand";
-import { brDate, localToday } from "../../ui/dates";
+import { brDate, farmToday } from "../../ui/dates";
 
 /**
  * Busca de animais.
@@ -289,7 +289,7 @@ export function AnimalSearchPage({
           <p>
             {describeSearch(lastSearch)} · {printItems.length}{" "}
             {printItems.length === 1 ? "animal" : "animais"} · impresso em{" "}
-            {brDate(localToday())}
+            {brDate(farmToday())}
           </p>
           <table>
             <thead>

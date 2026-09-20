@@ -325,14 +325,48 @@ Decisões de implementação:
   associação continua pelo brinco, com alerta, e a vaca do nome aparece em
   "Ou é esta", a um toque. Nada é trocado sozinho.
 
-## Pendente: vacas duplicadas no cadastro
+## Nomes repetidos no cadastro: o que é duplicata e o que não é
 
-Ao comparar as folhas de 22/07/2026 com o banco apareceram vacas com duas
-fichas — uma com brinco e outra sem — e a medição do dia na ficha sem brinco:
-SAIA BRANCA (861), TIETA (964), BRANQUINHA (B2-549), FAÍSCA (434), entre
-outras. Uma leitura certa do brinco cai na ficha sem histórico. Resolver exige
-decidir, vaca a vaca, qual ficha fica (e juntar o histórico), com auditoria —
-decisão do titular.
+26 nomes aparecem em duas (ou mais) fichas, uma com brinco e outra sem. A
+planilha conferida de 25/08/2026 desempatou (ver `docs/Treinamento-VC/`, fora
+do Git):
+
+- **Na maioria são vacas diferentes com o mesmo nome.** Em 15 casos o número
+  da planilha é o brinco da ficha que tem brinco, e a outra ficha está seca ou
+  sem nenhuma medição (NEBLINA 767 × nº antigo 635, SURUBIM 846 × 474,
+  TIETA 964 × 10, MAÇA 663 × 702...). Nada a fazer.
+- **Duplicata de verdade** quando as duas fichas têm o mesmo nome e números
+  parecidos, e a medição caiu na ficha sem brinco porque o número escrito na
+  folha bateu com o "número antigo" da outra ficha:
+  - SAIA BRANCA (861 × 862) e MEIAS BRANCA (448 × 498): **resolvido** em
+    20/09/2026 — a produção de 22/07 foi anulada com motivo na ficha errada e
+    lançada na vaca certa (`measurement_voided` + `manual_entry` em
+    `audit_events`). A ficha duplicada continua no cadastro, vazia.
+  - **BRANQUINHA: resolvido** em 20/09/2026, por decisão do titular. A folha
+    de 25/08 traz "649 BRANQUINHA" no 2º lote **e** "649 REDONDA" no 3º — o
+    mesmo número para duas vacas, no mesmo dia (a planilha copiou a folha
+    fielmente; o conflito é da anotação). O titular confirmou que o 649 é da
+    BRANQUINHA. Aplicado, nesta ordem: o 649 foi **tirado** da REDONDA (que
+    fica sem brinco até ser conferida no curral, com a produção dela
+    preservada), passou para a BRANQUINHA (antes B2-549), e os 21,5 L de
+    22/07 saíram da ficha duplicada sem brinco (nº antigo 519) para ela.
+    **Pendente:** ler no curral o brinco da REDONDA.
+- **Dígito ambíguo, não ficha duplicada:** o número escrito difere do brinco
+  por um dígito (ARIZONA 1901 × 1001, BRUNA 473 × 433, FUMAÇA 491 × 441,
+  PRINCESA 518 × 548). É a letra de quem anota.
+
+Isto responde, com evidência independente, parte dos "27 pares candidatos por
+nome normalizado" registrados acima na reconciliação da baseline: lá eles
+ficaram separados por falta de prova; a planilha conferida de 25/08 é essa
+prova para SAIA BRANCA e MEIAS BRANCA.
+
+Números repetidos na própria folha não são raros: só em 25/08 apareceram
+cinco (016 em BORBOLETA e BELMONTE, 544 em XENA e PITUDA, 649 em BRANQUINHA e
+REDONDA, 652 em ASA BRANCA duas vezes, 732 em PRAUNA e PACIÊNCIA). Por isso o
+brinco lido nunca associa sozinho quando o nome desmente.
+
+Ainda falta um jeito de juntar duas fichas no sistema (histórico e auditoria);
+hoje a correção é anular e relançar, uma medição por vez.
 
 ## Revisão por arquivo — decisões registradas
 
@@ -345,6 +379,29 @@ decisão do titular.
   nome) ficam como estavam. Cada proposta muda de versão: quem estava com o
   cartão aberto recarrega antes de aprovar. Fica em `audit_events`
   (`source_date_corrected`).
+
+## Resolvido: "hoje" saía do fuso do aparelho, não do da fazenda
+
+O servidor recusa coleta e baixa com data no futuro comparando com o dia da
+fazenda (UTC−3 fixo, `app/core/farm_clock.py`). As telas, porém, montavam o
+"hoje" com os campos locais do navegador (`localToday`). Em UTC−3 os dois
+coincidem; fora disso, não: **das 21h à meia-noite de Brasília, um aparelho
+em UTC calcula "amanhã"**, e o lançamento é recusado sem o funcionário
+entender por quê — a linha some do "salvo" e nada explica.
+
+Achado pelo CI, que roda em UTC: o E2E do curral falhou às 00:30 UTC e
+passava na máquina de quem desenvolve, em UTC−3. Reproduzido localmente às
+01:09 UTC com a mesma mensagem.
+
+Corrigido: `farmToday()` calcula o dia da fazenda pelo deslocamento fixo,
+igual ao servidor, e não depende do fuso do aparelho. O Playwright agora
+roda com `timezoneId: "UTC"`, para que a suíte local cubra essa classe de
+bug em vez de escondê-la.
+
+Continua dependendo de o **relógio** do aparelho estar mais ou menos certo —
+só o fuso deixou de importar. Se isso virar problema (celular com data
+errada), o passo seguinte é a API devolver o dia da fazenda e a tela usar
+esse valor.
 
 ## Resolvido: sair e recarregar reabria a sessão
 

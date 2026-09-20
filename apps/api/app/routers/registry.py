@@ -28,6 +28,7 @@ from app.schemas.registry import (
     AnimalRead,
     AnimalUpdate,
     BrincoLink,
+    BrincoUnlink,
     FarmCreate,
     FarmRead,
     LotAssign,
@@ -39,6 +40,7 @@ from app.services.animal_registry import (
     create_animal,
     current_lot,
     link_brinco,
+    unlink_brinco,
     lot_history,
     register_exit,
     undo_exit,
@@ -271,6 +273,36 @@ async def link_brinco_endpoint(
             farm_id=farm.id,
             actor=user.email,
             brinco=payload.brinco,
+            evidence=payload.evidence,
+        )
+    except AnimalRegistryError as error:
+        raise _conflict(error) from error
+    return await _read_model(session, animal)
+
+
+@router.delete("/animals/{animal_id}/brinco", response_model=AnimalRead)
+async def unlink_brinco_endpoint(
+    animal_id: UUID,
+    payload: BrincoUnlink,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    farm: Annotated[Farm, Depends(resolve_current_farm)],
+    user: Annotated[User, Depends(require_minimum_role("reviewer"))],
+) -> AnimalRead:
+    """Tira o brinco: o número fica livre e o animal volta a ser "sem brinco"."""
+    if not payload.evidence.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Tirar o brinco muda a identidade operacional do animal: "
+                "informe a evidência que sustenta a decisão."
+            ),
+        )
+    try:
+        animal = await unlink_brinco(
+            session,
+            animal_id=animal_id,
+            farm_id=farm.id,
+            actor=user.email,
             evidence=payload.evidence,
         )
     except AnimalRegistryError as error:

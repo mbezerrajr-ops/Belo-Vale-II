@@ -294,6 +294,45 @@ async def link_brinco(
     return animal
 
 
+async def unlink_brinco(
+    session: AsyncSession,
+    *,
+    animal_id: UUID,
+    farm_id: UUID,
+    actor: str,
+    evidence: str,
+) -> Animal:
+    """Tira o brinco de um animal: ele volta a ficar "sem brinco".
+
+    Existe para o brinco que caiu da orelha e para o que foi atribuído à vaca
+    errada — o número precisa ficar livre para quem é de direito. Como
+    `link_brinco`, muda a identidade operacional: a partir daqui o animal
+    deixa de receber matching automático, e por isso exige evidência.
+    """
+    if not evidence or not evidence.strip():
+        raise AnimalRegistryError(
+            "Tirar o brinco muda a identidade operacional do animal: "
+            "informe a evidência que sustenta a decisão."
+        )
+
+    animal = await _load_animal(session, animal_id=animal_id, farm_id=farm_id)
+    previous = {"brinco": animal.brinco, "brinco_origem": animal.brinco_origem}
+    animal.brinco = None
+    animal.brinco_origem = None
+
+    _audit(
+        session,
+        farm_id=farm_id,
+        actor=actor,
+        action="animal_brinco_unlinked",
+        entity_id=animal.id,
+        previous=previous,
+        new={"brinco": None, "evidence": evidence.strip()},
+    )
+    await session.commit()
+    return animal
+
+
 async def assign_lot(
     session: AsyncSession,
     *,

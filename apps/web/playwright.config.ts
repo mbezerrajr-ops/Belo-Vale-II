@@ -25,6 +25,12 @@ export default defineConfig({
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:8080",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    // O navegador roda em UTC, como o runner do CI — e ao contrário da
+    // máquina de quem desenvolve, em UTC−3. Sem isto, um "hoje" tirado do
+    // fuso do aparelho passa aqui e quebra lá: foi o que aconteceu com o
+    // lançamento de produção, recusado como data futura das 21h à meia-noite
+    // de Brasília. O dia da fazenda é UTC−3 fixo, venha o aparelho de onde vier.
+    timezoneId: "UTC",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });

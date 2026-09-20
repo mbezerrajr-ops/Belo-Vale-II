@@ -279,6 +279,20 @@ export async function linkBrinco(
   return parseJsonOrThrow<Animal>(response);
 }
 
+/** Tira o brinco: caiu da orelha, ou estava na vaca errada. */
+export async function unlinkBrinco(
+  token: string,
+  animalId: string,
+  evidence: string,
+): Promise<Animal> {
+  const response = await fetch(`${API_BASE_URL}/api/animals/${animalId}/brinco`, {
+    method: "DELETE",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ evidence }),
+  });
+  return parseJsonOrThrow<Animal>(response);
+}
+
 export async function assignLot(
   token: string,
   animalId: string,

@@ -1,6 +1,13 @@
 import { useState, type CSSProperties } from "react";
 
-import { assignLot, linkBrinco, registerExit, undoExit, updateAnimal } from "../../api/client";
+import {
+  assignLot,
+  linkBrinco,
+  registerExit,
+  undoExit,
+  unlinkBrinco,
+  updateAnimal,
+} from "../../api/client";
 import {
   EXIT_REASON_LABEL,
   type Animal,
@@ -8,7 +15,7 @@ import {
   type AnimalUpdateInput,
   type ExitReason,
 } from "../../api/types";
-import { brDate, localToday } from "../../ui/dates";
+import { brDate, farmToday } from "../../ui/dates";
 import { ProductionHistory } from "./ProductionHistory";
 import type { ProductionHistoryEntry, Reading } from "../../api/types";
 
@@ -26,6 +33,7 @@ type LinkFn = (
   brinco: string,
   evidence: string,
 ) => Promise<Animal>;
+type UnlinkFn = (token: string, animalId: string, evidence: string) => Promise<Animal>;
 type AssignFn = (
   token: string,
   animalId: string,
@@ -53,6 +61,7 @@ interface Props {
   canEdit: boolean;
   onChanged: () => void;
   onLinkBrinco?: LinkFn;
+  onUnlinkBrinco?: UnlinkFn;
   onAssignLot?: AssignFn;
   onUpdate?: UpdateFn;
   onExit?: ExitFn;
@@ -82,17 +91,18 @@ export function AnimalDetailPanel({
   canEdit,
   onChanged,
   onLinkBrinco = linkBrinco,
+  onUnlinkBrinco = unlinkBrinco,
   onAssignLot = assignLot,
   onUpdate = updateAnimal,
   onExit = registerExit,
   onUndoExit = undoExit,
-  today = localToday(),
+  today = farmToday(),
   onLoadProduction,
   onCorrect,
   onVoid,
 }: Props): JSX.Element {
   const [panel, setPanel] = useState<
-    "none" | "brinco" | "lote" | "cadastro" | "baixa" | "desfazer"
+    "none" | "brinco" | "tirar-brinco" | "lote" | "cadastro" | "baixa" | "desfazer"
   >("none");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -135,6 +145,15 @@ export function AnimalDetailPanel({
       return;
     }
     void guard(() => onLinkBrinco(token, animal.id, brinco.trim(), evidence.trim()));
+  }
+
+  function submitUnlinkBrinco(): void {
+    if (!evidence.trim()) {
+      // Tirar o brinco muda a identidade do animal, como vincular.
+      setError("Informe a evidência que sustenta tirar o brinco.");
+      return;
+    }
+    void guard(() => onUnlinkBrinco(token, animal.id, evidence.trim()));
   }
 
   function submitLot(): void {
@@ -244,6 +263,11 @@ export function AnimalDetailPanel({
           <button type="button" onClick={() => setPanel("brinco")}>
             {animal.brinco ? "Trocar brinco" : "Vincular brinco"}
           </button>
+          {animal.brinco && (
+            <button type="button" className="secondary" onClick={() => setPanel("tirar-brinco")}>
+              Tirar o brinco
+            </button>
+          )}
           <button type="button" onClick={() => setPanel("lote")}>
             Mudar de lote
           </button>
@@ -286,6 +310,32 @@ export function AnimalDetailPanel({
           </p>
           <button type="submit" disabled={busy}>
             Confirmar vínculo
+          </button>
+        </form>
+      )}
+
+      {panel === "tirar-brinco" && canEdit && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            submitUnlinkBrinco();
+          }}
+        >
+          <h3>Tirar o brinco</h3>
+          <p className="hint">
+            Para brinco que caiu da orelha ou que estava na vaca errada. O número {animal.brinco}{" "}
+            fica livre, e esta vaca deixa de receber leitura automática até ganhar outro.
+          </p>
+          <label htmlFor="evidencia-tirar">Evidência</label>
+          <input
+            id="evidencia-tirar"
+            value={evidence}
+            onChange={(event) => setEvidence(event.target.value)}
+            placeholder="Ex.: o 649 é da BRANQUINHA; esta será conferida no curral"
+            autoComplete="off"
+          />
+          <button type="submit" className="danger" disabled={busy}>
+            Confirmar e tirar o brinco
           </button>
         </form>
       )}
