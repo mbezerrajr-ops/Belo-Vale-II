@@ -618,3 +618,63 @@ class TestBandResolution:
         largura_pagina, _ = _image_size(transport.requests[0])
         largura_banda, _ = _image_size(transport.requests[1])
         assert largura_banda > largura_pagina
+
+
+class TestRepeatedAnnotation:
+    """A anotação fica na margem, longe da linha, e o modelo às vezes copia a
+    mesma para a folha inteira: numa foto real, uma seta "→ 3º LOTE" virou 23
+    trocas de lote, e um "SECA" virou 27 ordens de secagem. Uma ordem de secar
+    falsa é o erro mais caro que pode chegar na caixa, então a folha inteira
+    marcada igual é recusada — a leitura crua fica guardada no run, e quem
+    revisa tem a foto ao lado."""
+
+    def test_the_same_annotation_on_the_whole_page_is_dropped(self) -> None:
+        sheet = {
+            **SHEET,
+            "linhas": [
+                _line(str(i), f"10{i}", f"VACA {i}", "5", "5", "10", "3º LOTE")
+                for i in range(1, 12)
+            ],
+        }
+
+        tidy = tidy_transcription(sheet)
+
+        assert [line["anotacao"] for line in tidy["linhas"]] == [None] * 11
+        # A produção não se perde: o que é suspeito é a margem, não a tabela.
+        assert [line["total"] for line in tidy["linhas"]] == ["10"] * 11
+
+    def test_an_annotation_on_a_few_lines_is_kept(self) -> None:
+        linhas = [
+            _line(str(i), f"10{i}", f"VACA {i}", "5", "5", "10") for i in range(1, 12)
+        ]
+        linhas[0] = _line("1", "101", "VACA 1", "5", "5", "10", "3º LOTE")
+        linhas[4] = _line("5", "105", "VACA 5", "5", "5", "10", "3º LOTE")
+        linhas[9] = _line("10", "110", "VACA 10", "5", "5", "10", "DOENTE")
+
+        tidy = tidy_transcription({**SHEET, "linhas": linhas})
+
+        anotadas = [line["anotacao"] for line in tidy["linhas"] if line["anotacao"]]
+        assert anotadas == ["3º LOTE", "3º LOTE", "DOENTE"]
+
+    def test_a_short_page_where_every_cow_really_moved_is_kept(self) -> None:
+        # Quatro linhas marcadas iguais cabem na realidade (um lote pequeno
+        # que mudou junto); vinte e três, não.
+        linhas = [
+            _line(str(i), f"10{i}", f"VACA {i}", "5", "5", "10", "SECAR")
+            for i in range(1, 5)
+        ]
+
+        tidy = tidy_transcription({**SHEET, "linhas": linhas})
+
+        assert [line["anotacao"] for line in tidy["linhas"]] == ["SECAR"] * 4
+
+    def test_accents_and_case_do_not_hide_the_repetition(self) -> None:
+        textos = ["3º LOTE", "3o lote", "3º Lote", "3º LOTE", "3o LOTE", "3º lote"]
+        linhas = [
+            _line(str(i), f"10{i}", f"VACA {i}", "5", "5", "10", texto)
+            for i, texto in enumerate(textos, start=1)
+        ]
+
+        tidy = tidy_transcription({**SHEET, "linhas": linhas})
+
+        assert [line["anotacao"] for line in tidy["linhas"]] == [None] * 6
