@@ -283,6 +283,49 @@ uv run python -m app.core.load_proposals --email revisor@fazenda \
   --file "../../docs/Treinamento-VC/<nome>.leitura.json" --kind photo --label "<nome>"
 ```
 
+### Ligar o leitor ao app (enviar a foto pelo celular)
+
+O app não sabe que existe Ollama. Ele conhece **um leitor, num endereço
+configurável**, e quem lê a foto é o `worker`. Três variáveis, no `worker`:
+
+| variável | valores | para que serve |
+|---|---|---|
+| `READER_PROVIDER` | `fake` (padrão) ou `ollama` | `fake` inventa uma leitura fixa; serve para CI e testes, **nunca** para uso real |
+| `READER_URL` | endereço do leitor | só endereço da máquina ou de rede privada; domínio público é recusado |
+| `READER_MODEL` | `qwen2.5vl:7b` (padrão) | o modelo carregado no Ollama |
+
+O mesmo código atende os três formatos de implantação, sem alteração:
+
+1. **Hoje (treinamento), Windows do titular:** o Ollama roda fora do Docker,
+   porque a GPU AMD não passa para o contêiner →
+   `READER_URL=http://host.docker.internal:11434`.
+2. **Servidor Linux com GPU:** o Ollama vira serviço do compose →
+   `READER_URL=http://ollama:11434`.
+3. **Servidor próprio ligado por VPN:** endereço privado (`10.x`, `100.x`) →
+   `READER_URL=http://10.8.0.5:11434`. A foto não trafega pela internet
+   aberta, e a guarda do código recusa endereço público.
+
+Para ligar de verdade no Windows, em `infra/.env.local`:
+
+```
+READER_PROVIDER=ollama
+READER_URL=http://host.docker.internal:11434
+READER_MODEL=qwen2.5vl:7b
+```
+
+Depois `docker compose ... up -d worker` e, no app, **Revisão → Enviar foto**
+(no celular, abre a câmera direto). O envio responde na hora; a leitura
+acontece em segundo plano e as propostas aparecem na caixa — o botão
+**Atualizar**, acima da lista, relê sem precisar trocar de aba.
+
+Em produção a configuração é conferida na subida: `READER_PROVIDER=ollama`
+sem `READER_URL` é recusado, e `READER_PROVIDER=fake` num `worker` também —
+o leitor falso inventaria medições.
+
+**Se o leitor estiver fora do ar,** a leitura fica `failed` e a foto continua
+guardada: reenviar a mesma foto oferece "Ler de novo", que tenta outra vez.
+O resto do app não depende de GPU.
+
 ## 7. Rodar os testes de backend
 
 O alvo oficial usa PostgreSQL real, aplica migrations e roda pytest em uma

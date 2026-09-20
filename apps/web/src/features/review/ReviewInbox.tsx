@@ -18,7 +18,9 @@ import {
   type ExitReason,
   type Proposal,
   type ProposalStatus,
+  type UploadResult,
 } from "../../api/types";
+import { SendPhoto } from "./SendPhoto";
 import { brDate, liters } from "../../ui/dates";
 
 /**
@@ -52,6 +54,8 @@ type RedateFn = (
 
 interface Props {
   token: string;
+  /** Resolvida no servidor; necessária para enviar foto. */
+  farmId?: string;
   /** Revisor e administrador decidem; operador só vê. */
   canDecide: boolean;
   onList?: ListFn;
@@ -59,9 +63,17 @@ interface Props {
   onReject?: RejectFn;
   onSearch?: SearchFn;
   onRedate?: RedateFn;
+  onUpload?: UploadFn;
+  onReprocess?: ReprocessFn;
   /** Chamado depois de cada decisão, para atualizar contadores. */
   onChanged?: () => void;
 }
+
+type UploadFn = (
+  input: { farmId: string; file: File; declaredLot?: string },
+  token: string,
+) => Promise<UploadResult>;
+type ReprocessFn = (importId: string, token: string) => Promise<UploadResult>;
 
 const EVENT_LABEL: Record<EventType, string> = {
   production: "Produção",
@@ -597,6 +609,9 @@ export function ReviewInbox({
   onReject = rejectProposal,
   onSearch = searchAnimals,
   onRedate = redateSource,
+  onUpload,
+  onReprocess,
+  farmId,
   onChanged,
 }: Props): JSX.Element {
   const [tab, setTab] = useState<ProposalStatus>("pending");
@@ -663,6 +678,23 @@ export function ReviewInbox({
         ))}
       </div>
 
+      {/* A leitura da foto termina em segundo plano: sem isto, quem enviou fica
+          olhando uma tela parada, porque clicar na aba já escolhida não
+          recarrega nada. */}
+      <button type="button" className="link-btn refresh-inbox" onClick={() => void reload(tab)}>
+        Atualizar
+      </button>
+
+      {farmId && (
+        <SendPhoto
+          token={token}
+          farmId={farmId}
+          onUpload={onUpload}
+          onReprocess={onReprocess}
+          onSent={() => void reload("pending")}
+        />
+      )}
+
       {files.length > 0 && (
         <div className="search-shortcuts file-filter" role="group" aria-label="Arquivos">
           <button type="button" aria-pressed={selected === null} onClick={() => setSourceId(null)}>
@@ -705,6 +737,17 @@ export function ReviewInbox({
                 {group.source.reference_date ? ` · ${brDate(group.source.reference_date)}` : ""} ·{" "}
                 {group.items.length} {group.items.length === 1 ? "evento" : "eventos"}
               </small>
+              {group.source.photo_url && (
+                <a
+                  className="source-photo"
+                  href={group.source.photo_url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img src={group.source.photo_url} alt="" />
+                  <span>Ver a folha</span>
+                </a>
+              )}
             </h3>
             <SourceDate
               source={group.source}

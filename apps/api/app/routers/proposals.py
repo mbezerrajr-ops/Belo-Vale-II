@@ -17,9 +17,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import require_minimum_role
-from app.db.models import Farm, User
+from app.db.models import Farm, ImageAsset, User
 from app.db.session import get_db_session
 from app.routers.registry import resolve_current_farm
+from app.services.storage import ObjectStorage, get_object_storage
 from app.services.animal_registry import AnimalRegistryError
 from app.services.event_proposals import (
     ProposalAlreadyDecided,
@@ -37,6 +38,9 @@ from app.services.event_proposals import (
 from app.services.production_entry import producao_of
 
 router = APIRouter(prefix="/api/proposals", tags=["proposals"])
+
+#: Validade do link da foto na revisão, como nos recortes da ficha.
+_PHOTO_URL_TTL_SECONDS = 900
 
 
 class ApproveIn(BaseModel):
@@ -102,12 +106,27 @@ async def inbox(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     farm: Annotated[Farm, Depends(resolve_current_farm)],
     _: Annotated[User, Depends(require_minimum_role("operator"))],
+    storage: Annotated[ObjectStorage, Depends(get_object_storage)],
     status_: Annotated[
         Literal["pending", "approved", "rejected"], Query(alias="status")
     ] = "pending",
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
 ) -> list[dict[str, Any]]:
     items = await list_proposals(session, farm_id=farm.id, status=status_, limit=limit)
+
+    photos: dict[UUID, str | None] = {}
+
+    async def photo_url(source) -> str | None:
+        if source.image_asset_id is None:
+            return None
+        if source.image_asset_id not in photos:
+            image = await session.get(ImageAsset, source.image_asset_id)
+            photos[source.image_asset_id] = (
+                storage.presigned_url(image.object_key, expires_seconds=_PHOTO_URL_TTL_SECONDS)
+                if image is not None and image.object_key
+                else None
+            )
+        return photos[source.image_asset_id]
     summaries: dict[UUID, dict[str, Any]] = {}
 
     async def summary(animal):
@@ -131,6 +150,9 @@ async def inbox(
                     "corrected_by": item.corrected_by,
                     "extractor_name": source.extractor_name,
                     "created_at": source.created_at.isoformat(),
+                    # A folha que deu origem à leitura, para conferir sem
+                    # trocar de tela. Link curto: 15 minutos.
+                    "photo_url": await photo_url(source),
                 },
                 "position": proposal.position,
                 "event_type": proposal.event_type,

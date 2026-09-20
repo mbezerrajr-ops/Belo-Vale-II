@@ -43,6 +43,11 @@ services:
       MINIO_URL: http://minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY in the server environment}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY in the server environment}
+      # Quem lê a foto. "fake" (padrão) inventa leitura e serve ao CI e à
+      # demonstração; "ollama" lê de verdade, no endereço abaixo.
+      READER_PROVIDER: ${READER_PROVIDER:-fake}
+      READER_URL: ${READER_URL:-http://host.docker.internal:11434}
+      READER_MODEL: ${READER_MODEL:-qwen2.5vl:7b}
     depends_on:
       db:
         condition: service_healthy
@@ -50,7 +55,17 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    networks: [ingestion_private]
+    # O modelo roda fora do Docker quando a GPU não passa para o contêiner
+    # (é o caso da AMD no Windows); este apelido é como o worker alcança o
+    # hospedeiro. Num servidor Linux, o Ollama vira um serviço aqui e o
+    # endereço passa a ser http://ollama:11434, sem mudar código.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # `reader_link` existe só para alcançar o leitor: `ingestion_private` não
+    # tem rota para fora, nem para o hospedeiro. O preço é o worker ganhar
+    # saída; o que segura isso é a guarda de endereço (só privado) e o
+    # padrão continuar sendo o leitor falso.
+    networks: [ingestion_private, reader_link]
 
   # Opt-in test target. `docker compose --profile test run --rm api-tests`
   # starts the disposable local dependencies, migrates PostgreSQL and runs the
@@ -140,6 +155,8 @@ networks:
   # api and web sit here too so the host (and Playwright/browsers) can reach
   # them via their published ports; this network is deliberately NOT internal.
   ingestion_edge: {}
+  # Só o worker entra aqui, e só para falar com o leitor de fotos.
+  reader_link: {}
 
 volumes:
   postgres_data:

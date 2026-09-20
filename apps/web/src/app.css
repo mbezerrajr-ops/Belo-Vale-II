@@ -2667,3 +2667,58 @@ button.danger {
   flex-basis: 100%;
   color: var(--muted);
 }
+
+/* ---------- revisão: enviar foto e ver a folha ---------- */
+
+.send-photo {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.send-photo h3 {
+  margin: 0;
+}
+
+.send-photo form,
+form.send-photo {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.send-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.send-photo input[type="file"] {
+  width: 100%;
+  margin: 0;
+}
+
+/* A folha ao lado do que foi lido: miniatura que abre em tamanho cheio. */
+.source-photo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.source-photo img {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+/* Reler a caixa sem trocar de aba: a leitura da foto termina em segundo plano. */
+.refresh-inbox {
+  margin: 10px 0 4px;
+}

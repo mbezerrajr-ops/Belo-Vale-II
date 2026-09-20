@@ -88,6 +88,13 @@ class ReaderFormatError(ValueError):
 # ------------------------------------------------------------ só endereço local
 
 
+#: Nomes que apontam para a própria máquina, apesar do ponto.
+#: `host.docker.internal` é o apelido que o Docker dá ao hospedeiro — é por
+#: ele que o worker em contêiner alcança um leitor rodando fora do Docker
+#: (no Windows, onde a GPU AMD não passa para o contêiner).
+_LOCAL_NAMES = frozenset({"localhost", "host.docker.internal"})
+
+
 def ensure_local_url(url: str) -> str:
     """Aceita só a própria máquina e a rede interna. Devolve a URL sem "/" final.
 
@@ -103,7 +110,7 @@ def ensure_local_url(url: str) -> str:
     try:
         address = ipaddress.ip_address(host)
     except ValueError:
-        if host == "localhost" or "." not in host:
+        if host in _LOCAL_NAMES or "." not in host:
             return url.rstrip("/")
         raise ValueError(
             f"O leitor precisa rodar na própria infraestrutura; {host} não é endereço interno."

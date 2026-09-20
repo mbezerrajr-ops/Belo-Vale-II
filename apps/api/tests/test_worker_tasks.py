@@ -10,10 +10,11 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy import select
 
 from app.core.config import Settings
-from app.db.models import ExtractedLine, ExtractionRun, Farm, ValidationAlert
+from app.db.models import ExtractedLine, ExtractionRun, Farm, User, ValidationAlert
 from app.services.ingestion import create_import
 from app.services.storage import InMemoryObjectStorage
 from app.vision.contracts import VisionExtraction
+from app.services.event_extraction import FakeEventExtractor
 from app.vision.provider import FakeVisionProvider
 import app.workers.tasks as tasks_module
 from app.workers.tasks import (
@@ -164,7 +165,7 @@ def test_process_extraction_run_succeeds_across_repeated_calls_in_one_process(
     settings = Settings(environment="test", postgres_url=_database_url())
     monkeypatch.setattr(tasks_module, "get_settings", lambda: settings)
     monkeypatch.setattr(tasks_module, "get_object_storage", lambda: storage)
-    monkeypatch.setattr(tasks_module, "get_vision_provider", lambda: FakeVisionProvider())
+    monkeypatch.setattr(tasks_module, "get_event_reader", lambda: FakeEventExtractor())
 
     async def make_pending_run() -> UUID:
         engine = create_async_engine(_database_url())
@@ -173,9 +174,22 @@ def test_process_extraction_run_succeeds_across_repeated_calls_in_one_process(
             async with session_factory() as session:
                 farm = Farm(name="Fazenda Modelo")
                 session.add(farm)
+                # A proposta é criada em nome de quem enviou a foto.
+                sender = User(
+                    email=f"envio-{uuid4().hex[:8]}@belovale",
+                    password_hash="x",
+                    role="operator",
+                    is_active=True,
+                )
+                session.add(sender)
                 await session.commit()
                 created = await create_import(
-                    session, storage, farm_id=farm.id, content=_jpeg_bytes(), max_bytes=1_000_000
+                    session,
+                    storage,
+                    farm_id=farm.id,
+                    content=_jpeg_bytes(),
+                    max_bytes=1_000_000,
+                    initiated_by=sender.email,
                 )
                 return created.extraction_run_id
         finally:

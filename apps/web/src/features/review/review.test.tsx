@@ -41,6 +41,7 @@ function proposal(overrides: Partial<Proposal> = {}): Proposal {
       reference_date: "2026-08-25",
       reference_date_read: "2026-08-25",
       corrected_by: null,
+      photo_url: null,
       extractor_name: "teste",
       created_at: "2026-09-18T10:00:00Z",
     },

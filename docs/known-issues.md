@@ -469,3 +469,55 @@ Decisões do titular em 19/09/2026, a partir da primeira folha real:
 
 API e telas existem: buscar animal, ver ficha, vincular brinco, mudar de lote,
 cadastrar animal e gerenciar contas. Ver a seção 5 do runbook.
+
+## Foto do celular vira proposta (fase 2c) — decisões registradas (20/09/2026)
+
+### O `worker` ganhou saída para fora da rede interna
+
+Até aqui o `worker` vivia só em `ingestion_private`, uma rede `internal`: sem
+rota para fora. Para falar com o leitor (que no Windows roda **fora** do
+Docker, porque a GPU AMD não passa para o contêiner) ele precisou de uma
+segunda rede, `reader_link`, não interna, mais
+`extra_hosts: host.docker.internal:host-gateway`.
+
+**É uma troca de isolamento por capacidade, e está registrada como tal.** O
+que limita o estrago:
+
+- o padrão continua `READER_PROVIDER=fake`, que não fala com ninguém;
+- `ensure_local_url` recusa endereço público: só loopback, IP privado, nome
+  sem ponto, `localhost` e `host.docker.internal` passam. Mandar a foto para
+  um provedor externo exigiria afrouxar a guarda de propósito;
+- o `worker` não tem `AUTH_SECRET`: mesmo comprometido, não emite sessão;
+- a `api` e o banco continuam sem essa rota.
+
+Quando o leitor virar serviço do compose (`ollama:11434`) ou um servidor
+próprio na VPN, a `reader_link` pode voltar a ser `internal` — a mudança é de
+infraestrutura, não de código.
+
+### O leitor falso é recusado em produção
+
+`RUNTIME_ROLE=worker` com `READER_PROVIDER=fake` não sobe em produção: o
+leitor falso devolve sempre a mesma vaca e o mesmo volume, e isso viraria
+medição de mentira na caixa de Revisão. `ollama` sem `READER_URL` também é
+recusado, na subida, não na primeira foto.
+
+### A foto fica ligada à proposta, e a fonte continua imutável
+
+`event_proposal_sources.image_asset_id` (migração 0012) é gravado **no
+INSERT**. A fonte é imutável por gatilho: ligar a foto depois, por UPDATE,
+seria recusado pelo banco. O inbox devolve `photo_url` assinada por 15
+minutos, para quem revisa conferir a folha sem trocar de tela.
+
+### A área "Fichas" saiu do menu, o código antigo ficou
+
+O caminho antigo (`POST /api/imports` → `run_extraction` →
+`provenance=ocr_review`) continua no banco e no código, servindo as fichas já
+importadas. O envio de foto novo mora dentro da Revisão. Apagar as telas, as
+rotas e o `approval.py` é assunto de outro PR — nada foi removido agora.
+
+### A caixa não se atualiza sozinha
+
+A leitura termina em segundo plano, e a tela não escuta o servidor. Enquanto
+não há notificação, a Revisão traz um botão **Atualizar**: clicar na aba já
+escolhida não recarregaria nada. Empurrar a atualização (SSE, WebSocket ou
+sondagem) fica para quando houver mais de um revisor ao mesmo tempo.

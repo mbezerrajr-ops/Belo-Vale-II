@@ -24,6 +24,7 @@ from app.core.login_throttle import InMemoryLoginThrottle, get_login_throttle
 from app.core.security import create_access_token, hash_password
 from app.db.session import get_db_session
 from app.main import create_app
+from app.services.storage import InMemoryObjectStorage, get_object_storage
 
 SECRET = "daily-use-test-secret-at-least-32-bytes-long"
 PASSWORD = "capim elefante molhado"
@@ -91,6 +92,15 @@ def db() -> Execute:
     return execute
 
 
+#: Compartilhado: o teste grava a foto aqui e a API lê daqui.
+TEST_STORAGE = InMemoryObjectStorage()
+
+
+@pytest.fixture()
+def storage() -> InMemoryObjectStorage:
+    return TEST_STORAGE
+
+
 @pytest.fixture()
 def api():
     app = create_app()
@@ -110,6 +120,8 @@ def api():
     app.dependency_overrides[get_db_session] = override_session
     throttle = InMemoryLoginThrottle()
     app.dependency_overrides[get_login_throttle] = lambda: throttle
+    # Sem MinIO nos testes: a foto da revisão sai deste armazenamento.
+    app.dependency_overrides[get_object_storage] = lambda: TEST_STORAGE
     with TestClient(app) as client:
         yield client
 

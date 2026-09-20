@@ -15,7 +15,9 @@ cada um vira uma proposta. O que estes testes garantem:
 from __future__ import annotations
 
 import asyncio
+import uuid
 from datetime import date
+from uuid import UUID
 
 import pytest
 from sqlalchemy import select
@@ -35,6 +37,7 @@ from tests.pg_support import (  # noqa: F401 — fixtures
     make_farm,
     make_user,
     one,
+    storage,
 )
 
 REF = date(2026, 8, 25)
@@ -64,7 +67,12 @@ def _event(event_type, brinco=None, nome=None, **fields) -> ExtractedEvent:
 
 
 def _load(
-    farm_id: str, user_email: str, *events: ExtractedEvent, kind="text", reference: date | None = REF
+    farm_id: str,
+    user_email: str,
+    *events: ExtractedEvent,
+    kind="text",
+    reference: date | None = REF,
+    image_asset_id: str | None = None,
 ) -> list[str]:
     """Cria as propostas pelo serviço, como o leitor fará, e devolve os ids."""
 
@@ -80,6 +88,7 @@ def _load(
                     user=user,
                     kind=kind,
                     label="caderno de 25/08",
+                    image_asset_id=UUID(image_asset_id) if image_asset_id else None,
                     extraction=EventExtraction(
                         events=list(events),
                         extractor_name="teste",
@@ -738,3 +747,36 @@ class TestSourceDate:
                 "UPDATE event_proposal_sources SET corrected_reference_date = NULL, "
                 "corrected_by_user_id = NULL, corrected_at = NULL RETURNING id"
             )
+
+
+class TestPhotoInTheInbox:
+    """Quem revisa vê a folha ao lado do que foi lido, sem trocar de tela."""
+
+    def test_a_proposal_from_a_photo_carries_a_link_to_it(self, api, farm, storage) -> None:
+        _, reviewer = make_user("reviewer")
+        make_animal(farm, brinco="389", name="ÁGATA", lote="LOTE 1")
+        image_id = one(
+            "INSERT INTO image_assets (farm_id, sha256, object_key, media_type, byte_size) "
+            "VALUES (CAST(:f AS uuid), :s, :k, 'image/jpeg', 10) RETURNING id::text",
+            f=farm,
+            s=f"sha-{uuid.uuid4().hex}",
+            k="fazenda/foto.jpg",
+        )[0][0]
+
+        _load(
+            farm,
+            "reviewer@belovale",
+            _event("production", "389", None, producao="20"),
+            kind="photo",
+            image_asset_id=image_id,
+        )
+
+        item = _inbox(api, reviewer).json()[0]
+        assert item["source"]["photo_url"].startswith("memory://fazenda/foto.jpg")
+
+    def test_a_reading_without_a_photo_has_no_link(self, api, farm) -> None:
+        _, reviewer = make_user("reviewer")
+        _load(farm, "reviewer@belovale", _event("note", "389", None, texto="mancando"))
+
+        item = _inbox(api, reviewer).json()[0]
+        assert item["source"]["photo_url"] is None

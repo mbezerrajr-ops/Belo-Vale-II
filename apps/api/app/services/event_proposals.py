@@ -112,6 +112,7 @@ async def create_proposals(
     kind: str,
     label: str,
     extraction: EventExtraction,
+    image_asset_id: UUID | None = None,
 ) -> EventProposalSource:
     """Grava a leitura e uma proposta por evento. Não faz commit."""
     if kind not in SOURCE_KINDS:
@@ -127,6 +128,9 @@ async def create_proposals(
         reference_date=extraction.reference_date,
         raw_output=extraction.to_raw(),
         created_by_user_id=user.id,
+        # A foto vai junto no INSERT: a fonte é imutável, um UPDATE depois
+        # seria recusado pelo trigger.
+        image_asset_id=image_asset_id,
     )
     session.add(source)
     await session.flush()

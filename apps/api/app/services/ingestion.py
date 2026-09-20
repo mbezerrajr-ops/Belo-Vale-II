@@ -60,6 +60,7 @@ async def create_import(
     max_bytes: int,
     declared_lot: str | None = None,
     declared_measured_on: date | None = None,
+    initiated_by: str | None = None,
 ) -> ImportStatus:
     media_type = sniff_image_media_type(content)
     if media_type is None:
@@ -86,6 +87,9 @@ async def create_import(
         status="pending",
         declared_lot=declared_lot,
         declared_measured_on=declared_measured_on,
+        # Quem enviou: a proposta que sair desta foto é criada em nome dessa
+        # pessoa, e o worker não tem sessão para descobrir isso depois.
+        initiated_by=initiated_by,
     )
     session.add(import_row)
     await session.flush()

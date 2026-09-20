@@ -4,7 +4,6 @@ import {
   getAnimal,
   getCurrentFarm,
   getCurrentUser,
-  getFeatures,
   getImportReview,
   listProposals,
   logout as endSession,
@@ -287,20 +286,6 @@ function AuthenticatedApp({
   const [importId, setImportId] = useState<string | null>(null);
   const [review, setReview] = useState<ImportReview | null>(null);
 
-  // "Fichas" só aparece com OCR real: com o provedor falso, a leitura seria
-  // inventada. Na dúvida (falha ao consultar), fica escondida.
-  const [photoSheets, setPhotoSheets] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    getFeatures(token)
-      .then((features) => {
-        if (!cancelled) setPhotoSheets(Boolean(features?.photo_sheets));
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [token]);
 
   // Quantas propostas esperam revisão: aparece na navegação para ninguém
   // precisar abrir a caixa para saber se há algo nela.
@@ -367,7 +352,10 @@ function AuthenticatedApp({
     "producao",
     "revisao",
     "animais",
-    ...(photoSheets ? (["fichas"] as Area[]) : []),
+    // A foto da folha passou a ser enviada pela própria Revisão. As fichas
+    // antigas continuam no banco; a área saiu do menu para não haver duas
+    // telas fazendo a mesma coisa.
+
     "insumos",
     "medicoes",
     ...(isAdmin ? (["contas"] as Area[]) : []),
@@ -432,7 +420,12 @@ function AuthenticatedApp({
         {area === "producao" && <ProductionPage token={token} canCorrect={canEdit} />}
 
         {area === "revisao" && (
-          <ReviewInbox token={token} canDecide={canEdit} onChanged={refreshPending} />
+          <ReviewInbox
+            token={token}
+            farmId={farm?.id}
+            canDecide={canEdit}
+            onChanged={refreshPending}
+          />
         )}
 
         {area === "insumos" && (
