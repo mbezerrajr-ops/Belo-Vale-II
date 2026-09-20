@@ -180,13 +180,52 @@ manuscrita única de 25/08 medida antes (brinco 12/18 ≈ 67%): em volume, com
 páginas de até 51 linhas lidas em faixas, o leitor erra mais do que numa
 folha de 18 linhas lida de uma vez.
 
-**A causa mais provável do cabeçalho errado:** a página do 2º lote tem 45
-linhas e é lida em faixas; se o cabeçalho cair perto do corte da primeira
-faixa, pode sair cortado ou comprimido na imagem, e o modelo "completa"
-errado. A escrita em si é legível — "2º LOTE" claro, sem rasura relevante.
-Ainda não corrigido; hipóteses para a próxima rodada: repetir o cabeçalho
-em todas as faixas de uma página (hoje só a primeira o recebe por inteiro),
-ou aumentar a sobreposição no topo.
+**A causa do cabeçalho errado** era disputa de atenção: data e lote eram
+pedidos **dentro** da transcrição de 48 linhas. A escrita em si é legível —
+"2º LOTE" claro, sem rasura relevante.
+
+### v7: cabeçalho à parte e faixas na resolução original (20/09/2026)
+
+Duas mudanças, medidas juntas no mesmo PDF de 113 linhas:
+
+1. **O topo da folha (18% da altura) vai numa chamada própria**, com esquema
+   de duas chaves e instrução curta — inclusive o aviso de que "2 e 3 se
+   parecem nesta letra". A resposta tem dez palavras em vez de quatro mil
+   tokens, e o valor lido ali prevalece sobre o que vier no meio das linhas
+   (se o recorte não for legível, o antigo vale como reserva).
+2. **Os recortes saem da página original.** Antes a página era reduzida para
+   1200 px e **depois** cortada em faixas — cada faixa chegava com 1200×600
+   de uma imagem já encolhida. Agora a página fica em resolução cheia, os
+   recortes saem dela, e só então cada um é reduzido: o dobro de pixels por
+   letra em cada faixa.
+
+| | v6 | v7 |
+|---|---|---|
+| linhas perdidas / inventadas | 51 / 45 | **7 / 1** |
+| manhã / tarde | 46% / 47% | **78% / 78%** |
+| total | 43% | **73%** |
+| anotação | 44% | **75%** |
+| brinco | 38% | **63%** |
+| nome | 19% | **30%** |
+| tempo (3 páginas) | 424 s | 535 s |
+
+O cabeçalho saiu certo nas três páginas, inclusive o "2º LOTE" que errara
+nas duas leituras anteriores — era ele que derrubava o agregado, porque uma
+página inteira deixava de casar.
+
+Por lote, com a v7:
+
+| lote | linhas | brinco | manhã/tarde | total | anotação |
+|---|---|---|---|---|---|
+| 1º (48 linhas, em faixas) | 45 lidas | 66% | 72% / 72% | 66% | 89% |
+| 2º (47 linhas, em faixas) | 45 lidas | 59% | 76% / 74% | 72% | 74% |
+| 3º (18 linhas, 1 chamada) | 18 lidas | 61% | 94% / 100% | 94% | 38% |
+
+**O que ainda erra:** o ano da data (25/08/**2024** em vez de 2026) — o
+revisor corrige o arquivo inteiro de uma vez. O brinco continua na casa dos
+60%: é o campo mais difícil, porque um dígito trocado não tem contexto que o
+denuncie. Nome baixo (30%) importa menos: ele serve de sugestão, e a caixa
+de Revisão já casa por semelhança.
 
 **Não é uma regressão de código:** a comparação honesta expôs um problema
 de leitura que já existia, mas a comparação anterior (por posição, cega ao

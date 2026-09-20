@@ -258,27 +258,43 @@ def _png(width=40, height=30) -> bytes:
 
 
 class _Transport:
-    """Faz o papel do Ollama. Responde a pergunta do formato com `layout` e as
-    transcrições com `answer` (uma resposta, ou uma lista, na ordem)."""
+    """Faz o papel do Ollama. Responde a pergunta do formato com `layout`, a do
+    cabeçalho com `header`, e as transcrições com `answer` (uma resposta, ou
+    uma lista, na ordem)."""
 
-    def __init__(self, answer, layout="manuscrito"):
+    def __init__(self, answer, layout="manuscrito", header=None):
         self.answers = list(answer) if isinstance(answer, list) else None
         self.answer = answer
         self.layout = layout
+        self.header = header if header is not None else {"data": None, "lote": None}
         self.requests: list[dict] = []
+        self.headers: list[dict] = []
         self.classified = 0
 
     def __call__(self, url: str, body: dict, timeout: float) -> dict:
         if isinstance(self.answer, Exception):
             raise self.answer
-        if "formato" in body["format"]["properties"]:
+        properties = body["format"]["properties"]
+        if "formato" in properties:
             self.classified += 1
             return _reply({"formato": self.layout})
+        if "linhas" not in properties:
+            self.headers.append({"url": url, "body": body})
+            return _reply(self.header)
         self.requests.append({"url": url, "body": body})
         answer = self.answers.pop(0) if self.answers is not None else self.answer
         if isinstance(answer, Exception):
             raise answer
         return answer
+
+
+def _image_size(request: dict) -> tuple[int, int]:
+    """Tamanho da imagem que foi enviada numa chamada."""
+    import base64
+
+    raw = base64.b64decode(request["body"]["messages"][-1]["images"][0])
+    with Image.open(io.BytesIO(raw)) as image:
+        return image.size
 
 
 def _reply(content) -> dict:
@@ -546,3 +562,56 @@ class TestSelfCheck:
         reading = reader.transcribe(_png(3000, 4000))
 
         assert len(reading["linhas"]) == 3
+
+
+class TestHeaderInItsOwnCall:
+    """A data e o lote saíam no meio da transcrição de 48 linhas, disputando
+    atenção com o resto — e saíam errados: numa folha de 25/08 o cabeçalho
+    do 2º lote foi lido como "3º LOTE" em duas leituras seguidas, e todas as
+    47 linhas daquela página deixaram de casar com o gabarito. Agora o topo
+    da folha vai numa chamada própria, curta e com mais pixels por letra."""
+
+    def test_the_header_is_asked_apart_from_the_lines(self) -> None:
+        transport = _Transport(_reply(SHEET), header={"data": "25/08/2026", "lote": "2º LOTE"})
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reading = reader.transcribe(_png(1200, 1600))
+
+        assert len(transport.headers) == 1
+        # O que vale é o cabeçalho lido à parte, não o que veio na transcrição.
+        assert (reading["data"], reading["lote"]) == ("25/08/2026", "2º LOTE")
+
+    def test_the_header_call_sees_only_the_top_of_the_page(self) -> None:
+        transport = _Transport(_reply(SHEET), header={"data": "25/08/2026", "lote": "2º"})
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reader.transcribe(_png(1200, 1600))
+
+        _, altura_topo = _image_size(transport.headers[0])
+        _, altura_pagina = _image_size(transport.requests[0])
+        assert altura_topo < altura_pagina
+
+    def test_an_unreadable_header_keeps_what_the_page_said(self) -> None:
+        """Sem cabeçalho legível no recorte, o que a transcrição trouxe vale."""
+        transport = _Transport(_reply(SHEET), header={"data": None, "lote": None})
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reading = reader.transcribe(_png(1200, 1600))
+
+        assert (reading["data"], reading["lote"]) == (SHEET["data"], SHEET["lote"])
+
+
+class TestBandResolution:
+    def test_bands_are_cropped_from_the_original_page_not_from_the_reduced_one(self) -> None:
+        """A faixa recortada da página já reduzida tem metade dos pixels por
+        letra. Recortada do original e só então reduzida, cada faixa chega ao
+        modelo com o dobro de resolução útil."""
+        banda = {"data": None, "lote": None, "linhas": [_line("1", "853", "PRETINHA", "4", "3", "7")]}
+        transport = _Transport([TimeoutError("tempo"), _reply(banda), _reply(banda)])
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reader.transcribe(_png(3000, 4000))
+
+        largura_pagina, _ = _image_size(transport.requests[0])
+        largura_banda, _ = _image_size(transport.requests[1])
+        assert largura_banda > largura_pagina
