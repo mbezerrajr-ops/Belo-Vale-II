@@ -42,6 +42,7 @@ from app.services.event_normalization import parse_event_date
 from app.services.production_files import parse_number_br
 from app.vision.pages import (
     DEFAULT_MAX_SIDE,
+    MARGIN_STRIP_NARROW,
     crop_bands,
     crop_left,
     crop_sides,
@@ -178,8 +179,7 @@ _COMMON_RULES = """Regras:
 - Leia linha por linha, alinhando pela altura: brinco, nome, litros e
   anotação de uma entrada têm de estar na mesma linha da folha.
 - Não corrija contas, não complete números, não troque nomes por parecidos.
-- Campo ilegível: deixe vazio. Nunca invente linhas nem valores, e nunca
-  escreva a palavra "null" como se fosse conteúdo.
+- Campo ilegível: null. Nunca invente linhas nem valores.
 - Cada linha é independente: não repita a anotação ou o brinco de outra linha.
 - Em "trecho", copie a linha como você a leu.
 """
@@ -203,7 +203,8 @@ PROMPTS: dict[str, str] = {
   linhas fica com o campo vazio. Só escreva anotação na linha em que HÁ tinta
   na margem direita naquela altura. Se você só vê uma seta na folha, só uma
   linha recebe anotação — não repita a mesma nas outras.
-- Linhas da tabela que ficaram em branco não entram em "linhas".
+- Linhas da tabela que ficaram em branco não entram em "linhas". Campo sem
+  nada é campo vazio: nunca escreva a palavra "null" como se fosse conteúdo.
 
 """ + _COMMON_RULES,
     "manuscrito": """Você está transcrevendo uma folha pautada de pesagem de leite, escrita à mão.
@@ -218,7 +219,7 @@ Exemplo: "3 - 389 ÁGATA → 4 + 5 = 9"   ou   "8 - 633 GIGANTE → 2 + 2 = 4 �
   (ex.: "18 - QUARTINHA 406").
 - MANHÃ e TARDE são os litros das duas ordenhas; TOTAL vem depois do "=".
 - ANOTAÇÃO é o que vem depois da última seta: "SECAR", "1º LOTE", "SECAR 7 MES.".
-  A maioria das linhas não tem anotação: deixe o campo vazio.
+  A maioria das linhas não tem anotação: use null.
 
 """ + _COMMON_RULES,
 }
@@ -415,18 +416,38 @@ class OllamaSheetReader:
             return {}
         return answer if isinstance(answer, dict) else {}
 
-    def read_margin(self, image_jpeg: bytes) -> dict[str, str] | None:
+    def read_margin(self, page: PreprocessedImage) -> dict[str, str] | None:
         """As anotações da margem, perguntadas sozinhas: número da linha → texto.
 
         No meio da transcrição de uma folha inteira, a margem é o campo que o
         modelo mais generaliza — uma seta vira anotação em todas as linhas.
-        Perguntada sozinha, a resposta é curta: só as linhas que têm escrita.
+        Perguntada sozinha, numa imagem que cola a coluna dos números ao lado
+        da margem, a resposta é curta: só as linhas que têm escrita.
+
+        A tira da direita é fração fixa da largura, e cada foto enquadra a
+        folha de um jeito: numa delas ela caiu sobre a coluna TOTAL e a
+        resposta veio "26, 34, 33, 30" — os litros. Resposta feita de números
+        é sinal de coluna errada, e a folha é perguntada de novo numa tira
+        mais estreita, colada à borda.
 
         `None` quer dizer "não deu para perguntar" (leitor fora do ar, resposta
         fora do esquema): aí vale o que a transcrição trouxer. Lista vazia
         quer dizer "a margem está limpa", e isso apaga o que a transcrição
         inventou.
         """
+        larga = self._margin_answer(fit(crop_sides(page), DEFAULT_MAX_SIDE).content)
+        if larga is None or not _reads_like_a_column(larga):
+            return larga
+        estreita = self._margin_answer(
+            fit(crop_sides(page, margin=MARGIN_STRIP_NARROW), DEFAULT_MAX_SIDE).content
+        )
+        if estreita is None:
+            return larga
+        # Se a tira estreita também só traz números, a folha não tem anotação
+        # legível: melhor nenhuma do que a coluna de litros virando observação.
+        return {} if _reads_like_a_column(estreita) else estreita
+
+    def _margin_answer(self, image_jpeg: bytes) -> dict[str, str] | None:
         try:
             answer = self._chat(
                 prompt=MARGIN_PROMPT,
@@ -557,8 +578,7 @@ class OllamaSheetReader:
                     reading = apply_brincos(reading, brincos)
                 # A margem manda na anotação: linha que ela não cita fica sem
                 # anotação nenhuma.
-                composta = fit(crop_sides(page), DEFAULT_MAX_SIDE).content
-                if (margin := self.read_margin(composta)) is not None:
+                if (margin := self.read_margin(page)) is not None:
                     reading = apply_margin(reading, margin)
             # O cabeçalho lido à parte vale mais que o que veio no meio das linhas.
             readings.append({
@@ -634,7 +654,7 @@ _SECAR = re.compile(r"\bsecar?\b|\bsecagem\b")
 #: O "º" manuscrito sai do modelo como ":", "o" ou ".": "2: LOT" é a mesma
 #: troca de lote, e não pode virar observação só por causa da grafia — na
 #: caixa de Revisão uma é campo preenchido, a outra é texto solto.
-_LOT = re.compile(r"(\d+)\s*[ºo°ª:.]?\s*lote?\b|\blote?\s*(\d+)")
+_LOT = re.compile(r"(\d+)\s*[ºo°ª:.=-]?\s*lote?\b|\blote?\s*(\d+)")
 
 
 def _annotation_events(anotacao: str) -> list[tuple[str, dict[str, str | None]]]:
@@ -734,6 +754,19 @@ def _drop_repeated_annotation(lines: list[dict[str, Any]]) -> list[dict[str, Any
 #: vacas vizinhas mudando de lote juntas acontece na folha; sete linhas
 #: seguidas no rabo em branco do formulário, não.
 _RUN_LIMIT = 4
+
+
+def _reads_like_a_column(annotations: dict[str, str]) -> bool:
+    """A resposta da margem parece a coluna de litros, não anotações?
+
+    Anotação da fazenda é palavra ("SECA", "2º LOTE", "DOENTE"); a coluna
+    TOTAL é número ("26", "34", "20,5"). Três ou mais respostas sem nenhuma
+    letra, e a maioria assim, querem dizer que a tira pegou a tabela.
+    """
+    if len(annotations) < 3:
+        return False
+    numericas = sum(1 for texto in annotations.values() if not re.search(r"[^\W\d_]", texto))
+    return numericas >= 3 and numericas >= len(annotations) / 2
 
 
 def drop_margin_runs(annotations: dict[str, str]) -> dict[str, str]:

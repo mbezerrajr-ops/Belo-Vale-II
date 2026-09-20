@@ -35,6 +35,11 @@ LEFT_FRACTION = 0.34
 NUMBER_STRIP = (0.08, 0.30)
 MARGIN_STRIP = (0.70, 1.0)
 
+#: A tira estreita da segunda tentativa, colada à borda: é usada quando a
+#: primeira resposta vem cheia de números, sinal de que a tira larga pegou a
+#: coluna TOTAL em vez da margem.
+MARGIN_STRIP_NARROW = (0.84, 1.0)
+
 #: Sobreposição entre as faixas, para nenhuma linha cair no corte.
 BAND_OVERLAP = 0.08
 
