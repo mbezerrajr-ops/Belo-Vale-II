@@ -263,3 +263,61 @@ O brinco continua na casa dos 60% na folha manuscrita (ver a medição acima).
 Ele é sugestão, não decisão: nada entra no rebanho sem alguém aprovar na
 caixa de Revisão. Subir esse número (segmentar linha a linha, outros modelos)
 é trabalho separado.
+
+## v9 — os cantos da folha em perguntas próprias (20/09/2026)
+
+As cinco fotos de celular de 22/07, contra as medições já lançadas no banco:
+
+| versão | cabeçalho (5 folhas) | brinco | total | na revisão (vaca certa ou 1ª) | erro certo* |
+|---|---|---|---|---|---|
+| v6 | 2 de 5 | 87% | 53% | 82%, 10 toques em "Ou é esta" | 12 |
+| **v9** | **5 de 5** | 82% | **81%** | **91%**, 5 toques | **7** |
+
+\* linhas que apontam uma vaca já apontada por outra linha.
+
+O salto do total (53% → 81%) e o da revisão (82% → 91%) vêm de três coisas
+medidas uma a uma:
+
+1. **O recorte do cabeçalho pegava 18% do alto** — o bastante no PDF
+   escaneado, nada numa foto de celular, em que a mesa entra no
+   enquadramento. Com 32%, data e lote saem certos nas cinco folhas.
+2. **A palavra "null"**, escrita por extenso pelo modelo nas linhas em branco
+   do formulário, virava leitura: 14 produções fantasma numa foto de 14 vacas.
+3. **Brincos e margem ganharam pergunta própria**, com recorte próprio.
+
+Custo: a leitura de uma folha passou de uma chamada a cinco. Medido numa
+foto de 14 linhas, 220 s no total — 183 s deles na transcrição da página,
+que já existia. As duas perguntas novas somam 29 s (13%).
+
+### A margem ainda é o campo fraco
+
+Gabarito das cinco folhas, conferido olhando foto por foto: **16 anotações**
+(linhas 5 e 19 do lote 1; 5, 6 e 14 da continuação; 1, 10, 19 e 20 do lote 2;
+2, 8, 10, 11, 13 e 20 da continuação; 16 do lote 3).
+
+A pergunta própria acerta **7 linhas das 16**, com cerca de 5 falsas
+sobrevivendo às guardas. Melhor que antes — o estado inicial era uma seta
+virar 23 trocas de lote —, mas longe de bom.
+
+**Por que ainda erra, medido:** a tira da direita é uma fração fixa da
+largura (70% a 100%), e cada foto enquadra a folha de um jeito. Na foto do
+lote 1 essa fração caiu **em cima da coluna TOTAL**: o modelo respondeu
+26, 34, 33, 30… — os totais, não anotações. Não viraram 28 observações
+falsas só porque a guarda que já existia descarta anotação feita só de
+dígitos (era o tique de conferência ao lado do total). O sistema degradou
+com segurança, mas por acidente feliz, não por desenho.
+
+**Próximo passo, claro:** achar a borda direita da tabela na imagem em vez
+de chutar uma fração. A tentativa de detectar por projeção de escuridão
+esbarrou no fundo escuro da mesa e do espiral do caderno, que dominam as
+colunas das pontas — precisa olhar só a faixa da folha e procurar réguas
+finas, não regiões escuras.
+
+### Três guardas, todas no código
+
+Prompt deriva; código não. Na ordem em que agem:
+
+1. anotação feita só de dígitos é tique, não anotação;
+2. a mesma anotação em 6+ linhas cobrindo 60% da página é repetição;
+3. a mesma anotação em 4 linhas SEGUIDAS é invenção em fila — foi assim que
+   o modelo preencheu as linhas 21 a 27, em branco, de uma folha.

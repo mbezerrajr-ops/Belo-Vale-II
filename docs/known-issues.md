@@ -601,3 +601,94 @@ conferência do código mostrou que ela vale pouco: `sheet_to_events` usa só a
 `data` do cabeçalho. O lote lido serve para conferir a leitura contra o
 gabarito; não entra em proposta nenhuma. Troca de lote só existe quando está
 escrita na margem, linha a linha, e essa o revisor corrige no próprio cartão.
+
+## O recorte do cabeçalho cortava o cabeçalho (20/09/2026)
+
+A data saía errada em três das cinco fotos de 22/07 — e data errada erra a
+**página inteira**, não uma linha. A primeira hipótese foi prazo: o cabeçalho
+é perguntado numa chamada própria de 90 s, e a folha do 1º lote levava 216 s.
+Medida a chamada sozinha, ela leva **24 a 52 s**: nunca estourou.
+
+A causa era geométrica. O recorte pegava 18% do alto da folha, o que bastava
+no PDF escaneado, em que a folha começa no pixel zero. Na foto de celular a
+mesa entra no enquadramento, e esses 18% terminam **acima** da linha
+"LOTE: __ DATA: __": o modelo recebia um retângulo de papel em branco e
+inventava uma data — a mesma nas três, "25/08/26".
+
+Medido nas cinco fotos, com o recorte em 32%:
+
+| foto | 18% (antes) | 32% (agora) | folha |
+|---|---|---|---|
+| lote1-2 | 25/08/26 · 1º LOTE | **22/07/26 · 1º** | 22/07/26 · 1º |
+| lote1 | 25/08/26 · 2º LOTE | **22/07/26 · 1º** | 22/07/26 · 1º |
+| lote2-2 | 22/07/26 · 2º | 22/07/26 · 2º LOTE | 22/07/26 · 2º |
+| lote2 | 22/07/26 · 2º | 22/07/26 · 2º | 22/07/26 · 2º |
+| lote3 | 25/08/26 · 1º LOTE | **22/07/26 · 3º** | 22/07/26 · 3º |
+
+Cinco de cinco, data e lote. 45% não melhora nada e custa o mesmo. Na folha
+manuscrita de 25/08 (PDF escaneado) as três páginas dão leitura **idêntica**
+com 18% e com 32%: o recorte maior não tira nada de quem já acertava.
+
+**A lição** é sobre o método, não sobre o modelo: a hipótese ("estourou o
+prazo") era plausível e estava errada, e cronometrar a chamada custou dois
+minutos. O log de aviso que tinha sido acrescentado para esse caso continua
+no lugar — só não era esse o problema.
+
+## Margem e brincos ganharam pergunta própria (formulário impresso)
+
+A guarda contra anotação repetida apaga o estrago, mas com ele some também a
+anotação verdadeira: das 4 anotações reais do 2º lote saía 1. Então a margem
+passou a ser perguntada sozinha — "quais linhas têm escrita na margem
+direita, e o quê" —, e a resposta dela manda: a linha que ela não cita fica
+sem anotação. É o mesmo desenho que resolveu o cabeçalho.
+
+O brinco do formulário impresso segue o mesmo caminho, do outro lado: a faixa
+esquerda leva a coluna escrita à mão e os números impressos que a ancoram,
+com mais pixels por dígito. Aqui, porém, a regra é outra — a linha que a faixa
+não cita **fica com o que a transcrição leu**. O problema do brinco é dígito
+trocado, não brinco inventado, e apagar o que já se tinha seria perder leitura
+boa.
+
+**Só no formulário impresso.** Na folha manuscrita não há margem: brinco e
+anotação estão dentro da própria linha ("3 - 389 ÁGATA → 4 + 5 = 9 → SECAR").
+Perguntar "o que há na margem" ali devolveria lista vazia — e a lista vazia
+apaga anotação. Seriam as 10 ordens de secagem e as 7 trocas de lote de 25/08
+apagadas de uma vez.
+
+## Exemplo dentro do prompt vira resposta (20/09/2026)
+
+A instrução da margem dizia o que procurar: *"geralmente depois de uma seta:
+'→ 2º LOTE', '→ SECA', 'DOENTE'"*. Na primeira foto lida com a margem em
+chamada própria, o modelo devolveu exatamente **as três** — numa folha que
+tem só duas setas, ambas "→ 2º LOTE". As anotações falsas caíram de 13 para
+2, mas as 2 que sobraram saíram do nosso próprio texto.
+
+Agora a instrução descreve a **forma** ("em geral uma seta seguida de duas ou
+três palavras") e manda copiar o que estiver escrito, dizendo explicitamente
+para deixar a linha de fora quando não der para ler, em vez de trocar por
+uma anotação parecida ou provável. Um teste trava isso: "SECA" e "DOENTE"
+não podem aparecer nas instruções do formulário impresso nem da margem.
+
+**A folha manuscrita ficou como estava**, de propósito: ali "SECAR" aparece
+no exemplo que ensina o formato da linha ("8 - 633 GIGANTE → 2 + 2 = 4 →
+SECAR"), e é a folha em que a leitura de anotação ia razoável (10 secagens e
+7 trocas de lote em 113 linhas). Tirar sem medir contra o gabarito seria
+trocar um erro conhecido por um desconhecido. Está na fila, com gabarito.
+
+## A palavra "null" escrita por extenso virava leitura
+
+Na mesma foto, o modelo escreveu a **string** `"null"` nos campos das 14
+linhas em branco do formulário — em vez de deixar o campo vazio, como o
+esquema permite. Para o nosso código "null" era texto, logo a linha tinha
+conteúdo: as 14 linhas vazias viraram **14 produções fantasma**, com litros
+"null", que chegariam à caixa de Revisão.
+
+Duas correções:
+
+1. `_clean` passa a tratar como vazio o que é vazio escrito por extenso:
+   `null`, `none`, `nulo`, `n/a`, `-`, `--`. Vale para todos os campos.
+2. As instruções não pedem mais "use null" nem "o brinco é null" — pedem
+   "deixe vazio", e dizem para nunca escrever a palavra "null" como
+   conteúdo. Era provavelmente o que ensinava o modelo a escrevê-la.
+
+A guarda no código é o que garante: prompt deriva, código não.

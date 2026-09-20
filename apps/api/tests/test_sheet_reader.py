@@ -22,8 +22,11 @@ from datetime import date
 import pytest
 from PIL import Image
 
-from app.vision.pages import UnsupportedPage, load_pages
+from app.vision.pages import UnsupportedPage, crop_left, crop_sides, crop_top, load_pages
 from app.vision.sheet_reader import (
+    MARGIN_PROMPT,
+    drop_margin_runs,
+    PROMPTS,
     OllamaSheetReader,
     ReaderFormatError,
     ReaderUnavailable,
@@ -167,6 +170,17 @@ class TestSheetToEvents:
 
         assert len(tidy_transcription(sheet)["linhas"]) == 1
 
+    @pytest.mark.parametrize("vazio", ["null", "NULL", "none", "N/A", "-", "--"])
+    def test_the_word_null_written_out_is_not_a_reading(self, vazio) -> None:
+        """O modelo às vezes escreve a PALAVRA "null" em vez de deixar o campo
+        vazio. Numa foto real ele a escreveu nas 14 linhas em branco do
+        formulário, e elas viraram 14 produções fantasma com litros "null"."""
+        escrita = {"seq": "15", "brinco": vazio, "nome": vazio, "manha": vazio,
+                   "tarde": vazio, "total": vazio, "anotacao": vazio, "trecho": vazio}
+        sheet = {**SHEET, "linhas": [SHEET["linhas"][0], escrita]}
+
+        assert len(tidy_transcription(sheet)["linhas"]) == 1
+
     def test_a_row_with_only_a_margin_number_is_dropped(self) -> None:
         """Número na margem de uma linha vazia (ou riscada) não é leitura."""
         margin_only = {"seq": "24", "brinco": "6804", "nome": None, "manha": None,
@@ -265,13 +279,17 @@ class _Transport:
     cabeçalho com `header`, e as transcrições com `answer` (uma resposta, ou
     uma lista, na ordem)."""
 
-    def __init__(self, answer, layout="manuscrito", header=None):
+    def __init__(self, answer, layout="manuscrito", header=None, margin=None, brincos=None):
         self.answers = list(answer) if isinstance(answer, list) else None
         self.answer = answer
         self.layout = layout
         self.header = header if header is not None else {"data": None, "lote": None}
+        self.margin = margin if margin is not None else {"anotacoes": []}
+        self.brincos = brincos if brincos is not None else {"brincos": []}
         self.requests: list[dict] = []
         self.headers: list[dict] = []
+        self.margins: list[dict] = []
+        self.left: list[dict] = []
         self.classified = 0
 
     def __call__(self, url: str, body: dict, timeout: float) -> dict:
@@ -281,6 +299,16 @@ class _Transport:
         if "formato" in properties:
             self.classified += 1
             return _reply({"formato": self.layout})
+        if "brincos" in properties:
+            self.left.append({"url": url, "body": body})
+            if isinstance(self.brincos, Exception):
+                raise self.brincos
+            return _reply(self.brincos)
+        if "anotacoes" in properties:
+            self.margins.append({"url": url, "body": body})
+            if isinstance(self.margin, Exception):
+                raise self.margin
+            return _reply(self.margin)
         if "linhas" not in properties:
             self.headers.append({"url": url, "body": body})
             return _reply(self.header)
@@ -457,6 +485,45 @@ class TestPages:
     def test_anything_else_is_refused(self) -> None:
         with pytest.raises(UnsupportedPage):
             load_pages(b"isto nao e uma imagem")
+
+    def test_the_header_crop_clears_the_desk_around_a_phone_photo(self) -> None:
+        """18% do alto enquadravam o cabeçalho no PDF escaneado, em que a folha
+        começa no pixel zero. Na foto de celular esses 18% são a mesa e a borda
+        do papel: o corte caía EM CIMA da linha "LOTE: __ DATA: __", o modelo
+        recebia um retângulo em branco e inventava a data — três das cinco
+        fotos de 22/07 saíram com 25/08, e com elas a folha inteira. Medido nas
+        cinco, 32% enquadra todas; 45% não melhora."""
+        [page] = load_pages(_png(1000, 1400), max_side=None)
+
+        topo = crop_top(page)
+
+        assert topo.height >= page.height * 0.30
+
+    def test_the_two_sides_of_the_sheet_are_glued_into_one_narrow_image(self) -> None:
+        """A anotação fica na margem direita e o número da linha, a meia folha
+        de distância, na esquerda. Perguntando sobre a página inteira, o modelo
+        lia a anotação mas errava a linha: numa foto com setas nas linhas 5, 6
+        e 14, respondeu 25 e 26 — linhas em branco. Coladas as duas tiras, cada
+        anotação fica ao lado do seu número."""
+        [page] = load_pages(_png(1000, 1400), max_side=None)
+
+        junta = crop_sides(page)
+
+        assert junta.height == page.height
+        # O miolo da folha (as colunas de litros) fica de fora: a pergunta é
+        # só sobre número e margem.
+        assert junta.width < page.width * 0.6
+
+    def test_the_left_strip_keeps_the_brinco_column_and_its_line_numbers(self) -> None:
+        """No formulário impresso o brinco fica na margem esquerda, à mesma
+        altura do número impresso da linha. Recortar essa faixa dá mais pixels
+        por dígito sem perder a âncora: o número que diz de qual linha é."""
+        [page] = load_pages(_png(1000, 1400), max_side=None)
+
+        faixa = crop_left(page)
+
+        assert faixa.height == page.height  # a folha inteira, de cima a baixo
+        assert faixa.width < page.width
 
 
 def _dup_sheet(brinco="016"):
@@ -678,3 +745,228 @@ class TestRepeatedAnnotation:
         tidy = tidy_transcription({**SHEET, "linhas": linhas})
 
         assert [line["anotacao"] for line in tidy["linhas"]] == [None] * 6
+
+
+class TestMarginInItsOwnCall:
+    """A anotação fica solta na margem direita, longe da linha a que pertence,
+    e no meio da transcrição o modelo a copiava para a folha inteira: numa
+    foto real uma seta "→ 3º LOTE" virou 23 trocas de lote. A guarda contra
+    repetição apaga o estrago, mas com ele some também a anotação verdadeira.
+
+    Então a margem é perguntada sozinha — como já se faz com o cabeçalho —,
+    e a resposta é curta: só as linhas que têm escrita."""
+
+    def test_the_margin_is_asked_apart_from_the_lines(self) -> None:
+        transport = _Transport(_reply(SHEET), layout="impresso")
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reader.transcribe(_png(1200, 1600))
+
+        assert len(transport.margins) == 1
+
+    def test_what_the_margin_call_says_wins_over_the_lines(self) -> None:
+        linhas = [
+            _line("1", "101", "UMA", "5", "5", "10", "SECAR"),
+            _line("2", "102", "OUTRA", "5", "5", "10", "SECAR"),
+            _line("3", "103", "TERCEIRA", "5", "5", "10", "SECAR"),
+        ]
+        transport = _Transport(
+            _reply({**SHEET, "linhas": linhas}),
+            layout="impresso",
+            margin={"anotacoes": [{"linha": "2", "texto": "3º LOTE"}]},
+        )
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reading = reader.transcribe(_png(1200, 1600))
+
+        assert [linha["anotacao"] for linha in reading["linhas"]] == [None, "3º LOTE", None]
+
+    def test_an_empty_margin_clears_what_the_lines_invented(self) -> None:
+        linhas = [_line(str(i), f"10{i}", f"VACA {i}", "5", "5", "10", "SECAR") for i in range(1, 4)]
+        transport = _Transport(
+            _reply({**SHEET, "linhas": linhas}), layout="impresso", margin={"anotacoes": []}
+        )
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reading = reader.transcribe(_png(1200, 1600))
+
+        assert [linha["anotacao"] for linha in reading["linhas"]] == [None, None, None]
+
+    def test_a_margin_call_that_fails_keeps_what_the_lines_said(self) -> None:
+        """Sem a resposta da margem, o que a transcrição trouxe continua
+        valendo — com a guarda contra repetição ainda no caminho."""
+        linhas = [_line("1", "101", "UMA", "5", "5", "10", "SECAR")]
+        transport = _Transport(
+            _reply({**SHEET, "linhas": linhas}),
+            layout="impresso",
+            margin=ReaderUnavailable("leitor fora do ar"),
+        )
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reading = reader.transcribe(_png(1200, 1600))
+
+        assert [linha["anotacao"] for linha in reading["linhas"]] == ["SECAR"]
+
+
+class TestBrincosFromTheLeftStrip:
+    """No formulário impresso o brinco é escrito à mão na margem esquerda,
+    fora da tabela — é o campo que mais erra, e um dígito trocado não tem
+    contexto que o denuncie. A faixa esquerda vai numa chamada própria: só
+    a coluna de brincos e os números impressos que os ancoram, com o dobro
+    de pixels por dígito."""
+
+    def test_the_left_strip_is_asked_only_for_the_printed_form(self) -> None:
+        impresso = _Transport(_reply(SHEET), layout="impresso")
+        manuscrito = _Transport(_reply(SHEET), layout="manuscrito")
+
+        for transport in (impresso, manuscrito):
+            reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+            reader.transcribe(_png(1200, 1600))
+
+        assert (len(impresso.left), len(manuscrito.left)) == (1, 0)
+
+    def test_what_the_left_strip_says_replaces_the_brinco(self) -> None:
+        linhas = [_line("1", "323", "CHIQUINHA", "18", "20", "38")]
+        transport = _Transport(
+            _reply({**SHEET, "linhas": linhas}),
+            layout="impresso",
+            brincos={"brincos": [{"linha": "1", "brinco": "923"}]},
+        )
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reading = reader.transcribe(_png(1200, 1600))
+
+        assert reading["linhas"][0]["brinco"] == "923"
+
+    def test_a_line_the_strip_does_not_name_keeps_what_was_read(self) -> None:
+        """Diferente da margem: aqui o problema é dígito trocado, não anotação
+        inventada. Linha que a faixa não cita fica com o que a transcrição
+        trouxe."""
+        linhas = [
+            _line("1", "323", "CHIQUINHA", "18", "20", "38"),
+            _line("2", "586", "GAUCELA", "19", "23", "42"),
+        ]
+        transport = _Transport(
+            _reply({**SHEET, "linhas": linhas}),
+            layout="impresso",
+            brincos={"brincos": [{"linha": "2", "brinco": "586"}]},
+        )
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reading = reader.transcribe(_png(1200, 1600))
+
+        assert [linha["brinco"] for linha in reading["linhas"]] == ["323", "586"]
+
+    def test_a_strip_call_that_fails_keeps_what_was_read(self) -> None:
+        linhas = [_line("1", "323", "CHIQUINHA", "18", "20", "38")]
+        transport = _Transport(
+            _reply({**SHEET, "linhas": linhas}),
+            layout="impresso",
+            brincos=ReaderUnavailable("leitor fora do ar"),
+        )
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reading = reader.transcribe(_png(1200, 1600))
+
+        assert reading["linhas"][0]["brinco"] == "323"
+
+    def test_the_handwritten_sheet_has_no_margin_to_ask_about(self) -> None:
+        """Ali a anotação vem no fim da própria linha ("→ SECAR"), não numa
+        margem. Perguntar pela margem devolveria lista vazia — e apagaria a
+        anotação verdadeira."""
+        linhas = [_line("1", "633", "GIGANTE", "2", "2", "4", "SECAR")]
+        transport = _Transport(_reply({**SHEET, "linhas": linhas}), layout="manuscrito")
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reading = reader.transcribe(_png(1200, 1600))
+
+        assert transport.margins == []
+        assert reading["linhas"][0]["anotacao"] == "SECAR"
+
+    def test_the_prompt_does_not_dictate_which_annotations_exist(self) -> None:
+        """A instrução dizia o que procurar: "→ 2º LOTE", "→ SECA", "DOENTE".
+        O modelo devolveu as três — numa folha que só tem duas setas, ambas
+        de lote. Exemplo dentro do prompt vira resposta; o que a folha tem,
+        quem diz é a folha."""
+        for texto in (MARGIN_PROMPT, PROMPTS["impresso"]):
+            assert "SECA" not in texto.upper()
+            assert "DOENTE" not in texto.upper()
+        # A folha manuscrita continua com "SECAR" no exemplo que ensina o
+        # FORMATO da linha ("8 - 633 GIGANTE → 2 + 2 = 4 → SECAR"), e ali a
+        # leitura de anotação estava razoável. Tirar sem medir seria trocar um
+        # erro conhecido por um desconhecido: está na fila, com gabarito.
+        assert "SECAR" in PROMPTS["manuscrito"]
+
+    def test_the_line_number_matches_even_written_with_a_dot(self) -> None:
+        """O formulário imprime "6." e o modelo devolve o ponto junto. Casar
+        exatamente não colaria a anotação em linha nenhuma."""
+        linhas = [_line("6", "586", "GAUCELA", "19", "23", "42")]
+        transport = _Transport(
+            _reply({**SHEET, "linhas": linhas}),
+            layout="impresso",
+            margin={"anotacoes": [{"linha": "6.", "texto": "2º LOTE"}]},
+        )
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reading = reader.transcribe(_png(1200, 1600))
+
+        assert reading["linhas"][0]["anotacao"] == "2º LOTE"
+
+    def test_the_brinco_line_number_also_matches_with_a_dot(self) -> None:
+        linhas = [_line("1", "999", "CHIQUINHA", "18", "20", "38")]
+        transport = _Transport(
+            _reply({**SHEET, "linhas": linhas}),
+            layout="impresso",
+            brincos={"brincos": [{"linha": "1.", "brinco": "323"}]},
+        )
+        reader = OllamaSheetReader(url="http://127.0.0.1:11434", model="m", post=transport)
+
+        reading = reader.transcribe(_png(1200, 1600))
+
+        assert reading["linhas"][0]["brinco"] == "323"
+
+
+class TestAnnotationSpelling:
+    """O "º" da folha sai do modelo como ":", "o" ou ".". A troca de lote não
+    pode virar observação só por causa disso — na caixa de Revisão uma é um
+    campo preenchido, a outra é texto solto para alguém ler."""
+
+    @pytest.mark.parametrize("escrito", ["2º LOT", "2: LOT", "2o LOTE", "2. LOTE", "2 LOTE"])
+    def test_a_lot_change_survives_how_the_degree_sign_was_read(self, escrito) -> None:
+        sheet = {**SHEET, "linhas": [_line("1", "323", "CHIQUINHA", "18", "20", "38", escrito)]}
+
+        extraction = sheet_to_events(sheet, extractor_version="teste")
+
+        tipos = [e.event_type for e in extraction.events]
+        assert tipos == ["production", "lot_change"], escrito
+        assert extraction.events[1].fields == {"lote": "2"}
+
+
+class TestMarginRuns:
+    """A margem lida à parte ainda inventa, e a invenção tem assinatura:
+    linhas SEGUIDAS com o mesmo texto. Numa folha real o modelo listou as
+    linhas 21 a 27 com "3º LOT" — o rabo em branco do formulário — junto com
+    duas anotações verdadeiras. Anotação de verdade é esparsa: as seis dessa
+    folha estavam nas linhas 2, 8, 10, 11, 13 e 20."""
+
+    def test_a_run_of_equal_annotations_is_dropped(self) -> None:
+        lidas = {str(linha): "3º LOT" for linha in range(21, 28)}
+        lidas["8"] = "3º LOT"
+
+        assert drop_margin_runs(lidas) == {"8": "3º LOT"}
+
+    def test_scattered_equal_annotations_are_kept(self) -> None:
+        lidas = {"2": "3º LOT", "8": "3º LOT", "10": "3º LOT", "13": "1º LOT"}
+
+        assert drop_margin_runs(lidas) == lidas
+
+    def test_a_short_run_is_kept(self) -> None:
+        """Duas ou três vacas vizinhas mudando de lote juntas acontece."""
+        lidas = {"5": "2º LOT", "6": "2º LOT", "7": "2º LOT"}
+
+        assert drop_margin_runs(lidas) == lidas
+
+    def test_a_run_of_different_texts_is_kept(self) -> None:
+        lidas = {"5": "2º LOT", "6": "DOENTE", "7": "SECA", "8": "1º LOT"}
+
+        assert drop_margin_runs(lidas) == lidas
