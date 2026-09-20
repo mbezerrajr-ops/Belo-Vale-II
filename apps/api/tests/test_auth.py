@@ -278,6 +278,9 @@ def test_production_worker_configuration_does_not_require_auth_secret(monkeypatc
         minio_url="http://objects:9000",
         minio_access_key="configured-outside-source",
         minio_secret_key="configured-outside-source",
+        # Produção exige leitor de verdade; aqui o assunto é o AUTH_SECRET.
+        reader_provider="ollama",
+        reader_url="http://10.0.0.9:11434",
     )
 
     assert settings.auth_secret is None
@@ -293,6 +296,9 @@ def test_worker_configuration_ignores_an_irrelevant_short_auth_secret() -> None:
         minio_access_key="configured-outside-source",
         minio_secret_key="configured-outside-source",
         auth_secret="irrelevant",
+        # Produção exige leitor de verdade; aqui o assunto é o AUTH_SECRET.
+        reader_provider="ollama",
+        reader_url="http://10.0.0.9:11434",
     )
 
     assert settings.runtime_role == "worker"

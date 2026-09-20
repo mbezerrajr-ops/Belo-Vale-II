@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     vision_model_name: str = "unconfigured"
     #: Leitor local de folhas (Ollama). Só aceita endereço da própria máquina
     #: ou da rede interna — ver `app.vision.sheet_reader.ensure_local_url`.
+    #: Leitor de eventos do worker. "fake" inventa leitura (CI e demonstração);
+    #: "ollama" lê de verdade, no endereço de `reader_url`.
+    reader_provider: Literal["fake", "ollama"] = "fake"
     reader_url: str = "http://127.0.0.1:11434"
     reader_model: str = "qwen2.5vl:7b"
     auth_secret: SecretStr | None = None
@@ -69,6 +72,8 @@ class Settings(BaseSettings):
             required.append("auth_secret")
         if self.runtime_role == "worker" and self.vision_provider == "http":
             required += ["vision_api_url", "vision_api_key"]
+        if self.runtime_role == "worker" and self.reader_provider == "ollama":
+            required.append("reader_url")
         missing = [name for name in required if not getattr(self, name)]
         if missing:
             raise ValueError(
@@ -83,6 +88,15 @@ class Settings(BaseSettings):
             raise ValueError(
                 "photo_sheets_demo must stay disabled in production: the fake OCR "
                 "provider invents readings"
+            )
+
+        # O leitor falso devolve sempre o mesmo caderno. Em produção isso
+        # encheria a caixa de revisão de dado inventado, com a foto de verdade
+        # ignorada — e alguém acabaria aprovando.
+        if self.runtime_role == "worker" and self.reader_provider == "fake":
+            raise ValueError(
+                "reader_provider must not stay 'fake' in production: the fake "
+                "reader invents readings instead of reading the photo"
             )
 
         if self.runtime_role == "api" and not self.auth_cookie_secure:

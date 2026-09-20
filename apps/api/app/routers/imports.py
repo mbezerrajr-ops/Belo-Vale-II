@@ -28,7 +28,7 @@ async def upload_import(
     storage: Annotated[ObjectStorage, Depends(get_object_storage)],
     settings: Annotated[Settings, Depends(get_settings)],
     dispatcher: Annotated[ExtractionDispatcher, Depends(get_extraction_dispatcher)],
-    _: Annotated[User, Depends(require_minimum_role("operator"))],
+    user: Annotated[User, Depends(require_minimum_role("operator"))],
     farm_id: Annotated[UUID, Form()],
     file: Annotated[UploadFile, File()],
     declared_lot: Annotated[str | None, Form()] = None,
@@ -43,6 +43,7 @@ async def upload_import(
         max_bytes=settings.max_upload_bytes,
         declared_lot=declared_lot,
         declared_measured_on=normalize_date(declared_period),
+        initiated_by=user.email,
     )
     dispatcher.dispatch(created.extraction_run_id)
     return _response(created)

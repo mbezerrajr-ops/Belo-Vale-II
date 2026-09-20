@@ -231,6 +231,9 @@ class TestOnlyLocalEndpoints:
             "http://192.168.1.20:11434",
             "http://172.18.0.4:11434",
             "http://ollama:11434",
+            # O apelido que o Docker dá ao hospedeiro: é assim que o worker
+            # em contêiner alcança o Ollama rodando no Windows, fora dele.
+            "http://host.docker.internal:11434",
         ],
     )
     def test_the_machine_itself_and_the_internal_network_are_accepted(self, url) -> None:

@@ -513,6 +513,11 @@ class EventProposalSource(TimestampedModel, Base):
         ForeignKey("users.id", ondelete="RESTRICT")
     )
     corrected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: A foto de onde esta leitura saiu, quando veio pelo app. Quem revisa vê
+    #: a folha ao lado do que foi lido.
+    image_asset_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("image_assets.id", ondelete="SET NULL")
+    )
 
     @property
     def effective_reference_date(self) -> date | None:
