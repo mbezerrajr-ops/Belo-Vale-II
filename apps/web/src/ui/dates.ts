@@ -1,16 +1,18 @@
 /**
- * Datas no relógio de quem está usando.
+ * Datas no relógio da fazenda.
  *
- * `new Date().toISOString()` devolve o dia em UTC: depois das 21h no Nordeste
- * já é "amanhã", e a API recusa coleta ou baixa com data no futuro. Por isso
- * o "hoje" é montado com os campos locais.
+ * O servidor recusa coleta ou baixa com data no futuro comparando com o dia
+ * da fazenda — UTC−3 fixo (`app/core/farm_clock.py`). O "hoje" das telas
+ * precisa ser o mesmo, e não o do aparelho: um celular com outro fuso (ou o
+ * CI, que roda em UTC) calcula "amanhã" das 21h à meia-noite de Brasília, e
+ * o lançamento é recusado sem o funcionário entender por quê.
  */
 
-export function localToday(now: Date = new Date()): string {
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+/** Deslocamento fixo da fazenda, o mesmo do servidor. */
+const FARM_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+export function farmToday(now: Date = new Date()): string {
+  return new Date(now.getTime() - FARM_OFFSET_MS).toISOString().slice(0, 10);
 }
 
 /** `2026-09-18` → `18/09/2026`. */

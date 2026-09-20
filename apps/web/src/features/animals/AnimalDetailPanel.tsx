@@ -15,7 +15,7 @@ import {
   type AnimalUpdateInput,
   type ExitReason,
 } from "../../api/types";
-import { brDate, localToday } from "../../ui/dates";
+import { brDate, farmToday } from "../../ui/dates";
 import { ProductionHistory } from "./ProductionHistory";
 import type { ProductionHistoryEntry, Reading } from "../../api/types";
 
@@ -96,7 +96,7 @@ export function AnimalDetailPanel({
   onUpdate = updateAnimal,
   onExit = registerExit,
   onUndoExit = undoExit,
-  today = localToday(),
+  today = farmToday(),
   onLoadProduction,
   onCorrect,
   onVoid,

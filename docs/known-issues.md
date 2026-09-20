@@ -380,6 +380,29 @@ hoje a correção é anular e relançar, uma medição por vez.
   cartão aberto recarrega antes de aprovar. Fica em `audit_events`
   (`source_date_corrected`).
 
+## Resolvido: "hoje" saía do fuso do aparelho, não do da fazenda
+
+O servidor recusa coleta e baixa com data no futuro comparando com o dia da
+fazenda (UTC−3 fixo, `app/core/farm_clock.py`). As telas, porém, montavam o
+"hoje" com os campos locais do navegador (`localToday`). Em UTC−3 os dois
+coincidem; fora disso, não: **das 21h à meia-noite de Brasília, um aparelho
+em UTC calcula "amanhã"**, e o lançamento é recusado sem o funcionário
+entender por quê — a linha some do "salvo" e nada explica.
+
+Achado pelo CI, que roda em UTC: o E2E do curral falhou às 00:30 UTC e
+passava na máquina de quem desenvolve, em UTC−3. Reproduzido localmente às
+01:09 UTC com a mesma mensagem.
+
+Corrigido: `farmToday()` calcula o dia da fazenda pelo deslocamento fixo,
+igual ao servidor, e não depende do fuso do aparelho. O Playwright agora
+roda com `timezoneId: "UTC"`, para que a suíte local cubra essa classe de
+bug em vez de escondê-la.
+
+Continua dependendo de o **relógio** do aparelho estar mais ou menos certo —
+só o fuso deixou de importar. Se isso virar problema (celular com data
+errada), o passo seguinte é a API devolver o dia da fazenda e a tela usar
+esse valor.
+
 ## Resolvido: sair e recarregar reabria a sessão
 
 O botão Sair mostrava o login na hora e revogava a sessão no servidor sem

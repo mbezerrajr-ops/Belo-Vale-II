@@ -8,7 +8,7 @@ import {
   type ImportRecord,
   type ImportRowStatus,
 } from "../../api/types";
-import { brDate, liters, localToday } from "../../ui/dates";
+import { brDate, liters, farmToday } from "../../ui/dates";
 
 /**
  * Importação da coleta por arquivo (CSV, XLSX ou PDF).
@@ -82,7 +82,7 @@ function plural(count: number, one: string, many: string): string {
 export function ImportPanel({
   token,
   canReplace,
-  today = localToday(),
+  today = farmToday(),
   onPreview = previewImport,
   onCommit = commitImport,
   onList = listImports,

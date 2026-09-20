@@ -13,7 +13,7 @@ import {
   type ReadingConflict,
   type SheetItem,
 } from "../../api/types";
-import { brDate, liters, localToday } from "../../ui/dates";
+import { brDate, liters, farmToday } from "../../ui/dates";
 import { ImportPanel } from "./ImportPanel";
 
 /**
@@ -129,7 +129,7 @@ function label(item: SheetItem): string {
 export function ProductionPage({
   token,
   canCorrect,
-  today = localToday(),
+  today = farmToday(),
   onLoadSheet = getProductionSheet,
   onEnter = enterReading,
   onCorrect = correctReading,
