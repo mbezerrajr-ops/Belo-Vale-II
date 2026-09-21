@@ -93,31 +93,88 @@ class TestProductionSettings:
 
 
 class _Servidor:
-    """Faz o papel do whisper-server."""
+    """Faz o papel do whisper-server: devolve as respostas na ordem."""
 
-    def __init__(self, resposta: bytes) -> None:
-        self.resposta = resposta
+    def __init__(self, *respostas: bytes) -> None:
+        self.respostas = list(respostas)
         self.chamadas: list[tuple[str, dict[str, str], bytes]] = []
 
     def __call__(self, url: str, campos: dict[str, str], wav: bytes, prazo: float) -> bytes:
         self.chamadas.append((url, campos, wav))
-        return self.resposta
+        return self.respostas[min(len(self.chamadas), len(self.respostas)) - 1]
+
+
+def _detalhada(*trechos: tuple[float, float, str], duracao: float) -> bytes:
+    return json.dumps({
+        "text": " ".join(t for _, _, t in trechos),
+        "duration": duracao,
+        "segments": [{"start": a, "end": b, "text": t} for a, b, t in trechos],
+    }).encode()
 
 
 class TestTalkingToWhisper:
     def test_the_request_asks_for_portuguese_and_temperature_zero(self) -> None:
         """Temperatura zero: a mesma gravação dá a mesma transcrição, e é isso
         que permite comparar duas versões do tradutor."""
-        servidor = _Servidor(json.dumps({"text": " A 497 deu 18."}).encode())
+        servidor = _Servidor(_detalhada((0.0, 3.0, "A 497 deu 18."), duracao=3.0))
         transcritor = WhisperCppTranscriber(url="http://127.0.0.1:8081", model="m", post=servidor)
 
         texto = transcritor.transcribe(b"RIFF...")
 
-        assert texto == " A 497 deu 18."
+        assert texto == "A 497 deu 18."
         [(url, campos, wav)] = servidor.chamadas
         assert url == "http://127.0.0.1:8081/inference"
-        assert campos == {"language": "pt", "temperature": "0", "response_format": "json"}
+        assert campos["language"] == "pt"
+        assert campos["temperature"] == "0"
         assert wav == b"RIFF..."
+
+    def test_a_skipped_stretch_of_speech_is_asked_again_without_timestamps(self) -> None:
+        """Medido numa gravação do titular: o whisper transcreveu "Mensagem de
+        teste" (0 a 1,7 s) e SALTOU para 29,98 s — sumiram três vacas, em
+        silêncio. É o salto de marca de tempo: sem marcas, ele não tem para
+        onde saltar. O buraco entre trechos é o sinal (numa gravação boa, o
+        maior foi de 0,44 s)."""
+        servidor = _Servidor(
+            _detalhada((0.0, 1.66, "Mensagem de teste."), (29.98, 32.2, "Produziu 7 litros."), duracao=40.0),
+            json.dumps({"text": "Mensagem de teste. Vaca 417 Pandora. Produziu 7 litros."}).encode(),
+        )
+        transcritor = WhisperCppTranscriber(url="http://127.0.0.1:8081", model="m", post=servidor)
+
+        texto = transcritor.transcribe(b"RIFF...")
+
+        assert "Pandora" in texto
+        assert len(servidor.chamadas) == 2
+        assert servidor.chamadas[1][1]["no_timestamps"] == "true"
+
+    def test_speech_lost_at_the_end_is_asked_again_too(self) -> None:
+        servidor = _Servidor(
+            _detalhada((0.0, 9.0, "Vaca 417."), duracao=40.0),
+            json.dumps({"text": "Vaca 417. Vaca 633. Vaca 419."}).encode(),
+        )
+        transcritor = WhisperCppTranscriber(url="http://127.0.0.1:8081", model="m", post=servidor)
+
+        assert transcritor.transcribe(b"RIFF...") == "Vaca 417. Vaca 633. Vaca 419."
+
+    def test_each_segment_is_a_line(self) -> None:
+        """A pausa entre trechos é fronteira para o tradutor."""
+        servidor = _Servidor(
+            _detalhada((0.0, 5.0, " 7 pela manhã, mais 5 da tarde"), (5.2, 9.0, " Pequina produziu 6,5 litros"), duracao=9.5)
+        )
+        transcritor = WhisperCppTranscriber(url="http://127.0.0.1:8081", model="m", post=servidor)
+
+        assert transcritor.transcribe(b"RIFF...") == (
+            "7 pela manhã, mais 5 da tarde\nPequina produziu 6,5 litros"
+        )
+
+    def test_a_continuous_transcript_is_asked_only_once(self) -> None:
+        servidor = _Servidor(
+            _detalhada((0.0, 5.0, "Vaca 417."), (5.4, 11.0, "Vaca 633."), duracao=11.5)
+        )
+        transcritor = WhisperCppTranscriber(url="http://127.0.0.1:8081", model="m", post=servidor)
+
+        transcritor.transcribe(b"RIFF...")
+
+        assert len(servidor.chamadas) == 1
 
     @pytest.mark.parametrize("resposta", [b"<html>erro</html>", b'{"sem": "texto"}'])
     def test_an_answer_that_is_not_a_transcript_is_refused(self, resposta) -> None:

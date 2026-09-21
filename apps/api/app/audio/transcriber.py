@@ -11,6 +11,7 @@ O endereço só pode ser da própria máquina ou da rede interna
 from __future__ import annotations
 
 import json
+import logging
 import socket
 import urllib.error
 import urllib.request
@@ -19,6 +20,12 @@ from collections.abc import Callable
 from typing import Protocol
 
 from app.core.local_url import ensure_local_url
+
+logger = logging.getLogger(__name__)
+
+#: Buraco entre trechos transcritos a partir do qual a fala foi PULADA. Numa
+#: gravação boa do titular o maior buraco foi de 0,44 s; na que falhou, 28 s.
+SKIP_GAP_SECONDS = 8.0
 
 
 class TranscriberUnavailable(RuntimeError):
@@ -117,9 +124,31 @@ class WhisperCppTranscriber:
         return self.model
 
     def transcribe(self, wav: bytes) -> str:
+        """A gravação transcrita — sem trecho pulado.
+
+        Medido numa gravação do titular com um pouco de ruído: o whisper
+        transcreveu "Mensagem de teste" (0 a 1,7 s) e SALTOU para 29,98 s,
+        levando três vacas junto, em silêncio. É o salto de marca de tempo: o
+        modelo prevê o fim da janela antes da hora. Sem marcas de tempo ele
+        não tem para onde saltar — mas sem elas também erra mais dígito (na
+        mesma medição, "462" virou "4162").
+
+        Então a primeira pergunta vem com marcas de tempo, que servem de
+        detector: buraco grande entre trechos quer dizer fala pulada, e aí a
+        gravação é perguntada de novo sem marcas. Brinco errado aparece na caixa
+        de Revisão (o animal não existe, e o nome dito sugere o certo); vaca
+        pulada não aparece em lugar nenhum.
+        """
+        detalhada = self._ask(wav, {"response_format": "verbose_json"})
+        if not _skipped_speech(detalhada):
+            return _by_segment(detalhada)
+        logger.warning("transcrição pulou fala; perguntando de novo sem marcas de tempo")
+        return _text(self._ask(wav, {"response_format": "json", "no_timestamps": "true"}))
+
+    def _ask(self, wav: bytes, extra: dict[str, str]) -> dict:
         corpo = self._post(
             f"{self.url}/inference",
-            {"language": self.language, "temperature": "0", "response_format": "json"},
+            {"language": self.language, "temperature": "0", **extra},
             wav,
             self.timeout,
         )
@@ -127,7 +156,43 @@ class WhisperCppTranscriber:
             resposta = json.loads(corpo)
         except (ValueError, UnicodeDecodeError) as error:
             raise TranscriberFormatError("O transcritor respondeu algo que não é JSON.") from error
-        texto = resposta.get("text") if isinstance(resposta, dict) else None
-        if not isinstance(texto, str):
+        if not isinstance(resposta, dict):
             raise TranscriberFormatError("A resposta do transcritor não traz o texto.")
-        return texto
+        return resposta
+
+
+def _text(resposta: dict) -> str:
+    texto = resposta.get("text")
+    if not isinstance(texto, str):
+        raise TranscriberFormatError("A resposta do transcritor não traz o texto.")
+    return texto.strip()
+
+
+def _by_segment(resposta: dict) -> str:
+    """Um trecho por linha. Cada trecho é uma pausa natural da fala, e o
+    tradutor usa a quebra de linha como fronteira — é por ela que acha "Pequina
+    produziu" no começo de frase. O texto corrido às vezes perde o ponto entre
+    uma vaca e outra."""
+    trechos = [
+        str(s.get("text", "")).strip()
+        for s in resposta.get("segments") or []
+        if isinstance(s, dict)
+    ]
+    trechos = [t for t in trechos if t]
+    return "\n".join(trechos) if trechos else _text(resposta)
+
+
+def _skipped_speech(resposta: dict) -> bool:
+    """Há buraco grande entre os trechos transcritos — ou no fim?"""
+    trechos = [s for s in resposta.get("segments") or [] if isinstance(s, dict)]
+    if not trechos:
+        return False  # nada transcrito: é silêncio, e quem decide é quem lê
+    try:
+        fins = [0.0] + [float(s["end"]) for s in trechos]
+        buracos = [float(s["start"]) - fim for s, fim in zip(trechos, fins)]
+        duracao = float(resposta.get("duration") or 0.0)
+    except (KeyError, TypeError, ValueError):
+        return False
+    if duracao:
+        buracos.append(duracao - fins[-1])
+    return max(buracos) > SKIP_GAP_SECONDS
