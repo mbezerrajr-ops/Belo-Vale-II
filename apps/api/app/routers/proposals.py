@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import require_minimum_role
-from app.db.models import Farm, ImageAsset, User
+from app.db.models import Farm, MediaAsset, User
 from app.db.session import get_db_session
 from app.routers.registry import resolve_current_farm
 from app.services.storage import ObjectStorage, get_object_storage
@@ -117,16 +117,16 @@ async def inbox(
     photos: dict[UUID, str | None] = {}
 
     async def photo_url(source) -> str | None:
-        if source.image_asset_id is None:
+        if source.media_asset_id is None:
             return None
-        if source.image_asset_id not in photos:
-            image = await session.get(ImageAsset, source.image_asset_id)
-            photos[source.image_asset_id] = (
+        if source.media_asset_id not in photos:
+            image = await session.get(MediaAsset, source.media_asset_id)
+            photos[source.media_asset_id] = (
                 storage.presigned_url(image.object_key, expires_seconds=_PHOTO_URL_TTL_SECONDS)
                 if image is not None and image.object_key
                 else None
             )
-        return photos[source.image_asset_id]
+        return photos[source.media_asset_id]
     summaries: dict[UUID, dict[str, Any]] = {}
 
     async def summary(animal):

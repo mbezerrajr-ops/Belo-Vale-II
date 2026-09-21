@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.db.models import Animal, ExtractedLine, ExtractionRun, Farm, ImageAsset, OfficialMeasurement
+from app.db.models import Animal, ExtractedLine, ExtractionRun, Farm, MediaAsset, OfficialMeasurement
 from app.services.approval import (
     ConcurrentReviewError,
     LineNotFoundError,
@@ -32,10 +32,10 @@ async def _make_line(
     session.add(farm)
     await session.commit()
 
-    image = ImageAsset(farm_id=farm.id, sha256=uuid4().hex.ljust(64, "0"))
+    image = MediaAsset(farm_id=farm.id, sha256=uuid4().hex.ljust(64, "0"))
     session.add(image)
     await session.flush()
-    run = ExtractionRun(image_asset_id=image.id, status="extracted")
+    run = ExtractionRun(media_asset_id=image.id, status="extracted")
     session.add(run)
     await session.commit()
 

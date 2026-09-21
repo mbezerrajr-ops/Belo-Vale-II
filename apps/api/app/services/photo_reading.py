@@ -21,7 +21,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import EventProposalSource, ExtractionRun, ImageAsset, Import, User
+from app.db.models import EventProposalSource, ExtractionRun, MediaAsset, Import, User
 from app.services.event_extraction import EventExtractor
 from app.services.event_proposals import create_proposals
 from app.services.storage import ObjectStorage
@@ -33,7 +33,7 @@ class PhotoReadingError(Exception):
     """A foto não pôde virar proposta. A mensagem explica o que faltou."""
 
 
-async def _sender(session: AsyncSession, image: ImageAsset) -> User:
+async def _sender(session: AsyncSession, image: MediaAsset) -> User:
     """Quem enviou a foto: a proposta é criada em nome dessa pessoa."""
     import_row = await session.get(Import, image.import_id) if image.import_id else None
     email = (import_row.initiated_by or "").strip() if import_row else ""
@@ -51,7 +51,7 @@ async def _sender(session: AsyncSession, image: ImageAsset) -> User:
     return user
 
 
-def _label(image: ImageAsset, import_row: Import | None) -> str:
+def _label(image: MediaAsset, import_row: Import | None) -> str:
     """Como o arquivo aparece na caixa de Revisão."""
     enviado = f"{image.created_at:%d/%m/%Y %H:%M}" if image.created_at else "sem data"
     lote = f" · {import_row.declared_lot}" if import_row and import_row.declared_lot else ""
@@ -70,7 +70,7 @@ async def read_photo_into_proposals(
     if run is None:
         raise PhotoReadingError(f"Leitura não encontrada: {extraction_run_id}")
 
-    image = await session.get(ImageAsset, run.image_asset_id)
+    image = await session.get(MediaAsset, run.media_asset_id)
     if image is None or image.object_key is None:
         raise PhotoReadingError(f"A foto da leitura {extraction_run_id} não está guardada.")
 
@@ -103,7 +103,7 @@ async def read_photo_into_proposals(
             kind="photo",
             label=_label(image, import_row),
             extraction=extraction,
-            image_asset_id=image.id,
+            media_asset_id=image.id,
         )
         await session.commit()
     except Exception:

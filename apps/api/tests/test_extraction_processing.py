@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.db.models import Animal, ExtractionRun, Farm, ImageAsset, Import, ValidationAlert
+from app.db.models import Animal, ExtractionRun, Farm, MediaAsset, Import, ValidationAlert
 from app.services.extraction_processing import persist_extracted_lines
 from app.vision.contracts import VisionExtraction, VisionLine
 
@@ -39,10 +39,10 @@ def test_persist_extracted_lines_matches_animal_and_flags_a_lot_mismatch() -> No
                 session.add(ingestion)
                 await session.commit()
 
-                image = ImageAsset(farm_id=farm.id, import_id=ingestion.id, sha256="c" * 64)
+                image = MediaAsset(farm_id=farm.id, import_id=ingestion.id, sha256="c" * 64)
                 session.add(image)
                 await session.flush()
-                run = ExtractionRun(image_asset_id=image.id, status="processing")
+                run = ExtractionRun(media_asset_id=image.id, status="processing")
                 session.add(run)
                 await session.commit()
 
@@ -105,10 +105,10 @@ def test_persist_extracted_lines_flags_unknown_animal_with_no_candidates() -> No
                 session.add(farm)
                 await session.commit()
 
-                image = ImageAsset(farm_id=farm.id, sha256="d" * 64)
+                image = MediaAsset(farm_id=farm.id, sha256="d" * 64)
                 session.add(image)
                 await session.flush()
-                run = ExtractionRun(image_asset_id=image.id, status="processing")
+                run = ExtractionRun(media_asset_id=image.id, status="processing")
                 session.add(run)
                 await session.commit()
 

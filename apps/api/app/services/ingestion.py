@@ -9,7 +9,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import ExtractionRun, ImageAsset, Import
+from app.db.models import ExtractionRun, MediaAsset, Import
 from app.services.image_sniffing import sniff_image_media_type
 from app.services.storage import ObjectStorage
 
@@ -71,8 +71,8 @@ async def create_import(
     sha256 = hashlib.sha256(content).hexdigest()
 
     existing = await session.scalar(
-        select(ImageAsset).where(
-            ImageAsset.farm_id == farm_id, ImageAsset.sha256 == sha256
+        select(MediaAsset).where(
+            MediaAsset.farm_id == farm_id, MediaAsset.sha256 == sha256
         )
     )
     if existing is not None:
@@ -97,7 +97,7 @@ async def create_import(
     object_key = f"{farm_id}/{sha256}"
     storage.save(object_key, content, media_type)
 
-    image = ImageAsset(
+    image = MediaAsset(
         farm_id=farm_id,
         import_id=import_row.id,
         sha256=sha256,
@@ -108,7 +108,7 @@ async def create_import(
     session.add(image)
     await session.flush()
 
-    run = ExtractionRun(image_asset_id=image.id, status="pending")
+    run = ExtractionRun(media_asset_id=image.id, status="pending")
     session.add(run)
     await session.flush()
     import_row.status = "queued"
@@ -127,21 +127,21 @@ async def reprocess_import(session: AsyncSession, *, import_id: UUID) -> ImportS
         raise ImportNotFoundError(str(import_id))
 
     image = await session.scalar(
-        select(ImageAsset).where(ImageAsset.import_id == import_id)
+        select(MediaAsset).where(MediaAsset.import_id == import_id)
     )
     if image is None:
         raise ImportNotFoundError(str(import_id))
 
     active_run = await session.scalar(
         select(ExtractionRun).where(
-            ExtractionRun.image_asset_id == image.id,
+            ExtractionRun.media_asset_id == image.id,
             ExtractionRun.status.in_(_ACTIVE_RUN_STATUSES),
         )
     )
     if active_run is not None:
         raise ImportAlreadyProcessingError(str(import_id))
 
-    run = ExtractionRun(image_asset_id=image.id, status="pending")
+    run = ExtractionRun(media_asset_id=image.id, status="pending")
     session.add(run)
     await session.flush()
     import_row.status = "queued"

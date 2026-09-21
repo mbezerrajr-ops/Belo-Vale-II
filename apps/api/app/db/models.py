@@ -257,9 +257,16 @@ class Import(TimestampedModel, Base):
     declared_measured_on: Mapped[date | None] = mapped_column(Date)
 
 
-class ImageAsset(TimestampedModel, Base):
-    __tablename__ = "image_assets"
-    __table_args__ = (Index("uq_image_assets_farm_sha256", "farm_id", "sha256", unique=True),)
+class MediaAsset(TimestampedModel, Base):
+    """Um arquivo enviado pelo app: foto da folha, gravação de voz, texto.
+
+    Chamava-se `image_assets` enquanto só havia foto (migração 0013 renomeou).
+    O conteúdo sempre foi genérico: hash, chave no armazenamento, tipo e
+    tamanho — nada de largura, altura ou coisa de imagem.
+    """
+
+    __tablename__ = "media_assets"
+    __table_args__ = (Index("uq_media_assets_farm_sha256", "farm_id", "sha256", unique=True),)
 
     id: Mapped[UUID] = mapped_column(
         PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()")
@@ -278,7 +285,7 @@ class ExtractionRun(TimestampedModel, Base):
     id: Mapped[UUID] = mapped_column(
         PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()")
     )
-    image_asset_id: Mapped[UUID] = mapped_column(ForeignKey("image_assets.id", ondelete="RESTRICT"), nullable=False)
+    media_asset_id: Mapped[UUID] = mapped_column(ForeignKey("media_assets.id", ondelete="RESTRICT"), nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="pending", server_default=text("'pending'"), nullable=False)
     model_name: Mapped[str | None] = mapped_column(String(255))
     raw_response: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
@@ -513,10 +520,11 @@ class EventProposalSource(TimestampedModel, Base):
         ForeignKey("users.id", ondelete="RESTRICT")
     )
     corrected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    #: A foto de onde esta leitura saiu, quando veio pelo app. Quem revisa vê
-    #: a folha ao lado do que foi lido.
-    image_asset_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("image_assets.id", ondelete="SET NULL")
+    #: O arquivo de onde esta leitura saiu, quando veio pelo app: a foto da
+    #: folha ou a gravação da ordenha. Quem revisa vê (ou ouve) ao lado do que
+    #: foi lido.
+    media_asset_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("media_assets.id", ondelete="SET NULL")
     )
 
     @property

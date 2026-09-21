@@ -12,7 +12,7 @@ from app.db.models import (
     ExtractedLine,
     ExtractionRun,
     Farm,
-    ImageAsset,
+    MediaAsset,
     Import,
     OfficialMeasurement,
     ReviewDecision,
@@ -41,11 +41,11 @@ async def _create_review_decision(
     session.add(ingestion)
     await session.flush()
 
-    image = ImageAsset(farm_id=farm_id, import_id=ingestion.id, sha256="b" * 64)
+    image = MediaAsset(farm_id=farm_id, import_id=ingestion.id, sha256="b" * 64)
     session.add(image)
     await session.flush()
 
-    run = ExtractionRun(image_asset_id=image.id)
+    run = ExtractionRun(media_asset_id=image.id)
     session.add(run)
     await session.flush()
 
@@ -82,8 +82,8 @@ def test_same_image_hash_cannot_be_imported_twice() -> None:
                 farm, _ = await _create_farm_and_animal(session)
                 session.add_all(
                     (
-                        ImageAsset(farm_id=farm.id, sha256="a" * 64),
-                        ImageAsset(farm_id=farm.id, sha256="a" * 64),
+                        MediaAsset(farm_id=farm.id, sha256="a" * 64),
+                        MediaAsset(farm_id=farm.id, sha256="a" * 64),
                     )
                 )
                 with pytest.raises(IntegrityError):

@@ -72,7 +72,7 @@ def _load(
     *events: ExtractedEvent,
     kind="text",
     reference: date | None = REF,
-    image_asset_id: str | None = None,
+    media_asset_id: str | None = None,
 ) -> list[str]:
     """Cria as propostas pelo serviço, como o leitor fará, e devolve os ids."""
 
@@ -88,7 +88,7 @@ def _load(
                     user=user,
                     kind=kind,
                     label="caderno de 25/08",
-                    image_asset_id=UUID(image_asset_id) if image_asset_id else None,
+                    media_asset_id=UUID(media_asset_id) if media_asset_id else None,
                     extraction=EventExtraction(
                         events=list(events),
                         extractor_name="teste",
@@ -756,7 +756,7 @@ class TestPhotoInTheInbox:
         _, reviewer = make_user("reviewer")
         make_animal(farm, brinco="389", name="ÁGATA", lote="LOTE 1")
         image_id = one(
-            "INSERT INTO image_assets (farm_id, sha256, object_key, media_type, byte_size) "
+            "INSERT INTO media_assets (farm_id, sha256, object_key, media_type, byte_size) "
             "VALUES (CAST(:f AS uuid), :s, :k, 'image/jpeg', 10) RETURNING id::text",
             f=farm,
             s=f"sha-{uuid.uuid4().hex}",
@@ -768,7 +768,7 @@ class TestPhotoInTheInbox:
             "reviewer@belovale",
             _event("production", "389", None, producao="20"),
             kind="photo",
-            image_asset_id=image_id,
+            media_asset_id=image_id,
         )
 
         item = _inbox(api, reviewer).json()[0]

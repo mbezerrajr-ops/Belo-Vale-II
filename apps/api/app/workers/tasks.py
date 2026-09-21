@@ -12,7 +12,7 @@ from celery import Celery
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import get_settings
-from app.db.models import ExtractionRun, Import, ImageAsset
+from app.db.models import ExtractionRun, Import, MediaAsset
 from app.services.extraction_processing import persist_extracted_lines
 from app.services.photo_reading import read_photo_into_proposals
 from app.services.image_preprocessing import preprocess_image
@@ -58,7 +58,7 @@ async def run_extraction(
     if run is None:
         raise ExtractionRunNotFoundError(str(extraction_run_id))
 
-    image = await session.get(ImageAsset, run.image_asset_id)
+    image = await session.get(MediaAsset, run.media_asset_id)
     if image is None or image.object_key is None:
         raise ImageObjectMissingError(str(extraction_run_id))
 
