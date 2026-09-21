@@ -134,6 +134,19 @@ export async function uploadImport(
   return parseJsonOrThrow<UploadResult>(response);
 }
 
+/**
+ * O arquivo (folha ou gravação) de uma leitura, com o login da pessoa. O
+ * navegador não manda o token num `<img src>`, então a tela busca aqui e
+ * mostra como `blob:`.
+ */
+export async function fetchSourceMedia(url: string, token: string): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}${url}`, { headers: authHeaders(token) });
+  if (!response.ok) {
+    throw new ApiError(response.status, { code: "media_unavailable" });
+  }
+  return response.blob();
+}
+
 export async function reprocessImport(
   importId: string,
   token: string,

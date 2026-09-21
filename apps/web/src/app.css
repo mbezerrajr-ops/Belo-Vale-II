@@ -2722,3 +2722,17 @@ form.send-photo {
 .refresh-inbox {
   margin: 10px 0 4px;
 }
+
+/* A gravação ao lado das propostas: quem revisa ouve antes de aprovar. */
+.source-audio {
+  display: block;
+  margin-top: 8px;
+}
+.source-audio audio {
+  width: 100%;
+  max-width: 420px;
+}
+.source-media-error {
+  display: block;
+  color: var(--muted, #6b6b6b);
+}

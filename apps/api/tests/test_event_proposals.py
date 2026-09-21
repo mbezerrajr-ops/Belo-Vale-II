@@ -749,34 +749,88 @@ class TestSourceDate:
             )
 
 
-class TestPhotoInTheInbox:
-    """Quem revisa vê a folha ao lado do que foi lido, sem trocar de tela."""
+class TestTheFileInTheInbox:
+    """Quem revisa vê a folha, ou ouve a gravação, ao lado do que foi lido.
 
-    def test_a_proposal_from_a_photo_carries_a_link_to_it(self, api, farm, storage) -> None:
-        _, reviewer = make_user("reviewer")
-        make_animal(farm, brinco="389", name="ÁGATA", lote="LOTE 1")
-        image_id = one(
+    O arquivo abre pela própria API, com o mesmo login de tudo. Até a fase 2c
+    o link era uma URL assinada do armazenamento interno (`http://minio:9000`),
+    um nome que nenhum navegador fora do Docker resolve — e a política de
+    segurança da página barraria de qualquer jeito. Passava nos testes porque
+    eles só conferiam o endereço, nunca se ele abria.
+    """
+
+    def _with_file(self, farm, storage, *, media_type, conteudo, kind):
+        chave = f"fazenda/{uuid.uuid4().hex}"
+        storage.save(chave, conteudo, media_type)
+        media_id = one(
             "INSERT INTO media_assets (farm_id, sha256, object_key, media_type, byte_size) "
-            "VALUES (CAST(:f AS uuid), :s, :k, 'image/jpeg', 10) RETURNING id::text",
+            "VALUES (CAST(:f AS uuid), :s, :k, :t, :b) RETURNING id::text",
             f=farm,
             s=f"sha-{uuid.uuid4().hex}",
-            k="fazenda/foto.jpg",
+            k=chave,
+            t=media_type,
+            b=len(conteudo),
         )[0][0]
-
+        make_animal(farm, brinco="389", name="ÁGATA", lote="LOTE 1")
         _load(
             farm,
             "reviewer@belovale",
             _event("production", "389", None, producao="20"),
-            kind="photo",
-            media_asset_id=image_id,
+            kind=kind,
+            media_asset_id=media_id,
         )
 
-        item = _inbox(api, reviewer).json()[0]
-        assert item["source"]["photo_url"].startswith("memory://fazenda/foto.jpg")
+    def test_the_inbox_points_to_the_file_through_the_api(self, api, farm, storage) -> None:
+        _, reviewer = make_user("reviewer")
+        self._with_file(farm, storage, media_type="image/jpeg", conteudo=b"\xff\xd8foto", kind="photo")
 
-    def test_a_reading_without_a_photo_has_no_link(self, api, farm) -> None:
+        fonte = _inbox(api, reviewer).json()[0]["source"]
+
+        assert fonte["media_url"] == f"/api/proposals/sources/{fonte['id']}/media"
+
+    def test_the_photo_opens_with_its_type(self, api, farm, storage) -> None:
+        _, reviewer = make_user("reviewer")
+        self._with_file(farm, storage, media_type="image/jpeg", conteudo=b"\xff\xd8foto", kind="photo")
+        fonte = _inbox(api, reviewer).json()[0]["source"]
+
+        resposta = api.get(fonte["media_url"], headers=auth(reviewer))
+
+        assert resposta.status_code == 200
+        assert resposta.headers["content-type"] == "image/jpeg"
+        assert resposta.content == b"\xff\xd8foto"
+
+    def test_the_recording_opens_as_audio(self, api, farm, storage) -> None:
+        _, reviewer = make_user("reviewer")
+        self._with_file(farm, storage, media_type="audio/mp4", conteudo=b"ftypM4A gravacao", kind="audio")
+        fonte = _inbox(api, reviewer).json()[0]["source"]
+
+        resposta = api.get(fonte["media_url"], headers=auth(reviewer))
+
+        assert resposta.status_code == 200
+        assert resposta.headers["content-type"] == "audio/mp4"
+        # Não fica guardado em cache compartilhado: é dado da fazenda.
+        assert "private" in resposta.headers["cache-control"]
+
+    def test_without_login_the_file_does_not_open(self, api, farm, storage) -> None:
+        _, reviewer = make_user("reviewer")
+        self._with_file(farm, storage, media_type="image/jpeg", conteudo=b"\xff\xd8foto", kind="photo")
+        fonte = _inbox(api, reviewer).json()[0]["source"]
+
+        assert api.get(fonte["media_url"]).status_code == 401
+
+    def test_a_reading_without_a_file_has_no_link(self, api, farm) -> None:
         _, reviewer = make_user("reviewer")
         _load(farm, "reviewer@belovale", _event("note", "389", None, texto="mancando"))
 
-        item = _inbox(api, reviewer).json()[0]
-        assert item["source"]["photo_url"] is None
+        fonte = _inbox(api, reviewer).json()[0]["source"]
+
+        assert fonte["media_url"] is None
+        resposta = api.get(f"/api/proposals/sources/{fonte['id']}/media", headers=auth(reviewer))
+        assert resposta.status_code == 404
+
+    def test_an_unknown_source_is_not_found(self, api, farm) -> None:
+        _, reviewer = make_user("reviewer")
+
+        resposta = api.get(f"/api/proposals/sources/{uuid.uuid4()}/media", headers=auth(reviewer))
+
+        assert resposta.status_code == 404

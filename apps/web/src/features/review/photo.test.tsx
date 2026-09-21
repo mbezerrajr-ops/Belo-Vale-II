@@ -8,7 +8,7 @@
  */
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ReviewInbox } from "./ReviewInbox";
 import { ApiError, type Proposal } from "../../api/types";
@@ -26,7 +26,7 @@ function base(): Proposal {
       reference_date: "2026-09-20",
       reference_date_read: "2026-09-20",
       corrected_by: null,
-      photo_url: null,
+      media_url: null,
       extractor_name: "leitor-local-folha",
       created_at: "2026-09-20T14:10:00Z",
     },
@@ -140,17 +140,53 @@ describe("Enviar foto pela Revisão", () => {
   });
 });
 
-describe("A foto ao lado das propostas", () => {
-  it("mostra a folha de onde a leitura saiu", async () => {
-    const item = base();
-    item.source.photo_url = "https://exemplo/foto.jpg?assinada";
-    setup({}, [item]);
+describe("A folha e a gravação ao lado das propostas", () => {
+  // O arquivo vem da própria API, com o login: o navegador não manda o token
+  // num <img src> comum, então a tela busca e mostra como blob:. Até a fase 2c
+  // o link apontava para o armazenamento interno, que navegador nenhum abria —
+  // e o teste só conferia o endereço, nunca se ele abria.
+  const URL_ARQUIVO = "/api/proposals/sources/s-1/media";
 
-    const foto = await screen.findByRole("link", { name: /ver a folha/i });
-    expect(foto).toHaveAttribute("href", "https://exemplo/foto.jpg?assinada");
+  beforeEach(() => {
+    vi.stubGlobal("URL", Object.assign(URL, {
+      createObjectURL: vi.fn(() => "blob:arquivo"),
+      revokeObjectURL: vi.fn(),
+    }));
   });
 
-  it("leitura que não veio de foto não mostra link", async () => {
+  it("mostra a folha de onde a leitura saiu, buscada com o login", async () => {
+    const item = base();
+    item.source.media_url = URL_ARQUIVO;
+    const onFetchMedia = vi.fn().mockResolvedValue(new Blob(["x"], { type: "image/jpeg" }));
+    setup({ onFetchMedia }, [item]);
+
+    const foto = await screen.findByRole("link", { name: /ver a folha/i });
+    expect(foto).toHaveAttribute("href", "blob:arquivo");
+    expect(onFetchMedia).toHaveBeenCalledWith(URL_ARQUIVO, TOKEN);
+  });
+
+  it("uma gravação vira um tocador, não um link de imagem", async () => {
+    const item = base();
+    item.source.kind = "audio";
+    item.source.media_url = URL_ARQUIVO;
+    const onFetchMedia = vi.fn().mockResolvedValue(new Blob(["x"], { type: "audio/mp4" }));
+    setup({ onFetchMedia }, [item]);
+
+    const tocador = await screen.findByLabelText(/ouvir a grava[çc][ãa]o/i);
+    expect(tocador.tagName).toBe("AUDIO");
+    expect(tocador).toHaveAttribute("src", "blob:arquivo");
+    expect(screen.queryByRole("link", { name: /ver a folha/i })).not.toBeInTheDocument();
+  });
+
+  it("um arquivo que não abre avisa, em vez de sumir", async () => {
+    const item = base();
+    item.source.media_url = URL_ARQUIVO;
+    setup({ onFetchMedia: vi.fn().mockRejectedValue(new Error("404")) }, [item]);
+
+    expect(await screen.findByText(/n[ãa]o foi poss[íi]vel abrir o arquivo/i)).toBeInTheDocument();
+  });
+
+  it("leitura sem arquivo não mostra nada", async () => {
     setup();
 
     await screen.findByRole("article");
