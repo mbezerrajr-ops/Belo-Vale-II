@@ -14,11 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.config import get_settings
 from app.db.models import ExtractionRun, Import, MediaAsset
 from app.services.extraction_processing import persist_extracted_lines
-from app.services.photo_reading import read_photo_into_proposals
+from app.services.media_reading import read_upload_into_proposals
 from app.services.image_preprocessing import preprocess_image
 from app.services.storage import ObjectStorage, get_object_storage
 from app.vision.contracts import VisionProvider
 from app.vision.provider import get_vision_provider
+from app.audio.speech_reader import get_audio_reader
 from app.vision.reader import get_event_reader
 
 logger = logging.getLogger(__name__)
@@ -138,13 +139,15 @@ def process_extraction_run(extraction_run_id: str) -> None:
         session_factory = async_sessionmaker(engine, expire_on_commit=False)
         try:
             async with session_factory() as session:
-                # Caminho oficial: a foto vira propostas na caixa de Revisão.
+                # Caminho oficial: a foto e a gravação viram propostas na
+                # caixa de Revisão. O leitor é escolhido pelo tipo GRAVADO no
+                # envio, e só é montado quando um arquivo daquele tipo chega.
                 # `run_extraction` (linhas de ficha, provenance ocr_review)
                 # continua no módulo para as fichas antigas já no banco.
-                await read_photo_into_proposals(
+                await read_upload_into_proposals(
                     session,
                     get_object_storage(),
-                    get_event_reader(),
+                    {"photo": get_event_reader, "audio": get_audio_reader},
                     extraction_run_id=UUID(extraction_run_id),
                 )
         finally:

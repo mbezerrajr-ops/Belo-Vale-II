@@ -30,6 +30,18 @@ class Settings(BaseSettings):
     reader_provider: Literal["fake", "ollama"] = "fake"
     reader_url: str = "http://127.0.0.1:11434"
     reader_model: str = "qwen2.5vl:7b"
+    #: Transcritor da gravação de voz (whisper.cpp). Mesma regra do leitor de
+    #: fotos: "fake" inventa a fala (CI e demonstração), "whisper" transcreve
+    #: de verdade no endereço de `audio_url`, que só pode ser da própria
+    #: máquina ou da rede interna. A porta padrão é 8081 porque a 8080 é a do
+    #: app.
+    audio_provider: Literal["fake", "whisper"] = "fake"
+    audio_url: str = "http://127.0.0.1:8081"
+    #: Informativo: vai na versão da leitura, para comparar modelos.
+    audio_model: str = "ggml-large-v3-turbo-q5_0"
+    audio_language: str = "pt"
+    #: Gravação mais longa que isto não é transcrita: prenderia a GPU.
+    audio_max_seconds: int = Field(default=300, ge=10, le=3_600)
     auth_secret: SecretStr | None = None
     auth_token_ttl_seconds: int = Field(default=900, ge=60, le=86_400)
     #: Validade da sessão renovável, em segundos. Padrão de 30 dias.
@@ -74,6 +86,8 @@ class Settings(BaseSettings):
             required += ["vision_api_url", "vision_api_key"]
         if self.runtime_role == "worker" and self.reader_provider == "ollama":
             required.append("reader_url")
+        if self.runtime_role == "worker" and self.audio_provider == "whisper":
+            required.append("audio_url")
         missing = [name for name in required if not getattr(self, name)]
         if missing:
             raise ValueError(
@@ -97,6 +111,14 @@ class Settings(BaseSettings):
             raise ValueError(
                 "reader_provider must not stay 'fake' in production: the fake "
                 "reader invents readings instead of reading the photo"
+            )
+
+        # O mesmo vale para a fala: o transcritor falso devolve sempre a mesma
+        # frase, e a gravação de verdade ficaria ignorada.
+        if self.runtime_role == "worker" and self.audio_provider == "fake":
+            raise ValueError(
+                "audio_provider must not stay 'fake' in production: the fake "
+                "transcriber invents speech instead of listening to the recording"
             )
 
         if self.runtime_role == "api" and not self.auth_cookie_secure:

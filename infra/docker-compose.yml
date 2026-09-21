@@ -48,6 +48,13 @@ services:
       READER_PROVIDER: ${READER_PROVIDER:-fake}
       READER_URL: ${READER_URL:-http://host.docker.internal:11434}
       READER_MODEL: ${READER_MODEL:-qwen2.5vl:7b}
+      # Quem ouve a gravação. "fake" (padrão) devolve sempre a mesma frase;
+      # "whisper" transcreve de verdade no whisper-server (porta 8081 — a
+      # 8080 é a do app). Mesma regra: só endereço da própria máquina ou da
+      # rede interna.
+      AUDIO_PROVIDER: ${AUDIO_PROVIDER:-fake}
+      AUDIO_URL: ${AUDIO_URL:-http://host.docker.internal:8081}
+      AUDIO_MODEL: ${AUDIO_MODEL:-ggml-large-v3-turbo-q5_0}
     depends_on:
       db:
         condition: service_healthy

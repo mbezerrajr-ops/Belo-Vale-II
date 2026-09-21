@@ -1,0 +1,214 @@
+"""O leitor de fala: qual é, como fala com o whisper, e o que ele recusa.
+
+Mesma forma do leitor de fotos: o app só sabe que há "um transcritor, num
+endereço configurável", e o endereço só pode ser da própria máquina ou da
+rede interna — nenhuma gravação sai da fazenda, por construção.
+"""
+
+from __future__ import annotations
+
+import io
+import json
+import math
+import shutil
+import struct
+import wave
+
+import pytest
+
+from app.audio.decoding import to_wav_16k_mono
+from app.audio.speech_reader import SpokenEventReader, build_audio_reader
+from app.audio.transcriber import (
+    FAKE_SPEECH,
+    FakeAudioTranscriber,
+    TranscriberFormatError,
+    WhisperCppTranscriber,
+)
+from app.core.config import Settings
+
+
+def _settings(**kwargs) -> Settings:
+    return Settings(_env_file=None, **kwargs)
+
+
+_PRODUCAO = dict(
+    environment="production",
+    runtime_role="worker",
+    reader_provider="ollama",
+    reader_url="http://host.docker.internal:11434",
+    postgres_url="postgresql+asyncpg://u:p@db/x",
+    redis_url="redis://redis:6379/0",
+    minio_url="http://minio:9000",
+    minio_access_key="k",
+    minio_secret_key="s",
+)
+
+
+class TestWhichReader:
+    def test_the_fake_is_the_default(self) -> None:
+        """Sem configurar nada, ninguém transcreve de verdade por engano."""
+        leitor = build_audio_reader(_settings())
+
+        assert isinstance(leitor, SpokenEventReader)
+        assert isinstance(leitor.transcriber, FakeAudioTranscriber)
+
+    def test_whisper_uses_the_configured_address(self) -> None:
+        leitor = build_audio_reader(
+            _settings(audio_provider="whisper", audio_url="http://host.docker.internal:8081")
+        )
+
+        assert isinstance(leitor.transcriber, WhisperCppTranscriber)
+        assert leitor.transcriber.url == "http://host.docker.internal:8081"
+
+    def test_an_external_address_is_refused_when_building(self) -> None:
+        """A guarda vale na construção: nenhuma gravação chega a sair."""
+        with pytest.raises(ValueError):
+            build_audio_reader(
+                _settings(audio_provider="whisper", audio_url="https://transcreve.exemplo.com")
+            )
+
+    def test_whisper_without_an_address_says_what_is_missing(self) -> None:
+        with pytest.raises(RuntimeError, match="AUDIO_URL"):
+            build_audio_reader(_settings(audio_provider="whisper", audio_url=""))
+
+
+class TestProductionSettings:
+    def test_the_fake_transcriber_is_refused_in_production(self) -> None:
+        """O falso devolve sempre a mesma frase: em produção viraria produção
+        inventada esperando aprovação, com a gravação de verdade ignorada."""
+        with pytest.raises(ValueError, match="audio_provider"):
+            Settings(_env_file=None, audio_provider="fake", **_PRODUCAO)
+
+    def test_whisper_in_production_needs_the_address(self) -> None:
+        with pytest.raises(ValueError, match="audio_url"):
+            Settings(_env_file=None, audio_provider="whisper", audio_url="", **_PRODUCAO)
+
+    def test_a_complete_production_worker_starts(self) -> None:
+        Settings(
+            _env_file=None,
+            audio_provider="whisper",
+            audio_url="http://host.docker.internal:8081",
+            **_PRODUCAO,
+        )
+
+
+class _Servidor:
+    """Faz o papel do whisper-server."""
+
+    def __init__(self, resposta: bytes) -> None:
+        self.resposta = resposta
+        self.chamadas: list[tuple[str, dict[str, str], bytes]] = []
+
+    def __call__(self, url: str, campos: dict[str, str], wav: bytes, prazo: float) -> bytes:
+        self.chamadas.append((url, campos, wav))
+        return self.resposta
+
+
+class TestTalkingToWhisper:
+    def test_the_request_asks_for_portuguese_and_temperature_zero(self) -> None:
+        """Temperatura zero: a mesma gravação dá a mesma transcrição, e é isso
+        que permite comparar duas versões do tradutor."""
+        servidor = _Servidor(json.dumps({"text": " A 497 deu 18."}).encode())
+        transcritor = WhisperCppTranscriber(url="http://127.0.0.1:8081", model="m", post=servidor)
+
+        texto = transcritor.transcribe(b"RIFF...")
+
+        assert texto == " A 497 deu 18."
+        [(url, campos, wav)] = servidor.chamadas
+        assert url == "http://127.0.0.1:8081/inference"
+        assert campos == {"language": "pt", "temperature": "0", "response_format": "json"}
+        assert wav == b"RIFF..."
+
+    @pytest.mark.parametrize("resposta", [b"<html>erro</html>", b'{"sem": "texto"}'])
+    def test_an_answer_that_is_not_a_transcript_is_refused(self, resposta) -> None:
+        transcritor = WhisperCppTranscriber(
+            url="http://127.0.0.1:8081", model="m", post=_Servidor(resposta)
+        )
+
+        with pytest.raises(TranscriberFormatError):
+            transcritor.transcribe(b"RIFF...")
+
+
+class _Transcritor:
+    def __init__(self, texto: str) -> None:
+        self.texto = texto
+        self.ouviu: list[bytes] = []
+
+    def transcribe(self, wav: bytes) -> str:
+        self.ouviu.append(wav)
+        return self.texto
+
+
+class TestTheSpeechReader:
+    def _leitor(self, texto: str) -> tuple[SpokenEventReader, _Transcritor]:
+        transcritor = _Transcritor(texto)
+        leitor = SpokenEventReader(
+            transcritor, decode=lambda conteudo: b"wav:" + conteudo, model_name="modelo"
+        )
+        return leitor, transcritor
+
+    def test_the_recording_is_converted_then_transcribed_then_translated(self) -> None:
+        leitor, transcritor = self._leitor(FAKE_SPEECH)
+
+        extraction = leitor.extract(b"m4a", kind="audio")
+
+        assert transcritor.ouviu == [b"wav:m4a"]
+        [producao] = extraction.events
+        assert (producao.event_type, producao.brinco) == ("production", "497")
+        assert producao.fields == {"producao": "33", "parcelas": "18 + 15"}
+
+    def test_the_date_is_left_for_whoever_knows_when_it_was_sent(self) -> None:
+        """A fala não tem cabeçalho: a data é o dia do envio, e quem sabe
+        disso é quem lê a gravação guardada."""
+        leitor, _ = self._leitor(FAKE_SPEECH)
+
+        assert leitor.extract(b"m4a", kind="audio").reference_date is None
+
+    def test_the_version_says_model_and_grammar(self) -> None:
+        leitor, _ = self._leitor(FAKE_SPEECH)
+
+        assert leitor.extract(b"m4a", kind="audio").extractor_version.startswith("modelo/fala-")
+
+    def test_a_recording_of_silence_creates_nothing(self) -> None:
+        """Whisper sobre silêncio inventa frase de legenda de vídeo."""
+        leitor, _ = self._leitor(" Legendas pela comunidade Amara.org")
+
+        with pytest.raises(TranscriberFormatError):
+            leitor.extract(b"m4a", kind="audio")
+
+    def test_a_photo_is_not_for_this_reader(self) -> None:
+        leitor, _ = self._leitor(FAKE_SPEECH)
+
+        with pytest.raises(ValueError):
+            leitor.extract(b"jpg", kind="photo")
+
+
+def _wav(segundos: float = 1.0, taxa: int = 44_100, canais: int = 2) -> bytes:
+    """Um tom de 440 Hz em estéreo 44,1 kHz: o formato que o whisper NÃO quer."""
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as arquivo:
+        arquivo.setnchannels(canais)
+        arquivo.setsampwidth(2)
+        arquivo.setframerate(taxa)
+        amostras = (int(8_000 * math.sin(2 * math.pi * 440 * n / taxa)) for n in range(int(taxa * segundos)))
+        arquivo.writeframes(b"".join(struct.pack("<h", a) * canais for a in amostras))
+    return buffer.getvalue()
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg só existe no contêiner do worker")
+class TestTheConversion:
+    def test_any_recording_becomes_16k_mono(self) -> None:
+        convertido = to_wav_16k_mono(_wav(), max_seconds=300)
+
+        with wave.open(io.BytesIO(convertido)) as arquivo:
+            assert (arquivo.getframerate(), arquivo.getnchannels()) == (16_000, 1)
+
+    def test_a_long_recording_is_cut_at_the_limit(self) -> None:
+        convertido = to_wav_16k_mono(_wav(segundos=3.0), max_seconds=1)
+
+        with wave.open(io.BytesIO(convertido)) as arquivo:
+            assert arquivo.getnframes() / arquivo.getframerate() == pytest.approx(1.0, abs=0.05)
+
+    def test_something_that_is_not_audio_is_refused(self) -> None:
+        with pytest.raises(TranscriberFormatError):
+            to_wav_16k_mono(b"isto nao e audio nenhum", max_seconds=300)
