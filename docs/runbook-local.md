@@ -326,6 +326,77 @@ o leitor falso inventaria medições.
 guardada: reenviar a mesma foto oferece "Ler de novo", que tenta outra vez.
 O resto do app não depende de GPU.
 
+### Transcritor de voz (whisper.cpp na GPU, sem provedor externo)
+
+O funcionário grava a ordenha no celular e envia pela **Revisão → Enviar
+áudio**. O worker converte a gravação (ffmpeg), o whisper transcreve na GPU da
+fazenda, e um tradutor nosso transforma a fala em propostas. Nenhuma gravação
+sai da máquina.
+
+**O que está instalado na máquina do titular (21/09/2026):**
+
+| item | onde |
+|---|---|
+| whisper.cpp v1.9.4, compilado com Vulkan | `C:\Users\caiol\whisper.cpp` |
+| modelo `ggml-large-v3-turbo-q5_0.bin` (574 MB) | `...\whisper.cpp\models\` |
+| script que sobe e vigia o servidor | `...\whisper.cpp\iniciar-servidor.ps1` |
+| log do servidor | `...\whisper.cpp\whisper-server.log` |
+| tarefa agendada | `BeloVale-Whisper` |
+
+O hash do modelo foi conferido contra o publicado no Hugging Face
+(`394221709cd5ad1f…fa7e2`).
+
+**Por que Vulkan e não o binário pronto:** o whisper.cpp publica binário de
+Windows só para CPU e para GPU NVIDIA. Na RX 7600, compilado com Vulkan, a
+codificação de uma gravação leva ~2,9 s contra 18,9 s na CPU.
+
+**Para recompilar** (precisa de CMake, SDK do Vulkan e Build Tools do Visual
+Studio com C++, instalados via `winget` num terminal de administrador):
+
+```powershell
+cd C:\Users\caiol\whisper.cpp
+cmake -B build -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release -j 8
+```
+
+**Atenção ao antivírus.** O Avast (CyberCapture) segura na partida todo
+executável recém-compilado e sem assinatura: a compilação trava sem erro
+nenhum (processos com CPU zerada que nem o Windows encerra). A pasta
+`C:\Users\caiol\whisper.cpp` precisa estar nas exceções do Avast — para
+compilar e também para o servidor subir no dia a dia.
+
+**O servidor** escuta só em `127.0.0.1:8081` (a 8080 é a do app). O worker, no
+Docker, chega por `host.docker.internal:8081`. A tarefa `BeloVale-Whisper`
+roda o script no logon e a cada 5 minutos; o script é o vigia (se o servidor
+cair, sobe de novo em 10 s) e o redisparo cobre o caso de o próprio vigia
+morrer. Duas pegadinhas que custaram testes para descobrir:
+
+- o Agendador do Windows **mata toda tarefa depois de 72 h** por padrão —
+  aqui o limite está desligado;
+- a opção "reiniciar se falhar" do Agendador **só vale quando a tarefa não
+  consegue começar**, não quando o programa morre depois. Por isso o vigia
+  está no script.
+
+Conferir que está no ar:
+
+```bash
+curl -s http://127.0.0.1:8081/inference -F file=@gravacao.wav -F language=pt -F response_format=json
+```
+
+**Para o app ouvir de verdade**, em `infra/.env.local`:
+
+```
+AUDIO_PROVIDER=whisper
+AUDIO_URL=http://host.docker.internal:8081
+```
+
+e `docker compose ... up -d --build worker`. Em produção o worker se recusa a
+subir com o transcritor falso, e recusa `whisper` sem `AUDIO_URL`.
+
+**Memória de vídeo:** o whisper ocupa ~0,6 GB e o modelo de visão ~6 GB.
+Medido com os dois carregados: 7,08 GB dos 8 GB da RX 7600, e os dois
+continuam 100% na GPU.
+
 ## 7. Rodar os testes de backend
 
 O alvo oficial usa PostgreSQL real, aplica migrations e roda pytest em uma
