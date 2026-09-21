@@ -782,6 +782,34 @@ ffmpeg, whisper na GPU, tradutor, propostas no banco:
 É um número bom e **otimista**: as gravações são de teste, ditas com calma. O
 número de verdade sai de gravações no curral, com a ordenhadeira ligada.
 
+### Com ruído somado — e o salto do whisper que ele revelou
+
+Enquanto não há gravação do curral, as mesmas três gravações foram medidas
+com ruído grave (marrom, parecido com motor) somado em quatro níveis. Vacas
+com brinco e total certos, de 11:
+
+| voz / ruído | antes | depois do conserto | leituras erradas |
+|---|---|---|---|
+| limpo | — | 11 | 0 |
+| ~25 dB | 7 | 10 | 0 |
+| ~17 dB | 7 | 10 | 0 |
+| ~11 dB | 11 | 11 | 0 |
+| ~5 dB | 10 | 10 | 0 |
+
+O "antes" tinha uma anomalia: ruído **leve** ia pior que ruído forte. A causa
+era o **salto de marca de tempo** do whisper: numa das gravações ele
+transcreveu "Mensagem de teste" (0 a 1,7 s) e pulou direto para 29,98 s,
+levando três vacas junto — sem erro, sem aviso. Busca em feixe não resolveu.
+Sem marcas de tempo o salto some, mas o modelo erra mais dígito ("462" virou
+"4162"). O transcritor agora pergunta com marcas, e se houver buraco de mais
+de 8 s entre trechos (numa gravação boa o maior foi 0,44 s), pergunta de novo
+sem elas.
+
+O que importa na tabela é a última coluna: **nenhum nível produziu leitura
+errada**. Quando o ruído atrapalha, a vaca falta — não chega com número
+trocado. Ruído sintético não é o curral; a medição de verdade continua
+pendente.
+
 ### O jeito real de falar mudou o tradutor
 
 O primeiro desenho separava vaca por ponto final. As gravações mostraram que
