@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     vision_api_key: SecretStr | None = None
     vision_model_name: str = "unconfigured"
     #: Leitor local de folhas (Ollama). Só aceita endereço da própria máquina
-    #: ou da rede interna — ver `app.vision.sheet_reader.ensure_local_url`.
+    #: ou da rede interna — ver `app.core.local_url.ensure_local_url`.
     #: Leitor de eventos do worker. "fake" inventa leitura (CI e demonstração);
     #: "ollama" lê de verdade, no endereço de `reader_url`.
     reader_provider: Literal["fake", "ollama"] = "fake"
