@@ -160,17 +160,21 @@ async def _sender(session: AsyncSession, media: MediaAsset) -> User:
 
 def _label(kind: str, media: MediaAsset, import_row: Import | None) -> str:
     """Como o arquivo aparece na caixa de Revisão."""
-    enviado = f"{media.created_at:%d/%m/%Y %H:%M}" if media.created_at else "sem data"
+    # Na hora da fazenda: é por ela que quem enviou reconhece o arquivo.
+    enviado = f"{_farm_time(media.created_at):%d/%m/%Y %H:%M}" if media.created_at else "sem data"
     lote = f" · {import_row.declared_lot}" if import_row and import_row.declared_lot else ""
     return f"{_LABELS.get(kind, 'Arquivo')} de {enviado}{lote}"
 
 
-def _farm_date(enviado: datetime | None):
-    if enviado is None:
-        return farm_today()
+def _farm_time(enviado: datetime) -> datetime:
+    """O instante no fuso da fazenda. O banco guarda em UTC."""
     if enviado.tzinfo is None:
         enviado = enviado.replace(tzinfo=timezone.utc)
-    return enviado.astimezone(FARM_TZ).date()
+    return enviado.astimezone(FARM_TZ)
+
+
+def _farm_date(enviado: datetime | None):
+    return farm_today() if enviado is None else _farm_time(enviado).date()
 
 
 async def _mark_failed(session: AsyncSession, run: ExtractionRun) -> None:

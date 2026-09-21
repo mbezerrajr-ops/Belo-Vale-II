@@ -150,6 +150,27 @@ class TestTheRecordingBecomesProposals:
 
         _run(_m4a(), body)
 
+    def test_the_label_shows_the_farm_time(self) -> None:
+        """Na prova real, uma gravação enviada às 17:16 da fazenda apareceu
+        como "Áudio de ... 20:16": a hora saía em UTC. Quem revisa reconhece o
+        arquivo pela hora em que mandou."""
+
+        async def body(session, storage, run_id, farm):
+            await read_upload_into_proposals(
+                session, storage, _Leitores().fabricas(), extraction_run_id=run_id
+            )
+            run = await session.get(ExtractionRun, run_id)
+            midia = await session.get(MediaAsset, run.media_asset_id)
+            enviado = midia.created_at
+            if enviado.tzinfo is None:
+                enviado = enviado.replace(tzinfo=timezone.utc)
+            fonte = await session.scalar(
+                select(EventProposalSource).where(EventProposalSource.farm_id == farm.id)
+            )
+            assert fonte.label == f"Áudio de {enviado.astimezone(FARM_TZ):%d/%m/%Y %H:%M}"
+
+        _run(_m4a(), body)
+
     def test_the_file_is_linked_to_the_source(self) -> None:
         """Quem revisa ouve a gravação ao lado do que foi entendido."""
 
