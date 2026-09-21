@@ -195,3 +195,120 @@ class TestIntoEvents:
 
         [nota] = [e for e in extraction.events if e.event_type == "note"]
         assert nota.fields["texto"].startswith("No áudio: ")
+
+
+#: As três gravações do titular (21/09/2026), transcritas pelo whisper na
+#: RX 7600 — texto exato. Os áudios ficam fora do Git; a transcrição é o que
+#: o tradutor recebe.
+GRAVACAO_1 = (
+    ' Mensagem de teste\n'
+    ' Vaca 417 Pandora\n'
+    ' Produziu 5 litros pela manhã, 3 da tarde, totalizando 8 litros no total\n'
+    ' A vaca 633, gigante\n'
+    ' Produziu 2 litros pela manhã, mais 2 litros à tarde, 4\n'
+    ' Deve ser secada depois\n'
+    ' Assim como\n'
+    ' Vaca 419 Viajante\n'
+    ' Produziu 7 litros no total\n'
+    ' Onde 3 foi pela manhã e 4 pela tarde\n'
+    ' E o ideal é secar posteriormente\n'
+)
+GRAVACAO_2 = (
+    ' Ao de teste, vaca 011, dominó, produziu 7 litros no total do dia, 4 pela manhã e 3 pela tarde, deve ser secada depois disso.\n'
+    ' Vaca azeitona 117, produziu 14 litros no total.\n'
+    ' Vaca sabiá produziu 10 mais 5 litros, 15, deve ir para o primeiro lote.\n'
+    ' O número dela é 462, não lembro se eu falei.\n'
+    ' E por fim, a vaca 389, da Agatha.\n'
+    ' Produziu 4 litros pela manhã, 5 pela tarde, produzindo 9 no total.\n'
+    ' E é isso.\n'
+)
+GRAVACAO_3 = (
+    ' Bora lá, meu amigo, bora lá.\n'
+    ' Áudio de teste, viu?\n'
+    ' Vaca quartinha, 406, produziu 12 litros no total do dia.\n'
+    ' 7 pela manhã, mais 5 da tarde.\n'
+    ' Pequina, pequina produziu 6,5 litros.\n'
+    ' O número de pequina é 701.\n'
+    ' 649, redonda, produziu 5 litros.\n'
+    ' A gente deve secar ela daqui a 7 meses.\n'
+    ' 3 litros pela manhã, mais 2 da tarde.\n'
+    ' 5 litros no total.\n'
+    ' E por fim, a vaca aceitona, 117.\n'
+    ' 14 litros no total.\n'
+    ' Se é 14 litros, você já sabe quanto ela fez, né?\n'
+    ' Dividido aí.\n'
+    ' 7 pela manhã, mais 7 pela noite.\n'
+    ' Certo? Obrigado.\n'
+)
+
+
+def _vacas(texto: str) -> list[tuple]:
+    return [
+        (l["brinco"], l["nome"], l["manha"], l["tarde"], l["total"])
+        for l in speech_to_lines(texto)["linhas"]
+    ]
+
+
+def _eventos(texto: str) -> list[tuple]:
+    extraction = lines_to_events(
+        speech_to_lines(texto), extractor_name="t", extractor_version="t", origem=AUDIO_ORIGIN
+    )
+    return [(e.event_type, e.brinco, e.fields) for e in extraction.events if e.event_type != "production"]
+
+
+class TestTheRecordingsOfTheOwner:
+    """O gabarito é o que o titular ditou: 11 vacas em três gravações.
+
+    O jeito real de falar derrubou o primeiro desenho do tradutor, que
+    separava vaca por ponto final: o whisper põe ponto NO MEIO de uma vaca
+    ("Vaca 417 Pandora." / "Produziu 5 litros..."), o brinco às vezes vem
+    depois, em outra frase ("O número dela é 462"), e há conversa no meio
+    ("Bora lá, meu amigo"). Uma vaca começa numa âncora e vai até a próxima."""
+
+    def test_recording_1(self) -> None:
+        assert _vacas(GRAVACAO_1) == [
+            ("417", "PANDORA", "5", "3", "8"),
+            ("633", "GIGANTE", "2", "2", "4"),
+            ("419", "VIAJANTE", "3", "4", "7"),
+        ]
+
+    def test_recording_2(self) -> None:
+        assert _vacas(GRAVACAO_2) == [
+            ("011", "DOMINÓ", "4", "3", "7"),
+            ("117", "AZEITONA", None, None, "14"),
+            ("462", "SABIÁ", "10", "5", "15"),
+            ("389", "AGATHA", "4", "5", "9"),
+        ]
+
+    def test_recording_3(self) -> None:
+        assert _vacas(GRAVACAO_3) == [
+            ("406", "QUARTINHA", "7", "5", "12"),
+            ("701", "PEQUINA", None, None, "6,5"),
+            ("649", "REDONDA", "3", "2", "5"),
+            ("117", "ACEITONA", "7", "7", "14"),
+        ]
+
+    def test_the_commands_of_recording_1(self) -> None:
+        """ "Deve ser secada depois" e "o ideal é secar posteriormente" são
+        ordens de secagem — e só isso: "Assim como" e "Onde" são conversa."""
+        assert _eventos(GRAVACAO_1) == [
+            ("dry_off", "633", {"ordem": "secar"}),
+            ("dry_off", "419", {"ordem": "secar"}),
+        ]
+
+    def test_the_commands_of_recording_2(self) -> None:
+        assert _eventos(GRAVACAO_2) == [
+            ("dry_off", "011", {"ordem": "secar"}),
+            ("lot_change", "462", {"lote": "1"}),
+        ]
+
+    def test_the_commands_of_recording_3(self) -> None:
+        """ "Secar ela daqui a 7 meses": ordem de secagem, e o prazo vira
+        observação — é informação que quem revisa precisa ver. O 7 de "7
+        meses" não é litro."""
+        eventos = _eventos(GRAVACAO_3)
+
+        assert eventos[0] == ("dry_off", "649", {"ordem": "secar"})
+        [(tipo, brinco, campos)] = eventos[1:]
+        assert (tipo, brinco) == ("note", "649")
+        assert "7 meses" in campos["texto"]

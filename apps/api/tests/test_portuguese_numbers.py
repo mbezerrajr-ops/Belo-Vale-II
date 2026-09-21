@@ -82,6 +82,11 @@ class TestMixed:
     def test_plain_digits(self) -> None:
         assert _ler("497") == ("497", 1)
 
+    def test_the_leading_zero_of_a_brinco_is_kept(self) -> None:
+        """ "vaca 011, dominó": o brinco é 011, não 11. Numa gravação real do
+        titular o whisper escreveu assim, e o cadastro guarda com o zero."""
+        assert _ler("011") == ("011", 1)
+
 
 class TestWhereTheNumberStops:
     def test_the_next_word_is_not_eaten(self) -> None:

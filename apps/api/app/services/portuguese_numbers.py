@@ -61,6 +61,11 @@ def parse_number(words: list[str], start: int) -> tuple[str | None, int]:
     quantas palavras ele ocupou). Sem número ali: (None, 0)."""
     folded = [fold(w) for w in words]
     inteiro, fim = _integer(folded, words, start)
+    # Algarismo puro sai como foi escrito: "011" é brinco com zero à esquerda,
+    # e o cadastro guarda assim.
+    cru = words[start] if start < len(words) else ""
+    if re.fullmatch(r"\d+", cru) and fim == start + 1 and not _continues(folded, fim):
+        return cru, 1
     if inteiro is None:
         return None, 0
     valor = inteiro
@@ -74,6 +79,13 @@ def parse_number(words: list[str], start: int) -> tuple[str | None, int]:
         if fracao is not None and fracao == fracao.to_integral_value():
             return _format(Decimal(f"{int(valor)}.{int(fracao)}")), depois - start
     return _format(valor), fim - start
+
+
+def _continues(folded: list[str], fim: int) -> bool:
+    """O número segue depois daqui? ("e meio", "vírgula cinco")."""
+    if fim < len(folded) and folded[fim] in _DECIMAL_MARK:
+        return True
+    return fim + 1 < len(folded) and folded[fim] == "e" and folded[fim + 1] in _HALF
 
 
 def _integer(folded: list[str], words: list[str], i: int) -> tuple[Decimal | None, int]:
