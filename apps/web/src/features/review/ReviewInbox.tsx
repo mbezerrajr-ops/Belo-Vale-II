@@ -20,6 +20,7 @@ import {
   type ProposalStatus,
   type UploadResult,
 } from "../../api/types";
+import { SendAudio } from "./SendAudio";
 import { SendPhoto } from "./SendPhoto";
 import { SourceMedia } from "./SourceMedia";
 import { brDate, liters } from "../../ui/dates";
@@ -690,13 +691,22 @@ export function ReviewInbox({
       </button>
 
       {farmId && (
-        <SendPhoto
-          token={token}
-          farmId={farmId}
-          onUpload={onUpload}
-          onReprocess={onReprocess}
-          onSent={() => void reload("pending")}
-        />
+        <div className="send-uploads">
+          <SendPhoto
+            token={token}
+            farmId={farmId}
+            onUpload={onUpload}
+            onReprocess={onReprocess}
+            onSent={() => void reload("pending")}
+          />
+          <SendAudio
+            token={token}
+            farmId={farmId}
+            onUpload={onUpload}
+            onReprocess={onReprocess}
+            onSent={() => void reload("pending")}
+          />
+        </div>
       )}
 
       {files.length > 0 && (

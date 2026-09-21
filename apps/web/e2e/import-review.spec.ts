@@ -26,6 +26,10 @@ const FIXTURE_SHEET = path.join(currentDir, "fixtures", "sheet.jpg");
 // Outra imagem (outros bytes): o primeiro envio do teste de duplicidade não
 // colide com a FIXTURE_SHEET já usada.
 const FIXTURE_SHEET_2 = path.join(currentDir, "fixtures", "sheet2.jpg");
+// Um segundo de silêncio em m4a, gerado pelo ffmpeg: passa pela porta de
+// entrada como gravação de verdade. No CI o transcritor é o falso, que
+// "ouve" sempre a mesma frase — mas o tradutor da fala é o de verdade.
+const FIXTURE_AUDIO = path.join(currentDir, "fixtures", "fala.m4a");
 
 test.describe("foto da folha até a medição oficial", () => {
   test.beforeAll(() => {
@@ -100,5 +104,25 @@ test.describe("foto da folha até a medição oficial", () => {
       await page.getByRole("button", { name: "Ler de novo" }).click();
       await expect(page.getByText(/lendo a folha/i)).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 45_000, intervals: [1_000, 2_000, 3_000] });
+  });
+
+  test("gravação pela Revisão vira proposta de áudio", async ({ page }) => {
+    await loginAsAdmin(page);
+    await openArea(page, /Revisão/);
+
+    await page.getByRole("button", { name: /enviar [áa]udio/i }).click();
+    await page.getByLabel(/grava[çc][ãa]o da ordenha/i).setInputFiles(uniqueFixtureCopy(FIXTURE_AUDIO));
+    await page.getByRole("button", { name: "Enviar", exact: true }).click();
+    await expect(page.getByText(/ouvindo a grava[çc][ãa]o/i)).toBeVisible();
+
+    // O worker ouve em segundo plano: a caixa é relida até o arquivo de áudio
+    // aparecer. A frase do transcritor falso é "A 497 deu 18 litros de manhã
+    // e 15 à tarde", e o tradutor de verdade a transforma na produção de 33 L.
+    const fonte = page.getByText(/^[ÁA]udio de /).first();
+    const refresh = page.getByRole("button", { name: "Atualizar", exact: true });
+    await expect(async () => {
+      await refresh.click();
+      await expect(fonte).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 45_000, intervals: [500, 1000, 2000] });
   });
 });

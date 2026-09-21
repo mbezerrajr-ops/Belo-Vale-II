@@ -2736,3 +2736,11 @@ form.send-photo {
   display: block;
   color: var(--muted, #6b6b6b);
 }
+
+/* Foto e gravação lado a lado; no celular, um abaixo do outro. */
+.send-uploads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}
