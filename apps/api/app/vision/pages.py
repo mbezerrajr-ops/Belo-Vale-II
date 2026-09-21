@@ -14,7 +14,7 @@ import pypdfium2 as pdfium
 from PIL import Image
 
 from app.services.image_preprocessing import PreprocessedImage, preprocess_image
-from app.services.image_sniffing import sniff_image_media_type
+from app.services.media_sniffing import sniff_image_media_type
 
 #: Lado maior da página enviada ao leitor.
 DEFAULT_MAX_SIDE = 1200

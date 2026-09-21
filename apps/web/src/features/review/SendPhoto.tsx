@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 
 import { reprocessImport, uploadImport } from "../../api/client";
+import { uploadErrorMessage } from "./uploadErrors";
 import { ApiError, type UploadResult } from "../../api/types";
 
 /**
@@ -66,10 +67,7 @@ export function SendPhoto({
         setState({ status: "duplicate", importId: String(error.body.existing_import_id ?? "") });
         return;
       }
-      setState({
-        status: "error",
-        message: "Não foi possível enviar a foto. Confira a conexão e tente de novo.",
-      });
+      setState({ status: "error", message: uploadErrorMessage(error, "foto") });
     }
   }
 

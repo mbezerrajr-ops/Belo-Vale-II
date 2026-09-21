@@ -39,7 +39,12 @@ import {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 async function parseJsonOrThrow<T>(response: Response): Promise<T> {
-  const body = await response.json();
+  // Nem toda resposta vem da nossa API: um envio grande demais morre no
+  // proxy, que responde HTML. Ler isso como JSON estourava um erro de
+  // sintaxe, e a tela dizia "confira a conexão" para um arquivo pesado.
+  const body = await response
+    .json()
+    .catch(() => ({ code: response.status === 413 ? "upload_too_large" : "server_error" }));
   if (!response.ok) {
     throw new ApiError(response.status, body);
   }

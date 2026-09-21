@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ExtractionRun, MediaAsset, Import
-from app.services.image_sniffing import sniff_image_media_type
+from app.services.media_sniffing import sniff_media_type
 from app.services.storage import ObjectStorage
 
 logger = logging.getLogger(__name__)
@@ -62,9 +62,10 @@ async def create_import(
     declared_measured_on: date | None = None,
     initiated_by: str | None = None,
 ) -> ImportStatus:
-    media_type = sniff_image_media_type(content)
+    # O tipo declarado pelo aparelho não entra nesta conta: vale o conteúdo.
+    media_type = sniff_media_type(content)
     if media_type is None:
-        raise InvalidImageError("unsupported or unrecognized image format")
+        raise InvalidImageError("unsupported or unrecognized image or audio format")
     if len(content) > max_bytes:
         raise ImageTooLargeError(f"image exceeds the maximum size of {max_bytes} bytes")
 

@@ -15,7 +15,7 @@ from app.core.security import create_access_token, hash_password
 from app.db.models import ExtractionRun, Farm, MediaAsset, User
 from app.db.session import get_db_session
 from app.main import create_app
-from app.services.image_sniffing import sniff_image_media_type
+from app.services.media_sniffing import sniff_image_media_type
 from app.services.ingestion import (
     DuplicateImageError,
     ImageTooLargeError,
