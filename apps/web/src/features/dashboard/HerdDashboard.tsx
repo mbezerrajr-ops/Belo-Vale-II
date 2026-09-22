@@ -45,9 +45,13 @@ export function HerdDashboard({
   const [panel, setPanel] = useState<DashboardSummary | null>(null);
   const [filters, setFilters] = useState<DashboardFilters>({});
   const [error, setError] = useState<string | null>(null);
+  // Trocar um filtro relê o painel: enquanto isso os números antigos ficam
+  // esmaecidos, para ninguém ler o lote anterior como se fosse o escolhido.
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     onLoad(token, filters)
       .then((loaded) => {
         if (!cancelled) setPanel(loaded);
@@ -57,6 +61,9 @@ export function HerdDashboard({
         if (!cancelled) {
           setError(body?.detail ?? "Não foi possível carregar o painel.");
         }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -70,7 +77,7 @@ export function HerdDashboard({
         <h2>Painel do rebanho</h2>
         <div className="kpis">
           {[0, 1, 2, 3, 4, 5].map((i) => (
-            <div className="skeleton kpi" key={i} style={{ minHeight: 82 }} />
+            <div className="skeleton kpi" key={i} />
           ))}
         </div>
         <div className="skeleton skeleton-card" />
@@ -95,7 +102,7 @@ export function HerdDashboard({
   );
 
   return (
-    <section className="dashboard">
+    <section className="dashboard" aria-busy={loading}>
       <div className="row-between">
         <h2>Painel do rebanho</h2>
         {panel.measured_on && (

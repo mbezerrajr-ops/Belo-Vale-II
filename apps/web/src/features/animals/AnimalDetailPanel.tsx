@@ -311,17 +311,19 @@ export function AnimalDetailPanel({
 
       {canEdit && !exited && !merged && (
         <div className="actions">
+          {/* As duas do curral primeiro e cheias; as de escritório depois, em
+              contorno; a baixa por último. */}
           <button type="button" onClick={() => setPanel("brinco")}>
             {animal.brinco ? "Trocar brinco" : "Vincular brinco"}
+          </button>
+          <button type="button" onClick={() => setPanel("lote")}>
+            Mudar de lote
           </button>
           {animal.brinco && (
             <button type="button" className="secondary" onClick={() => setPanel("tirar-brinco")}>
               Tirar o brinco
             </button>
           )}
-          <button type="button" onClick={() => setPanel("lote")}>
-            Mudar de lote
-          </button>
           <button type="button" className="secondary" onClick={() => setPanel("cadastro")}>
             Editar cadastro
           </button>
