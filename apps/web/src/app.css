@@ -1070,6 +1070,37 @@ form h3 {
   }
 }
 
+/* Painel: produção e lucro em destaque, lado a lado em qualquer largura. */
+.kpis.kpis-hero {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 0;
+}
+
+.kpis-hero + .kpis {
+  margin-top: 10px;
+}
+
+.kpi.kpi-hero {
+  padding: 16px 16px 14px;
+}
+
+.kpi.kpi-hero strong {
+  font-size: clamp(1.5rem, 2.6vw + 0.8rem, 2.2rem);
+  font-variant-numeric: tabular-nums;
+}
+
+/* No Painel, receita e custo dividem a linha (são o par que explica o
+   lucro); Animais, que é contagem, fica com a linha de baixo. */
+@media (max-width: 639px) {
+  .dashboard .kpis-trio > :first-child {
+    grid-column: auto;
+  }
+
+  .dashboard .kpis-trio > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
 .kpi {
   position: relative;
   padding: 14px 14px 12px;
@@ -1160,7 +1191,8 @@ form h3 {
 
 .chart-card > header {
   display: flex;
-  align-items: baseline;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 8px;
@@ -1704,16 +1736,33 @@ tbody tr:hover td {
   margin: 8px 0 4px;
 }
 
-/* Duas colunas no celular; o filtro que sobra fica com a linha toda, em vez
-   de meia largura solto no canto. */
+/* Os três filtros numa linha também no celular: em duas, ocupavam metade
+   da primeira tela antes de qualquer número. */
 @media (max-width: 639px) {
   .filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
   }
 
-  .filters > :last-child:nth-child(odd) {
-    grid-column: 1 / -1;
+  .filters label {
+    font-size: 0.74rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
+
+  /* 16 px: abaixo disso o iPhone amplia a tela ao tocar no campo. */
+  .filters select {
+    padding-inline: 8px 2px;
+    font-size: 16px;
+  }
+}
+
+/* O aviso de cobertura é contexto dos números, não um alerta: uma faixa. */
+.warning.coverage {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  font-size: 0.86rem;
 }
 
 .filters label {
@@ -2072,6 +2121,73 @@ p.count {
 
 .supply-list > li h3 {
   margin-top: 0;
+}
+
+/* Nome e preço numa linha; o custo do dia logo abaixo, em apoio. */
+.supply-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 10px;
+}
+
+.supply-head h3,
+.supply-head .price {
+  margin: 0;
+}
+
+.supply-total {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.supply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.supply-actions .secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.supply-actions .secondary[aria-expanded="true"] {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+/* Campo curto com o botão ao lado (preço do leite). */
+.inline-field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.inline-field input {
+  flex: 1 1 8rem;
+  max-width: 14rem;
+  margin: 0;
+}
+
+.inline-field button,
+.inline-field button[type="submit"] {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+}
+
+form.milk-price .hint {
+  margin: -4px 0 4px;
 }
 
 .price {

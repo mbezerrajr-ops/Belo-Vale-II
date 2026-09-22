@@ -143,13 +143,20 @@ describe("HerdDashboard", () => {
     expect(screen.getByText("0-100")).toBeInTheDocument();
   });
 
-  it("mostra maiores e menores produções", async () => {
+  it("mostra maiores e menores produções no mesmo cartão", async () => {
     render(
       <HerdDashboard token={TOKEN} onLoad={vi.fn().mockResolvedValue(summary())} />,
     );
 
     expect(await screen.findByText("ÁGATA")).toBeInTheDocument();
+    expect(screen.queryByText("SEREIA")).not.toBeInTheDocument();
+
+    const menores = screen.getByRole("button", { name: "Menores" });
+    fireEvent.click(menores);
+
+    expect(menores).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("SEREIA")).toBeInTheDocument();
+    expect(screen.queryByText("ÁGATA")).not.toBeInTheDocument();
   });
 
   it("filtra por lote", async () => {
@@ -305,7 +312,9 @@ describe("SuppliesPage", () => {
       />,
     );
 
-    fireEvent.change(await screen.findByLabelText(/pre[çc]o.*concentrado/i), {
+    // O preço abre pelo botão do insumo: fechado, cada insumo cabe numa olhada.
+    fireEvent.click(await screen.findByRole("button", { name: /alterar preço/i }));
+    fireEvent.change(screen.getByLabelText(/pre[çc]o.*concentrado/i), {
       target: { value: "2.50" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Salvar preço" }));
@@ -322,7 +331,8 @@ describe("SuppliesPage", () => {
       />,
     );
 
-    expect(await screen.findByText(/pre[çc]o anterior fica no hist[óo]rico/i)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: /alterar preço/i }));
+    expect(screen.getByText(/pre[çc]o anterior fica no hist[óo]rico/i)).toBeInTheDocument();
   });
 
   it("esconde a edição de quem não pode editar", async () => {
@@ -338,6 +348,7 @@ describe("SuppliesPage", () => {
     expect(
       screen.queryByRole("button", { name: "Salvar preço" }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /alterar preço|novo insumo/i })).not.toBeInTheDocument();
   });
 });
 

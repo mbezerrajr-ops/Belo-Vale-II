@@ -49,7 +49,9 @@ describe("UsersPage", () => {
       <UsersPage token={TOKEN} currentUserId="u-9" onList={list} onCreate={create} />,
     );
 
-    fireEvent.change(await screen.findByLabelText(/e-mail/i), {
+    await screen.findByRole("button", { name: /nova conta/i });
+    fireEvent.click(screen.getByRole("button", { name: /nova conta/i }));
+    fireEvent.change(screen.getByLabelText(/e-mail/i), {
       target: { value: "novo@belovale" },
     });
     fireEvent.change(screen.getByLabelText(/^senha/i), {
@@ -79,7 +81,8 @@ describe("UsersPage", () => {
       />,
     );
 
-    expect(await screen.findByText(/pelo menos 8 caracteres/i)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: /nova conta/i }));
+    expect(screen.getByText(/pelo menos 8 caracteres/i)).toBeInTheDocument();
   });
 
   it("explica o motivo quando a senha é recusada", async () => {
@@ -99,7 +102,9 @@ describe("UsersPage", () => {
       />,
     );
 
-    fireEvent.change(await screen.findByLabelText(/e-mail/i), {
+    await screen.findByRole("button", { name: /nova conta/i });
+    fireEvent.click(screen.getByRole("button", { name: /nova conta/i }));
+    fireEvent.change(screen.getByLabelText(/e-mail/i), {
       target: { value: "fraco@belovale" },
     });
     fireEvent.change(screen.getByLabelText(/^senha/i), {

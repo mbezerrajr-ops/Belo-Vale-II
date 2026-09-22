@@ -41,6 +41,7 @@ test.beforeAll(() => {
 test("conta nova escolhe a própria senha no primeiro acesso", async ({ page }) => {
   await loginAsAdmin(page);
   await openArea(page, "Contas");
+  await page.getByRole("button", { name: "Nova conta" }).click();
   await page.getByLabel("E-mail").fill(OPERATOR);
   await page.getByLabel("Senha", { exact: true }).fill(INITIAL);
   await page.getByLabel("Função").selectOption("operator");

@@ -49,6 +49,8 @@ export function HerdDashboard({
   // Trocar um filtro relê o painel: enquanto isso os números antigos ficam
   // esmaecidos, para ninguém ler o lote anterior como se fosse o escolhido.
   const [loading, setLoading] = useState(true);
+  // Maiores e menores produções dividem um cartão: medem a mesma coisa.
+  const [ranking, setRanking] = useState<"maiores" | "menores">("maiores");
 
   useEffect(() => {
     let cancelled = false;
@@ -183,32 +185,46 @@ export function HerdDashboard({
       )}
 
       {partialCoverage && (
-        <p className="warning">
-          Nesta data há leitura de {fmt.int(panel.animals_with_reading)} de{" "}
-          {fmt.int(panel.total_animals)} animais. O custo mostrado é o do lote
-          inteiro, então receita e lucro ficam subestimados — compare apenas
-          datas com cobertura parecida.
+        // O custo é o do lote inteiro e a receita só das vacas lidas: com
+        // pouca leitura, o lucro sai baixo. Uma linha, sem esconder isso.
+        <p className="warning coverage">
+          Leitura de {fmt.int(panel.animals_with_reading)} de {fmt.int(panel.total_animals)}{" "}
+          animais ({fmt.pct(panel.animals_with_reading / panel.total_animals)}) — receita e
+          lucro saem subestimados; compare datas com cobertura parecida.
         </p>
       )}
 
-      <div className="kpis">
-        <StatTile index={0} label="Animais" value={panel.total_animals} />
+      {/* O que o dono quer saber primeiro: quanto saiu de leite e quanto
+          sobrou. O resto explica esses dois. */}
+      <div className="kpis kpis-hero">
         <StatTile
-          index={1}
-          label="Com leitura"
-          value={panel.animals_with_reading}
-          hint={
-            panel.total_animals > 0
-              ? fmt.pct(panel.animals_with_reading / panel.total_animals) + " do rebanho"
-              : undefined
-          }
-        />
-        <StatTile
-          index={2}
+          index={0}
+          size="hero"
           label="Produção/dia"
           value={panel.total_production}
           format={fmt.liters}
           color="var(--series-3)"
+        />
+        <StatTile
+          index={1}
+          size="hero"
+          label="Lucro/dia"
+          value={panel.total_profit}
+          format={fmt.brl}
+          color={
+            panel.total_profit !== null && panel.total_profit < 0
+              ? "var(--danger)"
+              : "var(--good)"
+          }
+        />
+      </div>
+      <div className="kpis kpis-trio">
+        <StatTile
+          index={2}
+          label="Receita/dia"
+          value={panel.total_revenue}
+          format={fmt.brl}
+          color="var(--series-1)"
         />
         <StatTile
           index={3}
@@ -219,21 +235,9 @@ export function HerdDashboard({
         />
         <StatTile
           index={4}
-          label="Receita/dia"
-          value={panel.total_revenue}
-          format={fmt.brl}
-          color="var(--series-1)"
-        />
-        <StatTile
-          index={5}
-          label="Lucro/dia"
-          value={panel.total_profit}
-          format={fmt.brl}
-          color={
-            panel.total_profit !== null && panel.total_profit < 0
-              ? "var(--danger)"
-              : "var(--good)"
-          }
+          label="Animais"
+          value={panel.total_animals}
+          hint={`${fmt.int(panel.animals_with_reading)} com leitura`}
         />
       </div>
 
@@ -369,15 +373,39 @@ export function HerdDashboard({
         </ChartCard>
       </div>
 
-      {/* As duas listas medem a mesma coisa: mesma cor e mesma escala. Com a
-          escala de cada uma, 8,5 L aparecia com a barra quase cheia. */}
-      <div className="grid2">
-        <ChartCard index={6} title="Maiores produções" description="Nesta data de coleta.">
-          {panel.top_producers.length === 0 ? (
+      {/* As duas listas medem a mesma coisa: um cartão, mesma cor e mesma
+          escala. Com a escala de cada uma, 8,5 L aparecia com a barra quase
+          cheia. */}
+      <ChartCard
+        index={6}
+        title="Produção por vaca"
+        description="Nesta data de coleta."
+        aside={
+          <div className="segmented" role="group" aria-label="Quais vacas">
+            <button
+              type="button"
+              aria-pressed={ranking === "maiores"}
+              onClick={() => setRanking("maiores")}
+            >
+              Maiores
+            </button>
+            <button
+              type="button"
+              aria-pressed={ranking === "menores"}
+              onClick={() => setRanking("menores")}
+            >
+              Menores
+            </button>
+          </div>
+        }
+      >
+        {(() => {
+          const list = ranking === "maiores" ? panel.top_producers : panel.bottom_producers;
+          return list.length === 0 ? (
             <p className="chart-empty">Sem leituras nesta data.</p>
           ) : (
             <BarList
-              data={panel.top_producers.map((item) => ({
+              data={list.map((item) => ({
                 label: item.name ?? item.brinco ?? "—",
                 value: item.production,
                 series: 2,
@@ -386,26 +414,9 @@ export function HerdDashboard({
               tip={(d) => `${d.label}: ${fmt.liters(d.value)}`}
               max={producerScale}
             />
-          )}
-        </ChartCard>
-
-        <ChartCard index={7} title="Menores produções" description="Nesta data de coleta.">
-          {panel.bottom_producers.length === 0 ? (
-            <p className="chart-empty">Sem leituras nesta data.</p>
-          ) : (
-            <BarList
-              data={panel.bottom_producers.map((item) => ({
-                label: item.name ?? item.brinco ?? "—",
-                value: item.production,
-                series: 2,
-              }))}
-              format={fmt.liters}
-              tip={(d) => `${d.label}: ${fmt.liters(d.value)}`}
-              max={producerScale}
-            />
-          )}
-        </ChartCard>
-      </div>
+          );
+        })()}
+      </ChartCard>
     </section>
   );
 }

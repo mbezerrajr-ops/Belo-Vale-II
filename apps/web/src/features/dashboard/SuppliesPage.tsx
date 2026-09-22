@@ -9,7 +9,8 @@ import {
 } from "../../api/client";
 import type { Supply, SupplyPrice } from "../../api/types";
 import { brDate } from "../../ui/dates";
-import { BarList, fmt } from "../../ui/charts";
+import { Icons } from "../../ui/Brand";
+import { BarList, TableView, fmt } from "../../ui/charts";
 import { PageHeader } from "../../ui/PageHeader";
 
 /**
@@ -75,6 +76,10 @@ export function SuppliesPage({
   }, [milkPrice]);
   // Histórico aberto por insumo. Carregado só quando pedido.
   const [history, setHistory] = useState<Record<string, SupplyPrice[]>>({});
+  // Um formulário de preço aberto por vez; fechados, cada insumo cabe numa
+  // olhada — antes cada um ocupava quase uma tela do celular.
+  const [editing, setEditing] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   async function toggleHistory(supplyId: string): Promise<void> {
     if (history[supplyId]) {
@@ -118,14 +123,66 @@ export function SuppliesPage({
 
   return (
     <section className="supplies">
-      <PageHeader title="Insumos e dieta">
+      <PageHeader
+        title="Insumos e dieta"
+        actions={
+          canEdit && (
+            <button
+              type="button"
+              className="secondary"
+              aria-expanded={creating}
+              onClick={() => setCreating((open) => !open)}
+            >
+              <Icons.novo /> Novo insumo
+            </button>
+          )
+        }
+      >
         Preço do insumo × dieta do lote = o custo diário que aparece no painel.
       </PageHeader>
 
       {error && <p role="alert">{error}</p>}
 
+      {canEdit && creating && (
+        <form
+          className="new-supply"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void guard(async () => {
+              await onCreate(token, newName.trim(), Number(newPrice));
+              setCreating(false);
+              setNewName("");
+              setNewPrice("");
+            });
+          }}
+        >
+          <h3>Novo insumo</h3>
+          <label htmlFor="new-supply-name">Nome</label>
+          <input
+            id="new-supply-name"
+            value={newName}
+            onChange={(event) => setNewName(event.target.value)}
+            autoComplete="off"
+          />
+          <label htmlFor="new-supply-price">Preço por kg (R$)</label>
+          <input
+            id="new-supply-price"
+            type="number"
+            step="0.00001"
+            min="0"
+            inputMode="decimal"
+            value={newPrice}
+            onChange={(event) => setNewPrice(event.target.value)}
+          />
+          <button type="submit" disabled={busy || !newName.trim() || !newPrice}>
+            Cadastrar insumo
+          </button>
+        </form>
+      )}
+
       {canEdit && (
         <form
+          className="milk-price"
           onSubmit={(event) => {
             event.preventDefault();
             const price = Number(milk);
@@ -138,20 +195,22 @@ export function SuppliesPage({
           }}
         >
           <h3>Preço do leite</h3>
-          <label htmlFor="milk-price">Preço por litro (R$)</label>
-          <input
-            id="milk-price"
-            type="number"
-            step="0.01"
-            min="0"
-            inputMode="decimal"
-            value={milk}
-            onChange={(event) => setMilk(event.target.value)}
-          />
           <p className="hint">Base do cálculo de receita e lucro.</p>
-          <button type="submit" disabled={busy || milk === ""}>
-            Salvar preço do leite
-          </button>
+          <label htmlFor="milk-price">Preço por litro (R$)</label>
+          <div className="inline-field">
+            <input
+              id="milk-price"
+              type="number"
+              step="0.01"
+              min="0"
+              inputMode="decimal"
+              value={milk}
+              onChange={(event) => setMilk(event.target.value)}
+            />
+            <button type="submit" disabled={busy || milk === ""}>
+              Salvar preço do leite
+            </button>
+          </div>
           {milkSaved !== null && (
             <p role="status">
               Preço do leite salvo: R$ {milkSaved.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}{" "}
@@ -167,18 +226,19 @@ export function SuppliesPage({
         <ul className="supply-list">
           {supplies.map((item, index) => (
             <li key={item.id} style={{ "--i": index } as CSSProperties}>
-              <div className="row-between">
+              <header className="supply-head">
                 <h3>{item.name}</h3>
                 <p className="price">{precise.format(item.price_per_kg)} / kg</p>
-              </div>
-              <button
-                type="button"
-                className="link-btn"
-                aria-expanded={Boolean(history[item.id])}
-                onClick={() => void toggleHistory(item.id)}
-              >
-                Histórico de preço
-              </button>
+                {item.diets.length > 0 && (
+                  <p className="supply-total">
+                    {fmt.brl(
+                      item.diets.reduce((sum, diet) => sum + diet.kg_per_day, 0) *
+                        item.price_per_kg,
+                    )}{" "}
+                    por dia
+                  </p>
+                )}
+              </header>
               {history[item.id] && (
                 <ul className="price-history" aria-label={`Preços de ${item.name}`}>
                   {history[item.id].map((price) => (
@@ -212,34 +272,47 @@ export function SuppliesPage({
                 />
               )}
 
-              <div className="table-wrap">
-                <table className="diet">
-                  <thead>
-                    <tr>
-                      <th>Lote</th>
-                      <th className="num">kg/dia</th>
-                      <th className="num">Custo/dia</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {item.diets.map((diet) => (
-                      <tr key={diet.lote}>
-                        <td>{diet.lote}</td>
-                        <td className="num">{diet.kg_per_day}</td>
-                        <td className="num">{fmt.brl(diet.kg_per_day * item.price_per_kg)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {item.diets.length > 0 && (
+                <TableView
+                  columns={["Lote", "kg/dia", "Custo/dia"]}
+                  rows={item.diets.map((diet) => [
+                    diet.lote,
+                    diet.kg_per_day,
+                    fmt.brl(diet.kg_per_day * item.price_per_kg),
+                  ])}
+                />
+              )}
+
+              <div className="supply-actions">
+                {canEdit && (
+                  <button
+                    type="button"
+                    className="secondary"
+                    aria-expanded={editing === item.id}
+                    onClick={() => setEditing((open) => (open === item.id ? null : item.id))}
+                  >
+                    <Icons.editar /> Alterar preço
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="link-btn quiet"
+                  aria-expanded={Boolean(history[item.id])}
+                  onClick={() => void toggleHistory(item.id)}
+                >
+                  Histórico de preço
+                </button>
               </div>
 
-              {canEdit && (
+              {canEdit && editing === item.id && (
                 <form
+                  className="supply-price"
                   onSubmit={(event) => {
                     event.preventDefault();
-                    void guard(() =>
-                      onUpdatePrice(token, item.id, Number(prices[item.id])),
-                    );
+                    void guard(async () => {
+                      await onUpdatePrice(token, item.id, Number(prices[item.id]));
+                      setEditing(null);
+                    });
                   }}
                 >
                   <label htmlFor={`price-${item.id}`}>
@@ -272,36 +345,6 @@ export function SuppliesPage({
         </ul>
       )}
 
-      {canEdit && (
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            void guard(() => onCreate(token, newName.trim(), Number(newPrice)));
-          }}
-        >
-          <h3>Novo insumo</h3>
-          <label htmlFor="new-supply-name">Nome</label>
-          <input
-            id="new-supply-name"
-            value={newName}
-            onChange={(event) => setNewName(event.target.value)}
-            autoComplete="off"
-          />
-          <label htmlFor="new-supply-price">Preço por kg (R$)</label>
-          <input
-            id="new-supply-price"
-            type="number"
-            step="0.00001"
-            min="0"
-            inputMode="decimal"
-            value={newPrice}
-            onChange={(event) => setNewPrice(event.target.value)}
-          />
-          <button type="submit" disabled={busy || !newName.trim() || !newPrice}>
-            Cadastrar insumo
-          </button>
-        </form>
-      )}
     </section>
   );
 }
