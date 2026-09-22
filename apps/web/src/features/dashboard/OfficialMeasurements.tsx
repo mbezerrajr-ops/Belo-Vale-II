@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import { getMeasurements } from "../../api/client";
 import type { MeasurementRecord } from "../../api/types";
 import { BarList, ChartCard, StatTile, TableView, fmt } from "../../ui/charts";
+import { Icons } from "../../ui/Brand";
+import { PageHeader } from "../../ui/PageHeader";
 
 interface OfficialMeasurementsProps {
   farmId: string;
@@ -82,7 +84,7 @@ export function OfficialMeasurements({
   if (state === "loading") {
     return (
       <section aria-label="Medições oficiais">
-        <h2>Medições oficiais</h2>
+        <PageHeader title="Medições oficiais" />
         <div className="skeleton skeleton-card" />
       </section>
     );
@@ -98,15 +100,16 @@ export function OfficialMeasurements({
 
   return (
     <section aria-label="Medições oficiais">
-      <div className="row-between">
-        <h2>Medições oficiais</h2>
-        <button type="button" className="link-btn" onClick={load}>
-          Atualizar
-        </button>
-      </div>
-      <p className="muted">
+      <PageHeader
+        title="Medições oficiais"
+        actions={
+          <button type="button" className="link-btn" onClick={load}>
+            <Icons.atualizar /> Atualizar
+          </button>
+        }
+      >
         Só entram aqui leituras aprovadas por uma pessoa ou migradas da baseline.
-      </p>
+      </PageHeader>
 
       {/* Três indicadores: no celular o total ocupa a linha, e os outros
           dois dividem a de baixo — em vez de um ficar sozinho. */}

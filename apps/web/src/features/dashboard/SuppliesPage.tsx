@@ -10,6 +10,7 @@ import {
 import type { Supply, SupplyPrice } from "../../api/types";
 import { brDate } from "../../ui/dates";
 import { BarList, fmt } from "../../ui/charts";
+import { PageHeader } from "../../ui/PageHeader";
 
 /**
  * Insumos e dieta.
@@ -117,11 +118,9 @@ export function SuppliesPage({
 
   return (
     <section className="supplies">
-      <h2>Insumos e dieta</h2>
-      <p className="muted">
-        O preço de cada insumo, multiplicado pela dieta do lote, é o custo
-        diário que aparece no painel.
-      </p>
+      <PageHeader title="Insumos e dieta">
+        Preço do insumo × dieta do lote = o custo diário que aparece no painel.
+      </PageHeader>
 
       {error && <p role="alert">{error}</p>}
 

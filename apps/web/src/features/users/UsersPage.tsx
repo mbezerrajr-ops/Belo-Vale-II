@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 import { createUser, listUsers, resetUserPassword, updateUser } from "../../api/client";
 import type { PasswordReset, Role, UserAccount, UserPage } from "../../api/types";
+import { PageHeader } from "../../ui/PageHeader";
 
 /**
  * Gestão de contas, só para o dono.
@@ -150,8 +151,9 @@ export function UsersPage({
 
   return (
     <section className="users">
-      <h2>Contas</h2>
-      <p className="muted">Cada pessoa com a sua conta: é o que dá nome a cada alteração.</p>
+      <PageHeader title="Contas">
+        Cada pessoa com a sua conta: é o que dá nome a cada alteração.
+      </PageHeader>
 
       <form
         onSubmit={(event) => {

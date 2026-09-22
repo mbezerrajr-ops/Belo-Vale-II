@@ -4,6 +4,7 @@ import { createAnimal, searchAnimals } from "../../api/client";
 import { EXIT_REASON_LABEL, type Animal, type AnimalPage, type AnimalSearch } from "../../api/types";
 import { Icons } from "../../ui/Brand";
 import { brDate, farmToday } from "../../ui/dates";
+import { PageHeader } from "../../ui/PageHeader";
 
 /**
  * Busca de animais.
@@ -162,8 +163,7 @@ export function AnimalSearchPage({
 
   return (
     <section className="animals">
-      <h2>Animais</h2>
-      <p className="muted">Digite o brinco ou o nome e abra a ficha do animal.</p>
+      <PageHeader title="Animais">Digite o brinco ou o nome e abra a ficha.</PageHeader>
 
       <div className="search-row">
         <label htmlFor="animal-term">Brinco ou nome</label>

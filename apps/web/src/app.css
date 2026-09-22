@@ -37,6 +37,8 @@
   --brand: #285e4a;
   --brand-2: #3f8a5f;
   --brand-soft: #dcebe1;
+  /* Texto verde sobre fundo suave (filtro escolhido, trilho). */
+  --brand-ink: #1f4d3c;
   --accent: #b8632f;
   --accent-soft: #f6e3d5;
   --gold: #b8860b;
@@ -102,6 +104,7 @@
     --brand: #6fb58a;
     --brand-2: #8ccaa3;
     --brand-soft: #21332a;
+    --brand-ink: #a8dcbb;
     --accent: #d98b57;
     --accent-soft: #3a2a1f;
     --gold: #d1a13a;
@@ -478,10 +481,10 @@ a {
   justify-content: space-around;
   gap: 2px;
   padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  /* Opaca: translúcida, o texto da tela aparecia por trás dos rótulos. */
+  background: var(--surface);
   border-top: 1px solid var(--line);
+  box-shadow: 0 -6px 18px color-mix(in srgb, var(--ink) 7%, transparent);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -641,11 +644,107 @@ button.btn-ghost.danger {
   background: var(--danger-soft);
 }
 
-/* O que está escolhido num grupo de opções (aba, lote, jeito de lançar). */
+/* O filtro escolhido (lote, arquivo, recorte da busca). Tom suave, não
+   cheio: verde cheio é só da ação principal, e um filtro marcado ao lado de
+   "Enviar" ou "Aprovar" disputava com eles o lugar de "toque aqui". */
 .search-shortcuts button[aria-pressed="true"] {
-  background: var(--brand);
+  background: var(--brand-soft);
   border-color: var(--brand);
-  color: var(--on-brand);
+  color: var(--brand-ink);
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+
+/* Escolher um modo (Digitar | Importar, Pendentes | Aprovadas): um trilho
+   só, com a opção marcada em relevo. Não é filtro nem ação. */
+.segmented {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.segmented button {
+  flex: 1 1 auto;
+  min-height: 42px;
+  padding: 6px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+.segmented button:not([aria-pressed="true"]):hover {
+  color: var(--brand-ink);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  box-shadow: none;
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--brand-ink);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 14%, transparent),
+    0 0 0 1px var(--line);
+}
+
+/* ---------- topo de cada área ---------- */
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 4px 0 16px;
+}
+
+.page-head-text {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.page-head h2 {
+  margin: 0;
+  text-wrap: balance;
+}
+
+.page-lede {
+  max-width: 64ch;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Sair: no topo só no computador; no celular, dentro de Minha conta. */
+.logout-account {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 899px) {
+  .who .logout-top {
+    display: none;
+  }
+}
+
+@media (min-width: 900px) {
+  .logout-account {
+    display: none;
+  }
 }
 
 .link-btn {
@@ -1026,7 +1125,7 @@ form h3 {
 }
 
 /* Painel relendo depois de um filtro: o que está na tela é o anterior. */
-.dashboard[aria-busy="true"] > :not(.row-between, .filters) {
+.dashboard[aria-busy="true"] > :not(.page-head, .filters) {
   opacity: 0.55;
   transition: opacity var(--dur-fast);
 }
@@ -2851,8 +2950,36 @@ p.count {
   gap: 8px 12px;
 }
 
-.inbox-toolbar .search-shortcuts {
+.inbox-toolbar .segmented {
   margin: 0;
+}
+
+/* Situação e Atualizar cabem numa linha no celular: Atualizar vira ícone. */
+@media (max-width: 519px) {
+  .inbox-toolbar {
+    flex-wrap: nowrap;
+  }
+
+  .inbox-toolbar .segmented {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .inbox-toolbar .segmented button {
+    padding: 6px 10px;
+  }
+
+  .refresh-inbox {
+    flex: 0 0 auto;
+    width: var(--touch);
+    height: var(--touch);
+    justify-content: center;
+    padding: 0;
+  }
+
+  .wide-only {
+    display: none;
+  }
 }
 
 .proposal-card {

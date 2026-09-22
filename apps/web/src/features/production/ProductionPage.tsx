@@ -15,6 +15,7 @@ import {
 } from "../../api/types";
 import { brDate, liters, farmToday } from "../../ui/dates";
 import { ImportPanel } from "./ImportPanel";
+import { PageHeader } from "../../ui/PageHeader";
 
 /**
  * Lançamento de produção, vaca a vaca.
@@ -332,13 +333,11 @@ export function ProductionPage({
 
   return (
     <section className="production">
-      <h2>Produção do dia</h2>
-      <p className="muted">
-        Digite os litros de cada vaca ou importe o arquivo da coleta. Digitando, cada
-        valor é salvo sozinho ao sair do campo; Enter passa para a próxima.
-      </p>
+      <PageHeader title="Produção do dia">
+        Cada valor é salvo ao sair do campo; Enter passa para a próxima vaca.
+      </PageHeader>
 
-      <div className="search-shortcuts" role="group" aria-label="Como lançar">
+      <div className="segmented" role="group" aria-label="Como lançar">
         <button
           type="button"
           aria-pressed={how === "digitar"}

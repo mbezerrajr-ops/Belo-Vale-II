@@ -12,6 +12,7 @@ import {
   TableView,
   fmt,
 } from "../../ui/charts";
+import { PageHeader } from "../../ui/PageHeader";
 
 /**
  * Painel do rebanho.
@@ -74,7 +75,7 @@ export function HerdDashboard({
   if (panel === null) {
     return (
       <section className="dashboard">
-        <h2>Painel do rebanho</h2>
+        <PageHeader title="Painel do rebanho" />
         <div className="kpis">
           {[0, 1, 2, 3, 4, 5].map((i) => (
             <div className="skeleton kpi" key={i} />
@@ -103,12 +104,7 @@ export function HerdDashboard({
 
   return (
     <section className="dashboard" aria-busy={loading}>
-      <div className="row-between">
-        <h2>Painel do rebanho</h2>
-        {panel.measured_on && (
-          <span className="count">Coleta de {shortDate(panel.measured_on)}</span>
-        )}
-      </div>
+      <PageHeader title="Painel do rebanho" />
 
       <div className="filters">
         <div>
