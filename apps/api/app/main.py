@@ -31,6 +31,7 @@ from app.services.ingestion import (
     ImportAlreadyProcessingError,
     ImportNotFoundError,
     InvalidImageError,
+    ReprocessNotAllowedError,
 )
 
 
@@ -95,6 +96,15 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
             content={"code": "import_already_processing"},
+        )
+
+    @app.exception_handler(ReprocessNotAllowedError)
+    async def handle_reprocess_not_allowed(
+        request: Request, exc: ReprocessNotAllowedError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={"code": "reprocess_needs_reviewer"},
         )
 
     @app.exception_handler(ImportNotFoundError)

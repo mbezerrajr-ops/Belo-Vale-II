@@ -242,6 +242,56 @@ class TestWhenTheReadingFails:
         assert (estado["status"], estado["failure"]) == ("pending", None)
 
 
+class TestTryingAgain:
+    """Transcritor fora do ar não é culpa de quem gravou. Antes, só um revisor
+    mandava ler de novo — e o funcionário, com a gravação guardada e o aviso
+    de falha na tela, não tinha o que fazer. Agora ele tenta de novo a leitura
+    que FALHOU. A que deu certo continua sendo decisão de revisor: ler de novo
+    criaria outra cópia de cada proposta na caixa."""
+
+    def test_the_sender_may_try_again_a_failed_reading(self, envio, api) -> None:  # noqa: F811
+        enviar, ler, como_esta = envio
+        import_id = enviar()
+        with pytest.raises(TranscriberUnavailable):
+            ler(_Desligado())
+        _, vaqueiro = make_user("operator", "outro.vaqueiro@belovale")
+
+        resposta = api.post(f"/api/imports/{import_id}/reprocess", headers=auth(vaqueiro))
+
+        assert resposta.status_code == 202
+        assert como_esta(import_id).json()["status"] == "pending"
+
+    def test_but_not_a_reading_that_worked(self, envio, api) -> None:  # noqa: F811
+        enviar, ler, como_esta = envio
+        import_id = enviar()
+        ler(_fala())
+        _, vaqueiro = make_user("operator", "outro.vaqueiro@belovale")
+
+        resposta = api.post(f"/api/imports/{import_id}/reprocess", headers=auth(vaqueiro))
+
+        assert resposta.status_code == 403
+        assert resposta.json()["code"] == "reprocess_needs_reviewer"
+        assert como_esta(import_id).json()["status"] == "extracted"
+
+    def test_nor_a_reading_still_waiting(self, envio, api) -> None:  # noqa: F811
+        enviar, _, _ = envio
+        import_id = enviar()
+        _, vaqueiro = make_user("operator", "outro.vaqueiro@belovale")
+
+        resposta = api.post(f"/api/imports/{import_id}/reprocess", headers=auth(vaqueiro))
+
+        assert resposta.status_code == 409
+        assert resposta.json()["code"] == "import_already_processing"
+
+    def test_a_reviewer_still_reads_again_whatever_it_is(self, envio, api) -> None:  # noqa: F811
+        enviar, ler, _ = envio
+        import_id = enviar()
+        ler(_fala())
+        _, dono = make_user("reviewer", "dono@belovale")
+
+        assert api.post(f"/api/imports/{import_id}/reprocess", headers=auth(dono)).status_code == 202
+
+
 class TestWhoMayAsk:
     def test_an_unknown_sending_is_not_found(self, envio) -> None:
         _, _, como_esta = envio

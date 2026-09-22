@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
-from app.core.security import require_minimum_role
+from app.core.security import has_minimum_role, require_minimum_role
 from app.db.models import Farm, User
 from app.db.session import get_db_session
 from app.routers.registry import resolve_current_farm
@@ -56,9 +56,13 @@ async def reprocess(
     import_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     dispatcher: Annotated[ExtractionDispatcher, Depends(get_extraction_dispatcher)],
-    _: Annotated[User, Depends(require_minimum_role("reviewer"))],
+    user: Annotated[User, Depends(require_minimum_role("operator"))],
 ) -> dict[str, str]:
-    created = await reprocess_import(session, import_id=import_id)
+    # Quem enviou tenta de novo a leitura que falhou; ler de novo a que deu
+    # certo é de revisor.
+    created = await reprocess_import(
+        session, import_id=import_id, only_if_failed=not has_minimum_role(user, "reviewer")
+    )
     dispatcher.dispatch(created.extraction_run_id)
     return _response(created)
 
