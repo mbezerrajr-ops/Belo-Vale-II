@@ -606,8 +606,8 @@ function SourceDate({
         </p>
       )}
       {canDecide && !editing && (
-        <button type="button" className="link-btn" onClick={() => setEditing(true)}>
-          Trocar data do arquivo
+        <button type="button" className="link-btn quiet" onClick={() => setEditing(true)}>
+          <Icons.editar /> Trocar data do arquivo
         </button>
       )}
       {canDecide && editing && (

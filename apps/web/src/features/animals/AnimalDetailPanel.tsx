@@ -18,6 +18,7 @@ import {
   type ExitReason,
   type MergePreview,
 } from "../../api/types";
+import { Icons } from "../../ui/Brand";
 import { brDate, farmToday } from "../../ui/dates";
 import { MergeFichas } from "./MergeFichas";
 import { ProductionHistory } from "./ProductionHistory";
@@ -125,6 +126,12 @@ export function AnimalDetailPanel({
   const [panel, setPanel] = useState<
     "none" | "brinco" | "tirar-brinco" | "lote" | "cadastro" | "baixa" | "desfazer" | "juntar"
   >("none");
+  // As ações raras (tirar brinco, juntar, baixa) ficam atrás de "Mais ações".
+  const [moreActions, setMoreActions] = useState(false);
+  const open = (next: typeof panel): void => {
+    setPanel(next);
+    setMoreActions(false);
+  };
   const merged = Boolean(animal.merged_into_id);
   const del = daysInMilk(animal.ultimo_parto, today);
   const [busy, setBusy] = useState(false);
@@ -212,30 +219,35 @@ export function AnimalDetailPanel({
 
   return (
     <section className="animal-detail">
+      {/* O brinco uma vez só, no selo ao lado do nome — é como a vaca aparece
+          em todas as listas. Embaixo, só o que o selo não diz. */}
       <header className="detail-head">
+        <span className={animal.brinco ? "tag tag-lg" : "tag tag-lg none"}>
+          {animal.brinco ? (
+            <>
+              <span className="sr-only">Brinco </span>
+              {animal.brinco}
+            </>
+          ) : (
+            "sem brinco"
+          )}
+        </span>
         <div>
           <h2>{animal.name ?? "Animal sem nome"}</h2>
-          <p className="brinco">
-            {animal.brinco ? (
-              <>
-                Brinco <strong>{animal.brinco}</strong>
-                {/* O número antigo só diz algo quando é outro. */}
-                {animal.numero_legado && animal.numero_legado !== animal.brinco && (
-                  <> · nº antigo {animal.numero_legado}</>
-                )}
-              </>
-            ) : (
-              <>
-                <strong>Sem brinco</strong>
-                {animal.brinco_origem && (
-                  <> — leitura ilegível registrada: {animal.brinco_origem}</>
-                )}
-                {animal.numero_legado && <> · nº antigo {animal.numero_legado}</>}
-              </>
-            )}
-          </p>
+          {(() => {
+            // O número antigo só diz algo quando é outro.
+            const legado =
+              animal.numero_legado && animal.numero_legado !== animal.brinco
+                ? `nº antigo ${animal.numero_legado}`
+                : null;
+            const ilegivel =
+              !animal.brinco && animal.brinco_origem
+                ? `leitura ilegível registrada: ${animal.brinco_origem}`
+                : null;
+            const extra = [ilegivel, legado].filter(Boolean).join(" · ");
+            return extra ? <p className="brinco">{extra}</p> : null;
+          })()}
         </div>
-        {animal.brinco && <span className="tag">{animal.brinco}</span>}
       </header>
 
       <dl className="animal-fields">
@@ -300,40 +312,56 @@ export function AnimalDetailPanel({
 
       {canEdit && exited && !merged && (
         <div className="actions">
-          <button type="button" className="secondary" onClick={() => setPanel("desfazer")}>
+          <button type="button" className="secondary" onClick={() => open("desfazer")}>
             Desfazer baixa
           </button>
-          <button type="button" className="secondary" onClick={() => setPanel("juntar")}>
-            Juntar com outra ficha
+          <button type="button" className="secondary" onClick={() => open("juntar")}>
+            <Icons.juntar /> Juntar com outra ficha
           </button>
         </div>
       )}
 
       {canEdit && !exited && !merged && (
-        <div className="actions">
-          {/* As duas do curral primeiro e cheias; as de escritório depois, em
-              contorno; a baixa por último. */}
-          <button type="button" onClick={() => setPanel("brinco")}>
-            {animal.brinco ? "Trocar brinco" : "Vincular brinco"}
-          </button>
-          <button type="button" onClick={() => setPanel("lote")}>
-            Mudar de lote
-          </button>
-          {animal.brinco && (
-            <button type="button" className="secondary" onClick={() => setPanel("tirar-brinco")}>
-              Tirar o brinco
+        <>
+          {/* À vista, o que se faz toda semana; em "Mais ações", o que é raro
+              ou não tem volta fácil. Nenhuma em verde cheio: o verde é do
+              "Salvar" do formulário que cada uma abre. */}
+          <div className="actions">
+            <button type="button" className="secondary" onClick={() => open("lote")}>
+              <Icons.lote /> Mudar de lote
             </button>
+            <button type="button" className="secondary" onClick={() => open("brinco")}>
+              <Icons.brinco /> {animal.brinco ? "Trocar brinco" : "Vincular brinco"}
+            </button>
+            <button type="button" className="secondary" onClick={() => open("cadastro")}>
+              <Icons.editar /> Editar cadastro
+            </button>
+            <button
+              type="button"
+              className="secondary actions-toggle"
+              aria-expanded={moreActions}
+              aria-controls="ficha-mais-acoes"
+              onClick={() => setMoreActions((current) => !current)}
+            >
+              <Icons.menu /> Mais ações
+            </button>
+          </div>
+          {moreActions && (
+            <div className="actions actions-more" id="ficha-mais-acoes" role="group" aria-label="Mais ações">
+              {animal.brinco && (
+                <button type="button" className="secondary" onClick={() => open("tirar-brinco")}>
+                  Tirar o brinco
+                </button>
+              )}
+              <button type="button" className="secondary" onClick={() => open("juntar")}>
+                <Icons.juntar /> Juntar com outra ficha
+              </button>
+              <button type="button" className="secondary danger" onClick={() => open("baixa")}>
+                Dar baixa
+              </button>
+            </div>
           )}
-          <button type="button" className="secondary" onClick={() => setPanel("cadastro")}>
-            Editar cadastro
-          </button>
-          <button type="button" className="secondary" onClick={() => setPanel("juntar")}>
-            Juntar com outra ficha
-          </button>
-          <button type="button" className="secondary danger" onClick={() => setPanel("baixa")}>
-            Dar baixa
-          </button>
-        </div>
+        </>
       )}
 
       {error && <p role="alert">{error}</p>}

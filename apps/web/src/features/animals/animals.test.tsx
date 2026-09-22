@@ -238,6 +238,27 @@ describe("AnimalDetailPanel — vincular brinco", () => {
     expect(screen.getByText(/sem brinco/i)).toBeInTheDocument();
   });
 
+  it("o que é raro fica em Mais ações; a baixa só aparece ali", () => {
+    // Seis botões do mesmo tamanho, dois em verde cheio, e a baixa ao lado
+    // de "Mudar de lote": não havia como saber o que era do dia a dia.
+    render(<AnimalDetailPanel token={TOKEN} animal={animal()} canEdit onChanged={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: /mudar de lote/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /dar baixa/i })).not.toBeInTheDocument();
+
+    const more = screen.getByRole("button", { name: /mais ações/i });
+    fireEvent.click(more);
+
+    expect(more).toHaveAttribute("aria-expanded", "true");
+    const group = screen.getByRole("group", { name: /mais ações/i });
+    expect(within(group).getByRole("button", { name: /dar baixa/i })).toBeInTheDocument();
+
+    // Escolher uma fecha o menu e abre o formulário dela.
+    fireEvent.click(within(group).getByRole("button", { name: /dar baixa/i }));
+    expect(screen.queryByRole("group", { name: /mais ações/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/motivo da baixa/i)).toBeInTheDocument();
+  });
+
   it("exige evidência antes de enviar", async () => {
     const link = vi.fn();
 
@@ -275,6 +296,7 @@ describe("AnimalDetailPanel — vincular brinco", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: /mais ações/i }));
     fireEvent.click(screen.getByRole("button", { name: /tirar o brinco/i }));
     fireEvent.change(screen.getByLabelText(/evid[êe]ncia/i), {
       target: { value: "O 649 é da BRANQUINHA (folha de 25/08)" },
@@ -300,6 +322,7 @@ describe("AnimalDetailPanel — vincular brinco", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: /mais ações/i }));
     fireEvent.click(screen.getByRole("button", { name: /tirar o brinco/i }));
     fireEvent.click(screen.getByRole("button", { name: /confirmar e tirar o brinco/i }));
 
@@ -586,6 +609,7 @@ describe("AnimalDetailPanel — juntar fichas", () => {
   }
 
   async function escolherACerta(): Promise<void> {
+    fireEvent.click(screen.getByRole("button", { name: /mais ações/i }));
     fireEvent.click(screen.getByRole("button", { name: /juntar com outra ficha/i }));
     fireEvent.change(screen.getByLabelText(/brinco ou nome da outra ficha/i), {
       target: { value: "861" },

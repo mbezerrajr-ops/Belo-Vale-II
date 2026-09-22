@@ -131,6 +131,7 @@ test("baixa de animal e desfazer", async ({ page }) => {
   await page.getByRole("button", { name: "Buscar" }).click();
   await page.getByRole("button", { name: new RegExp(importedCow.name) }).click();
 
+  await page.getByRole("button", { name: "Mais ações" }).click();
   await page.getByRole("button", { name: "Dar baixa" }).click();
   await page.getByLabel("Motivo da baixa").selectOption("venda");
   await page.getByRole("button", { name: "Confirmar baixa" }).click();

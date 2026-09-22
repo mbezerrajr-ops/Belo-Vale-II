@@ -7,6 +7,7 @@ import {
   type ReadingFailure,
   type UploadResult,
 } from "../../api/types";
+import { Icons } from "../../ui/Brand";
 import {
   AudioRecorder,
   MAX_RECORDING_SECONDS,
@@ -44,6 +45,7 @@ export type MeasureFn = (file: File) => Promise<number | null>;
 export interface Variant {
   arquivo: "foto" | "gravação";
   id: string;
+  icone: "camera" | "microfone";
   abrir: string;
   titulo: string;
   rotulo: string;
@@ -283,7 +285,10 @@ export function SendUpload({
   if (!open) {
     return (
       <div className={`send-photo send-${variant.id}`}>
-        <button type="button" onClick={() => setOpen(true)}>
+        <button type="button" className="send-open" onClick={() => setOpen(true)}>
+          <span className="send-open-icon">
+            {variant.icone === "camera" ? <Icons.camera /> : <Icons.microfone />}
+          </span>
           {variant.abrir}
         </button>
         {outcome}
