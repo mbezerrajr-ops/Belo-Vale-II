@@ -21,6 +21,11 @@ const currency = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
 });
+const wholeCurrency = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  maximumFractionDigits: 0,
+});
 
 export const fmt = {
   int: (value: number): string => integer.format(value),
@@ -31,7 +36,19 @@ export const fmt = {
     value === null ? "—" : currency.format(value).replace(/^-/, "‑"),
   liters: (value: number): string => `${decimal.format(value)} L`,
   pct: (value: number): string => `${integer.format(value * 100)}%`,
+  /** Real sem centavos: para eixo, onde o centavo só ocupa lugar. */
+  brlWhole: (value: number): string => wholeCurrency.format(value),
 };
+
+/** O topo "redondo" da escala (1, 2, 2,5 ou 5 vezes uma potência de 10). */
+export function niceCeil(value: number): number {
+  if (value <= 0) return 1;
+  const base = 10 ** Math.floor(Math.log10(value));
+  for (const step of [1, 2, 2.5, 5, 10]) {
+    if (value <= step * base) return step * base;
+  }
+  return 10 * base;
+}
 
 export const SERIES = [
   "var(--series-1)",
@@ -151,12 +168,21 @@ interface BarListProps {
   format?: (value: number) => string;
   /** Texto do tooltip; padrão é "rótulo: valor". */
   tip?: (datum: BarDatum) => string;
+  /**
+   * O topo da escala. Duas listas da mesma medida (maiores e menores
+   * produções) comparam no mesmo topo: com a escala de cada uma, 8,5 L
+   * aparecia com a barra quase cheia.
+   */
+  max?: number;
 }
 
-export function BarList({ data, format = fmt.int, tip }: BarListProps): JSX.Element {
-  const max = Math.max(1, ...data.map((d) => Math.abs(d.value)));
+export function BarList({ data, format = fmt.int, tip, max: top }: BarListProps): JSX.Element {
+  const max = top ?? Math.max(1, ...data.map((d) => Math.abs(d.value)));
+  // A coluna do valor tem a largura do maior valor: as trilhas terminam
+  // todas no mesmo ponto, em vez de dançarem com o tamanho do número.
+  const valueWidth = Math.max(...data.map((d) => format(d.value).length), 1);
   return (
-    <ul className="bars">
+    <ul className="bars" style={{ "--value-w": `${valueWidth + 1}ch` } as CSSProperties}>
       {data.map((datum, index) => (
         <li
           key={datum.label}
@@ -283,20 +309,39 @@ interface ColumnsProps {
   groups: ColumnGroup[];
   series: string[];
   format?: (value: number) => string;
+  /** Rótulos do eixo; padrão, real sem centavos. */
+  axisFormat?: (value: number) => string;
 }
 
-export function Columns({ groups, series, format = fmt.brl }: ColumnsProps): JSX.Element {
-  const max = Math.max(1, ...groups.flatMap((group) => group.values.map(Math.abs)));
+export function Columns({
+  groups,
+  series,
+  format = fmt.brl,
+  axisFormat = fmt.brlWhole,
+}: ColumnsProps): JSX.Element {
+  // A escala vai até um valor redondo, e as linhas de grade (a cada quarto)
+  // têm o valor escrito ao lado: sem isto, as colunas só diziam "maior" e
+  // "menor".
+  const max = niceCeil(Math.max(1, ...groups.flatMap((group) => group.values.map(Math.abs))));
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((share) => share * max);
   return (
     <div className="columns">
       <Legend items={series.map((label, index) => ({ label, color: seriesColor(index) }))} />
+      <div className="columns-frame">
+        <div className="axis" aria-hidden="true">
+          {ticks.map((tick) => (
+            <span key={tick} style={{ bottom: `${(tick / max) * 100}%` }}>
+              {axisFormat(tick)}
+            </span>
+          ))}
+        </div>
       <div className="plot" role="img" aria-label="Comparativo por lote">
         {groups.map((group, groupIndex) => (
           <div className="group" key={group.label}>
             {group.values.map((value, seriesIndex) => (
               <span
                 key={series[seriesIndex]}
-                className="col"
+                className={`col${groupIndex === groups.length - 1 && groups.length > 1 ? " tip-end" : groupIndex === 0 && groups.length > 1 ? " tip-start" : ""}`}
                 data-tip={`${group.label} · ${series[seriesIndex]}: ${format(value)}`}
                 tabIndex={0}
                 style={
@@ -310,6 +355,7 @@ export function Columns({ groups, series, format = fmt.brl }: ColumnsProps): JSX
             ))}
           </div>
         ))}
+      </div>
       </div>
       <div className="labels">
         {groups.map((group) => (
@@ -337,49 +383,67 @@ export function Sparkline({
   points: SparkPoint[];
   format?: (value: number) => string;
 }): JSX.Element {
+  // A linha e o preenchimento esticam com o cartão; os pontos e os rótulos
+  // ficam em HTML por cima, então não viram elipses no computador.
   const W = 300;
-  const H = 64;
-  const PAD = 8;
+  const H = 80;
+  const PAD = 10;
   if (points.length === 0) {
     return <p className="chart-empty">Sem leituras ainda.</p>;
   }
   const max = Math.max(...points.map((p) => p.value), 1);
-  const min = Math.min(...points.map((p) => p.value), 0);
   const x = (index: number): number =>
     points.length === 1 ? W / 2 : PAD + (index * (W - 2 * PAD)) / (points.length - 1);
-  const y = (value: number): number =>
-    H - PAD - ((value - min) / (max - min || 1)) * (H - 2 * PAD);
+  // O chão da escala é o zero: litro não começa em outro lugar.
+  const y = (value: number): number => H - (value / max) * (H - PAD * 2.4);
   const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i)} ${y(p.value)}`).join(" ");
   const area = `${path} L${x(points.length - 1)} ${H} L${x(0)} ${H} Z`;
+  // Poucas coletas: cada ponto diz o valor e a data. Muitas: primeira e última.
+  const labelAll = points.length <= 6;
+  const edge = (i: number): string =>
+    points.length > 1 && i === 0 ? " start" : points.length > 1 && i === points.length - 1 ? " end" : "";
 
   return (
-    <div>
-      <svg
-        className="spark"
-        viewBox={`0 0 ${W} ${H}`}
-        preserveAspectRatio="none"
-        role="img"
-        aria-label="Produção por data de coleta"
-      >
-        <path className="area" d={area} />
-        <path className="line" d={path} vectorEffect="non-scaling-stroke" />
+    <div className="trend">
+      <div className="trend-plot">
+        <svg
+          className="spark"
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="none"
+          role="img"
+          aria-label="Produção por data de coleta"
+        >
+          <path className="spark-area" d={area} />
+          <path className="line" d={path} vectorEffect="non-scaling-stroke" />
+        </svg>
         {points.map((p, i) => (
-          <circle
+          <span
             key={p.label}
-            className={`dot${i === points.length - 1 ? " current" : ""}`}
-            cx={x(i)}
-            cy={y(p.value)}
-            r="4"
-          >
-            <title>
-              {p.label}: {format(p.value)}
-            </title>
-          </circle>
+            className={`trend-dot${i === points.length - 1 ? " current" : ""}${edge(i) ? ` tip-${edge(i).trim()}` : ""}`}
+            style={{ left: `${(x(i) / W) * 100}%`, top: `${(y(p.value) / H) * 100}%` }}
+            data-tip={`${p.label}: ${format(p.value)}`}
+            tabIndex={0}
+          />
         ))}
-      </svg>
-      <div className="spark-labels">
-        <span>{points[0].label}</span>
-        {points.length > 1 && <span>{points[points.length - 1].label}</span>}
+        {labelAll &&
+          points.map((p, i) => (
+            <span
+              key={`v-${p.label}`}
+              className={`trend-value${edge(i)}${i === points.length - 1 ? " current" : ""}`}
+              style={{ left: `${(x(i) / W) * 100}%`, top: `${(y(p.value) / H) * 100}%` }}
+            >
+              {format(p.value)}
+            </span>
+          ))}
+      </div>
+      <div className="trend-dates">
+        {points.map((p, i) =>
+          labelAll || i === 0 || i === points.length - 1 ? (
+            <span key={p.label} className={edge(i).trim()} style={{ left: `${(x(i) / W) * 100}%` }}>
+              {p.label}
+            </span>
+          ) : null,
+        )}
       </div>
     </div>
   );

@@ -257,6 +257,9 @@ const AREA_LABEL: Record<Area, string> = {
   "minha-conta": "Minha conta",
 };
 
+/** As que ficam na barra de baixo do celular; as outras vão para "Mais". */
+const PRIMARY_AREAS: Area[] = ["painel", "producao", "revisao", "animais"];
+
 const ROLE_LEVEL: Record<string, number> = {
   operator: 0,
   reviewer: 1,
@@ -347,6 +350,18 @@ function AuthenticatedApp({
     }
   };
 
+  // No celular, cabem quatro áreas na barra de baixo e um "Mais" com o
+  // resto; no computador, a barra mostra todas.
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => {
+    if (!moreOpen) return;
+    const close = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") setMoreOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [moreOpen]);
+
   const areas: Area[] = [
     "painel",
     "producao",
@@ -361,6 +376,7 @@ function AuthenticatedApp({
     ...(isAdmin ? (["contas"] as Area[]) : []),
     "minha-conta",
   ];
+  const moreAreas = areas.filter((name) => !PRIMARY_AREAS.includes(name));
 
   return (
     <main className="shell">
@@ -396,9 +412,12 @@ function AuthenticatedApp({
             <button
               key={name}
               type="button"
-              className={name === "minha-conta" ? "nav-secondary" : undefined}
+              className={PRIMARY_AREAS.includes(name) ? undefined : "nav-more-item"}
               aria-current={area === name}
-              onClick={() => setArea(name)}
+              onClick={() => {
+                setArea(name);
+                setMoreOpen(false);
+              }}
             >
               <Icon />
               {AREA_LABEL[name]}
@@ -410,7 +429,45 @@ function AuthenticatedApp({
             </button>
           );
         })}
+        {moreAreas.length > 0 && (
+          <button
+            type="button"
+            className="nav-more"
+            aria-expanded={moreOpen}
+            aria-controls="mais-areas"
+            aria-current={moreAreas.includes(area)}
+            onClick={() => setMoreOpen((open) => !open)}
+          >
+            <Icons.mais />
+            {moreAreas.includes(area) ? AREA_LABEL[area] : "Mais"}
+          </button>
+        )}
       </nav>
+
+      {moreOpen && (
+        <>
+          <div className="more-backdrop" aria-hidden="true" onClick={() => setMoreOpen(false)} />
+          <div className="more-sheet" id="mais-areas" role="group" aria-label="Mais áreas">
+            {moreAreas.map((name) => {
+              const Icon = Icons[name as IconName];
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  aria-current={area === name}
+                  onClick={() => {
+                    setArea(name);
+                    setMoreOpen(false);
+                  }}
+                >
+                  <Icon />
+                  {AREA_LABEL[name]}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {farmError && <p role="alert">{farmError}</p>}
 
