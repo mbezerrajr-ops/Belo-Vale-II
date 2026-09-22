@@ -30,8 +30,11 @@ O gabarito::
 
     {"linhas": [
       {"brinco": "633", "nome": "GIGANTE", "manha": "2", "tarde": "2", "total": "4", "secar": true},
-      {"brinco": "462", "nome": "SABIÁ", "total": "15", "lote": "1"}
+      {"brinco": "462", "nome": "SABIÁ", "total": "15", "lote": "1"},
+      {"brinco": "649", "nome": "REDONDA", "total": "5", "secar": true, "nota": "7 meses"}
     ]}
+
+`nota` é um pedaço do texto que a observação daquela vaca precisa ter.
 
 As gravações são dados reais da fazenda e ficam fora do Git
 (`docs/Treinamento_audios/` está no .gitignore). Nada sai da máquina: o
@@ -67,6 +70,7 @@ from app.audio.transcriber import (
 )
 from app.core.config import get_settings
 from app.services.event_proposals import SIMILAR_NAME, name_similarity
+from app.services.portuguese_numbers import fold
 from app.services.production_files import parse_number_br
 from app.services.reading_to_events import lines_to_events
 
@@ -110,6 +114,13 @@ class CowScore:
     lot_found: int = 0
     #: Ordem de secar ou troca de lote que ninguém deu.
     commands_invented: int = 0
+    notes_expected: int = 0
+    notes_found: int = 0
+    #: Observação que ninguém disse: uma proposta inútil esperando alguém
+    #: rejeitar.
+    notes_extra: int = 0
+    #: (brinco, texto) de cada observação a mais.
+    extra_notes: list[tuple[str | None, str]] = field(default_factory=list)
 
     @property
     def found(self) -> int:
@@ -184,6 +195,20 @@ def _score(lines: list[dict[str, Any]], events: list[Any], truth: dict[str, Any]
     score.dry_off_expected, score.dry_off_found = len(want_dry), len(want_dry & dry)
     score.lot_expected, score.lot_found = len(want_lots), len(want_lots & lots)
     score.commands_invented = len(dry - want_dry) + len(lots - want_lots)
+
+    want_notes = {brinco: fold(line["nota"]) for brinco, line in expected.items() if line.get("nota")}
+    found_notes: set[str] = set()
+    for event in events:
+        if event.event_type != "note":
+            continue
+        brinco, text = _brinco(event.brinco), fold(str(event.fields.get("texto") or ""))
+        want = want_notes.get(brinco) if brinco else None
+        if want is not None and want in text and brinco not in found_notes:
+            found_notes.add(brinco)
+        else:
+            score.notes_extra += 1
+            score.extra_notes.append((brinco, str(event.fields.get("texto") or "")))
+    score.notes_expected, score.notes_found = len(want_notes), len(found_notes)
     return score
 
 
@@ -262,6 +287,7 @@ class _Total:
     right: int = 0
     missing: int = 0
     wrong: int = 0
+    notes_extra: int = 0
     recordings: int = 0
     snr: list[float] = field(default_factory=list)
 
@@ -270,6 +296,7 @@ class _Total:
         self.right += score.right
         self.missing += len(score.missing)
         self.wrong += len(score.wrong)
+        self.notes_extra += score.notes_extra
         self.recordings += 1
         if snr is not None and math.isfinite(snr):
             self.snr.append(snr)
@@ -290,13 +317,16 @@ def _report(name: str, label: str, score: CowScore, seconds: float) -> str:
         f"   nome {score.name_right}/{score.found} · manhã e tarde {score.milkings_right}/{score.found}"
         " (das achadas)",
         f"   secar {score.dry_off_found}/{score.dry_off_expected} · lote "
-        f"{score.lot_found}/{score.lot_expected} · ordens a mais {score.commands_invented}",
+        f"{score.lot_found}/{score.lot_expected} · observações "
+        f"{score.notes_found}/{score.notes_expected} · ordens a mais {score.commands_invented}"
+        f" · observações a mais {score.notes_extra}",
     ]
     rows += [f"   - falta: {brinco}" for brinco in score.missing]
     rows += [
         f"   - errada: {w.brinco} {w.field} (esperado {w.expected!r}, lido {w.read!r})"
         for w in score.wrong
     ]
+    rows += [f"   - observação a mais: {brinco or 'sem brinco'}: {texto!r}" for brinco, texto in score.extra_notes]
     return "\n".join(rows)
 
 
@@ -425,7 +455,8 @@ def main(
             snr = sum(total.snr) / len(total.snr) if total.snr else None
             print(
                 f"   {_level_label(level, snr):<28} {total.right}/{total.expected} certas · "
-                f"{total.missing} faltando · {total.wrong} erradas"
+                f"{total.missing} faltando · {total.wrong} erradas · "
+                f"{total.notes_extra} observações a mais"
             )
         if levels:
             print("   (ruído sintético somado à gravação: não é o curral)")

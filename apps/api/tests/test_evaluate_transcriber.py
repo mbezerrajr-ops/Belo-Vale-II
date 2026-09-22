@@ -75,6 +75,24 @@ class TestCowByCow:
 
         assert _nota(GRAVACAO_1, gabarito).commands_invented == 2
 
+    def test_an_expected_note_is_found(self) -> None:
+        """ "Secar daqui a 7 meses": a ordem vira secagem, e o prazo vira
+        observação — é o que quem revisa precisa ler."""
+        texto = "649, redonda\nProduziu 5 litros\nDeve secar ela daqui a 7 meses"
+        gabarito = {"linhas": [{"brinco": "649", "total": "5", "secar": True, "nota": "7 meses"}]}
+
+        nota = _nota(texto, gabarito)
+
+        assert (nota.notes_expected, nota.notes_found, nota.notes_extra) == (1, 1, 0)
+
+    def test_a_note_nobody_said_is_counted(self) -> None:
+        """Observação que sobra do tradutor é uma proposta inútil na caixa,
+        esperando alguém rejeitar."""
+        texto = "Vaca 406 produziu 12 litros\nPequina\nVaca 701 produziu 6,5 litros"
+        gabarito = {"linhas": [{"brinco": "406", "total": "12"}, {"brinco": "701", "total": "6,5"}]}
+
+        assert _nota(texto, gabarito).notes_extra == 1
+
     def test_a_lot_change_is_compared_too(self) -> None:
         texto = "Vaca 462 sabiá produziu 10 mais 5 litros, 15, deve ir para o primeiro lote."
         gabarito = {"linhas": [{"brinco": "462", "total": "15", "lote": "1"}]}
