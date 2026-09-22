@@ -27,6 +27,7 @@ from app.services.approval import (
 )
 from app.services.ingestion import (
     DuplicateImageError,
+    FarmNotFoundError,
     ImageTooLargeError,
     ImportAlreadyProcessingError,
     ImportNotFoundError,
@@ -105,6 +106,13 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=status.HTTP_403_FORBIDDEN,
             content={"code": "reprocess_needs_reviewer"},
+        )
+
+    @app.exception_handler(FarmNotFoundError)
+    async def handle_farm_not_found(request: Request, exc: FarmNotFoundError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"code": "farm_not_found"},
         )
 
     @app.exception_handler(ImportNotFoundError)

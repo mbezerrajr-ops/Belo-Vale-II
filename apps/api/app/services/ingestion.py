@@ -40,6 +40,10 @@ class ImportNotFoundError(IngestionError):
     pass
 
 
+class FarmNotFoundError(IngestionError):
+    """O envio pediu uma fazenda que não é a do servidor."""
+
+
 class ImportAlreadyProcessingError(IngestionError):
     pass
 

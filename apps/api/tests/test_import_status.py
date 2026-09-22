@@ -292,6 +292,38 @@ class TestTryingAgain:
         assert api.post(f"/api/imports/{import_id}/reprocess", headers=auth(dono)).status_code == 202
 
 
+class TestTheFarmOfTheSending:
+    """A fazenda é a do servidor, como em toda a aplicação monofazenda. O
+    envio recebia o `farm_id` do navegador e confiava nele."""
+
+    def test_a_sending_to_another_farm_is_refused(self, envio, api) -> None:  # noqa: F811
+        _, vaqueiro = make_user("operator", "outro.vaqueiro@belovale")
+
+        resposta = api.post(
+            "/api/imports",
+            data={"farm_id": str(uuid4())},
+            files={"file": ("ordenha.m4a", _gravacao(), "application/octet-stream")},
+            headers=auth(vaqueiro),
+        )
+
+        assert resposta.status_code == 404
+        assert resposta.json()["code"] == "farm_not_found"
+        assert one("SELECT count(*) FROM imports")[0][0] == 0
+
+    def test_without_the_field_the_farm_of_the_server_is_used(self, envio, api) -> None:  # noqa: F811
+        _, _, como_esta = envio
+        _, vaqueiro = make_user("operator", "outro.vaqueiro@belovale")
+
+        resposta = api.post(
+            "/api/imports",
+            files={"file": ("ordenha.m4a", _gravacao(), "application/octet-stream")},
+            headers=auth(vaqueiro),
+        )
+
+        assert resposta.status_code == 202
+        assert como_esta(resposta.json()["id"]).json()["status"] == "pending"
+
+
 class TestWhoMayAsk:
     def test_an_unknown_sending_is_not_found(self, envio) -> None:
         _, _, como_esta = envio

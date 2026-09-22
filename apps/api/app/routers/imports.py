@@ -11,7 +11,12 @@ from app.core.security import has_minimum_role, require_minimum_role
 from app.db.models import Farm, User
 from app.db.session import get_db_session
 from app.routers.registry import resolve_current_farm
-from app.services.ingestion import ImportStatus, create_import, reprocess_import
+from app.services.ingestion import (
+    FarmNotFoundError,
+    ImportStatus,
+    create_import,
+    reprocess_import,
+)
 from app.services.media_reading import reading_status
 from app.services.normalization import normalize_date
 from app.services.storage import ObjectStorage, get_object_storage
@@ -31,16 +36,21 @@ async def upload_import(
     settings: Annotated[Settings, Depends(get_settings)],
     dispatcher: Annotated[ExtractionDispatcher, Depends(get_extraction_dispatcher)],
     user: Annotated[User, Depends(require_minimum_role("operator"))],
-    farm_id: Annotated[UUID, Form()],
+    farm: Annotated[Farm, Depends(resolve_current_farm)],
     file: Annotated[UploadFile, File()],
+    farm_id: Annotated[UUID | None, Form()] = None,
     declared_lot: Annotated[str | None, Form()] = None,
     declared_period: Annotated[str | None, Form()] = None,
 ) -> dict[str, str]:
+    # A fazenda é a do servidor. O campo que o navegador manda só é aceito se
+    # for ela: antes o envio confiava nele.
+    if farm_id is not None and farm_id != farm.id:
+        raise FarmNotFoundError(str(farm_id))
     content = await file.read()
     created = await create_import(
         session,
         storage,
-        farm_id=farm_id,
+        farm_id=farm.id,
         content=content,
         max_bytes=settings.max_upload_bytes,
         declared_lot=declared_lot,
