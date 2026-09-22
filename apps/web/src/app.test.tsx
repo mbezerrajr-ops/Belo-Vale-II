@@ -174,6 +174,43 @@ describe("App", () => {
     expect(await screen.findByRole("button", { name: /entrar/i })).toBeInTheDocument();
   });
 
+  describe("teclado e leitor de tela", () => {
+    it("trocar de tela leva o foco ao título da tela nova", async () => {
+      signedIn({ role: "admin", email: "dono@belovale" });
+      api.listSupplies.mockResolvedValue([]);
+      render(<App />);
+      const nav = await screen.findByRole("navigation", { name: "Áreas" });
+
+      fireEvent.click(within(nav).getByRole("button", { name: /^produção/i }));
+
+      const titulo = await screen.findByRole("heading", { name: /produção do dia/i });
+      await waitFor(() => expect(document.activeElement).toBe(titulo));
+    });
+
+    it("abrir o Mais põe o foco dentro dele; Esc devolve ao botão", async () => {
+      signedIn({ role: "admin", email: "dono@belovale" });
+      render(<App />);
+      const mais = await screen.findByRole("button", { name: /^mais$/i });
+
+      fireEvent.click(mais);
+      const painel = screen.getByRole("group", { name: /mais áreas/i });
+      expect(painel.contains(document.activeElement)).toBe(true);
+
+      fireEvent.keyDown(window, { key: "Escape" });
+      expect(document.activeElement).toBe(mais);
+    });
+
+    it("tem link para pular direto ao conteúdo e o nome do app como título", async () => {
+      signedIn({ role: "operator" });
+      render(<App />);
+      await screen.findByRole("heading", { name: /produção do dia/i });
+
+      expect(screen.getByRole("link", { name: /pular para o conteúdo/i })).toHaveAttribute("href", "#conteudo");
+      expect(screen.getByRole("heading", { level: 1, name: /belo vale ii/i })).toBeInTheDocument();
+      expect(screen.getByRole("main")).toHaveAttribute("id", "conteudo");
+    });
+  });
+
   describe("recarregar sem sinal", () => {
     it("abre com quem já estava, em vez de mandar para o login", async () => {
       // Antes, sem sinal, recarregar apagava o token ainda válido: quem

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { Icons } from "../ui/Brand";
+import { closeAndReturn, usePanelFocus } from "../ui/usePanelFocus";
 import { brDate } from "../ui/dates";
 import type { OutboxItem } from "./outbox";
 import { useOutbox } from "./OutboxContext";
@@ -50,16 +51,8 @@ export function OutboxButton(): JSX.Element | null {
   const queue = useOutbox();
   const [open, setOpen] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    panel.current?.focus();
-    const close = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [open]);
+  const chip = useRef<HTMLButtonElement>(null);
+  usePanelFocus(open, panel, chip, () => setOpen(false), "panel");
 
   if (queue === null || queue.pending.length === 0) return null;
   const refused = queue.pending.filter((item) => item.error).length;
@@ -69,6 +62,7 @@ export function OutboxButton(): JSX.Element | null {
     <>
       <button
         type="button"
+        ref={chip}
         className={refused > 0 ? "outbox-chip has-refused" : "outbox-chip"}
         aria-expanded={open}
         aria-controls="guardados"
@@ -81,7 +75,11 @@ export function OutboxButton(): JSX.Element | null {
       </button>
       {open && (
         <>
-          <div className="more-backdrop" aria-hidden="true" onClick={() => setOpen(false)} />
+          <div
+            className="more-backdrop"
+            aria-hidden="true"
+            onClick={() => closeAndReturn(() => setOpen(false), chip)}
+          />
           <div
             className="outbox-panel"
             id="guardados"
@@ -125,7 +123,7 @@ export function OutboxButton(): JSX.Element | null {
               <button type="button" onClick={queue.flushNow} disabled={count === refused}>
                 <Icons.atualizar /> Enviar agora
               </button>
-              <button type="button" className="secondary" onClick={() => setOpen(false)}>
+              <button type="button" className="secondary" onClick={() => closeAndReturn(() => setOpen(false), chip)}>
                 Fechar
               </button>
             </div>

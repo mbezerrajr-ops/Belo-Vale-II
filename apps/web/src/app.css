@@ -4433,7 +4433,8 @@ h1.wordmark {
    outros botões e alvo de dedo; o nome do arquivo escolhido ao lado. */
 input[type="file"] {
   min-height: 56px;
-  font-size: 0.95rem;
+  /* 16 px: abaixo disso o iPhone amplia a tela ao tocar no campo. */
+  font-size: 16px;
   color: var(--ink-2);
   cursor: pointer;
 }
@@ -4684,4 +4685,36 @@ input[type="file"]:hover::file-selector-button {
     padding-inline: 12px;
     background: var(--surface);
   }
+}
+
+/* ---------- teclado e leitor de tela ---------- */
+
+/* Aparece só com o foco do teclado: pula a barra de áreas. */
+.skip-link {
+  position: absolute;
+  z-index: 50;
+  left: 12px;
+  top: -80px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--brand);
+  color: var(--on-brand);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: calc(8px + env(safe-area-inset-top, 0px));
+}
+
+/* Foco levado pelo app (título da tela, área, diálogo): sem anel, porque
+   não foi a pessoa que chegou ali pelo teclado — o leitor de tela lê igual. */
+main.area:focus,
+h2[tabindex="-1"]:focus,
+[role="dialog"][tabindex="-1"]:focus {
+  outline: none;
+}
+
+.topbar h1.wordmark {
+  font-size: inherit;
 }

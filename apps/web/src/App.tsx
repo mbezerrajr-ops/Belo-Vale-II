@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   enterReading,
@@ -40,6 +40,7 @@ import { ChangePasswordForm } from "./features/users/ChangePasswordForm";
 import { UsersPage } from "./features/users/UsersPage";
 import { Cows, Hills, Icons, LogoMark, type IconName } from "./ui/Brand";
 import { PageHeader } from "./ui/PageHeader";
+import { closeAndReturn, usePanelFocus } from "./ui/usePanelFocus";
 import { useRoute, type AreaRoute } from "./router";
 import { deviceOutbox } from "./offline/outbox";
 import { OutboxProvider, useOutbox } from "./offline/OutboxContext";
@@ -465,14 +466,9 @@ function AppShell({
   // No celular, cabem quatro áreas na barra de baixo e um "Mais" com o
   // resto; no computador, a barra mostra todas.
   const [moreOpen, setMoreOpen] = useState(false);
-  useEffect(() => {
-    if (!moreOpen) return;
-    const close = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") setMoreOpen(false);
-    };
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [moreOpen]);
+  const moreButton = useRef<HTMLButtonElement>(null);
+  const moreSheet = useRef<HTMLDivElement>(null);
+  usePanelFocus(moreOpen, moreSheet, moreButton, () => setMoreOpen(false));
 
   const areas: Area[] = [
     "painel",
@@ -499,6 +495,29 @@ function AppShell({
   }, [allowed, homeArea, replace]);
   const setArea = (name: Area): void => navigate({ area: name as AreaRoute, animalId: null });
 
+  // Trocar de tela leva o foco ao título da tela nova. Sem isto o foco
+  // ficava no botão da barra, e quem usa leitor de tela não sabia que a
+  // página tinha mudado. A primeira abertura não rouba o foco.
+  const content = useRef<HTMLElement>(null);
+  const place = `${area}/${openAnimalId ?? ""}`;
+  const lastPlace = useRef(place);
+  // A ficha chega depois do endereço: até o título dela existir, o foco
+  // fica na área, e passa ao título quando ele aparece.
+  const wantsHeading = useRef(false);
+  useEffect(() => {
+    if (lastPlace.current !== place) {
+      lastPlace.current = place;
+      wantsHeading.current = true;
+      content.current?.focus({ preventScroll: true });
+    }
+    if (!wantsHeading.current) return;
+    const heading = content.current?.querySelector<HTMLElement>("h2");
+    if (!heading) return;
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+    wantsHeading.current = false;
+  }, [place, animal]);
+
   useEffect(() => {
     const titulo = area === "animais" && animal && openAnimalId ? animal.name ?? animal.brinco : AREA_LABEL[area];
     document.title = titulo ? `${titulo} · Belo Vale II` : "Belo Vale II";
@@ -518,15 +537,19 @@ function AppShell({
   const barAreas = areas.filter((name) => name !== "minha-conta");
 
   return (
-    <main className="shell">
+    <div className="shell">
+      {/* Teclado: pula os botões da barra direto para a tela. */}
+      <a className="skip-link" href="#conteudo">
+        Pular para o conteúdo
+      </a>
       <header className="topbar">
-        <span className="wordmark">
+        <h1 className="wordmark">
           <LogoMark />
           <span>
             <strong>Belo Vale II</strong>
             <small>Gestão do rebanho leiteiro</small>
           </span>
-        </span>
+        </h1>
         <div className="who">
           <OutboxButton />
           <button
@@ -577,6 +600,7 @@ function AppShell({
           <button
             type="button"
             className="nav-more"
+            ref={moreButton}
             aria-expanded={moreOpen}
             aria-controls="mais-areas"
             aria-current={moreAreas.includes(area)}
@@ -590,8 +614,12 @@ function AppShell({
 
       {moreOpen && (
         <>
-          <div className="more-backdrop" aria-hidden="true" onClick={() => setMoreOpen(false)} />
-          <div className="more-sheet" id="mais-areas" role="group" aria-label="Mais áreas">
+          <div
+            className="more-backdrop"
+            aria-hidden="true"
+            onClick={() => closeAndReturn(() => setMoreOpen(false), moreButton)}
+          />
+          <div className="more-sheet" id="mais-areas" role="group" aria-label="Mais áreas" ref={moreSheet}>
             {moreAreas.map((name) => {
               const Icon = Icons[name as IconName];
               return (
@@ -615,7 +643,7 @@ function AppShell({
 
       {farmError && <p role="alert">{farmError}</p>}
 
-      <div className="area" key={area}>
+      <main className="area" id="conteudo" tabIndex={-1} key={area} ref={content}>
         {area === "painel" && <HerdDashboard token={token} />}
 
         {area === "producao" && <ProductionPage token={token} canCorrect={canEdit} />}
@@ -729,7 +757,7 @@ function AppShell({
             <ChangePasswordForm token={token} />
           </>
         )}
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

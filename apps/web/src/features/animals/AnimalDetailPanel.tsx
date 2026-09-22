@@ -19,6 +19,7 @@ import {
   type MergePreview,
 } from "../../api/types";
 import { Icons } from "../../ui/Brand";
+import { usePanelFocus } from "../../ui/usePanelFocus";
 import { brDate, farmToday } from "../../ui/dates";
 import { MergeFichas } from "./MergeFichas";
 import { ProductionHistory } from "./ProductionHistory";
@@ -128,6 +129,9 @@ export function AnimalDetailPanel({
   >("none");
   // As ações raras (tirar brinco, juntar, baixa) ficam atrás de "Mais ações".
   const [moreActions, setMoreActions] = useState(false);
+  const moreToggle = useRef<HTMLButtonElement>(null);
+  const moreGroup = useRef<HTMLDivElement>(null);
+  usePanelFocus(moreActions, moreGroup, moreToggle, () => setMoreActions(false));
   const open = (next: typeof panel): void => {
     setPanel(next);
     setMoreActions(false);
@@ -354,6 +358,7 @@ export function AnimalDetailPanel({
             <button
               type="button"
               className="secondary actions-toggle"
+              ref={moreToggle}
               aria-expanded={moreActions}
               aria-controls="ficha-mais-acoes"
               onClick={() => setMoreActions((current) => !current)}
@@ -362,7 +367,13 @@ export function AnimalDetailPanel({
             </button>
           </div>
           {moreActions && (
-            <div className="actions actions-more" id="ficha-mais-acoes" role="group" aria-label="Mais ações">
+            <div
+              className="actions actions-more"
+              id="ficha-mais-acoes"
+              role="group"
+              aria-label="Mais ações"
+              ref={moreGroup}
+            >
               {animal.brinco && (
                 <button type="button" className="secondary" onClick={() => open("tirar-brinco")}>
                   Tirar o brinco

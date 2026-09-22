@@ -259,6 +259,18 @@ describe("AnimalDetailPanel — vincular brinco", () => {
     expect(screen.getByLabelText(/motivo da baixa/i)).toBeInTheDocument();
   });
 
+  it("Mais ações: o foco entra no grupo e Esc devolve ao botão", () => {
+    render(<AnimalDetailPanel token={TOKEN} animal={animal()} canEdit onChanged={vi.fn()} />);
+    const more = screen.getByRole("button", { name: /mais ações/i });
+
+    fireEvent.click(more);
+    expect(screen.getByRole("group", { name: /mais ações/i }).contains(document.activeElement)).toBe(true);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("group", { name: /mais ações/i })).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(more);
+  });
+
   it("abrir um formulário leva o cursor ao primeiro campo", () => {
     // No celular o formulário abre abaixo da dobra: sem isto, tocar em
     // "Mudar de lote" parecia não fazer nada.

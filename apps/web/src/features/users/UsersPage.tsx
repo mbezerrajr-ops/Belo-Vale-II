@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { createUser, listUsers, resetUserPassword, updateUser } from "../../api/client";
 import type { PasswordReset, Role, UserAccount, UserPage } from "../../api/types";
@@ -94,6 +94,16 @@ export function UsersPage({
     void reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // A confirmação aparece acima da lista: o foco vai até ela, para quem usa
+  // teclado ou leitor de tela saber que precisa responder.
+  const confirmBox = useRef<HTMLDivElement>(null);
+  const confirmingId = confirmReset?.id ?? null;
+  useEffect(() => {
+    if (confirmingId === null) return;
+    confirmBox.current?.focus({ preventScroll: true });
+    confirmBox.current?.scrollIntoView?.({ block: "nearest" });
+  }, [confirmingId]);
 
   // A lista primeiro: é o que se consulta. Criar conta é de vez em quando.
   const [creating, setCreating] = useState(false);
@@ -222,7 +232,7 @@ export function UsersPage({
       {notice && <p className="notice">{notice}</p>}
 
       {confirmReset !== null && (
-        <div className="confirm-box" role="dialog" aria-label="Redefinir senha">
+        <div className="confirm-box" role="dialog" aria-label="Redefinir senha" tabIndex={-1} ref={confirmBox}>
           <p>
             Gerar uma senha provisória para <strong>{confirmReset.email}</strong>? As
             sessões abertas dessa conta serão encerradas, e a pessoa terá de escolher
