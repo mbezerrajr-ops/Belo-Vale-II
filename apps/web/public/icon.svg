@@ -4,9 +4,10 @@
       <stop offset="0" stop-color="#3f8a5f"/>
       <stop offset="1" stop-color="#1f4d3c"/>
     </linearGradient>
+    <clipPath id="c"><circle cx="32" cy="32" r="31"/></clipPath>
   </defs>
   <circle cx="32" cy="32" r="31" fill="url(#g)"/>
-  <path d="M4 44c9-10 18-12 28-6s17 6 28 0v18H4z" fill="#f4efe4" opacity="0.18"/>
+  <path d="M0 44c10-10 19-12 32-6s19 6 32 0v26H0z" fill="#f4efe4" opacity="0.18" clip-path="url(#c)"/>
   <path d="M20 22c-4-3-8-3-9 1 2 3 5 4 8 4M44 22c4-3 8-3 9 1-2 3-5 4-8 4" fill="none" stroke="#fbf8f1" stroke-width="3" stroke-linecap="round"/>
   <path d="M22 25c0-6 4-9 10-9s10 3 10 9v9c0 6-4 10-10 10s-10-4-10-10z" fill="#fbf8f1"/>
   <ellipse cx="32" cy="38" rx="6.5" ry="4.2" fill="#dd7436" opacity="0.9"/>
