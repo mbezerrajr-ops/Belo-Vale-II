@@ -58,6 +58,19 @@ class EventExtractor(Protocol):
     def extract(self, content: bytes, *, kind: str) -> EventExtraction: ...
 
 
+class ReaderUnavailableError(RuntimeError):
+    """O leitor (de foto ou de fala) não respondeu, ou demorou demais.
+
+    O arquivo está bom e continua guardado: a leitura pode ser tentada de
+    novo depois, sem ninguém fotografar ou gravar outra vez.
+    """
+
+
+class UnreadableContentError(ValueError):
+    """O leitor respondeu, mas o arquivo não tem o que ler: folha ilegível,
+    gravação sem fala. O remédio é mandar outro."""
+
+
 class ExtractionFormatError(ValueError):
     """Extração em JSON com formato inválido. A mensagem diz onde."""
 

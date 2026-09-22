@@ -14,13 +14,17 @@ qualquer passo que possa falhar depois — é a prova do que foi lido.
 A leitura é assíncrona de propósito: se o modelo estiver fora do ar, a
 leitura fica `failed`, o arquivo continua guardado, e o reprocessar que já
 existe tenta de novo. O app segue funcionando sem ele.
+
+A leitura que falha guarda o motivo, e quem enviou pergunta como está
+(`reading_status`): gravação sem fala se resolve gravando de novo, ainda com
+as vacas ali; leitor desligado, não — o arquivo está guardado.
 """
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -29,7 +33,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.farm_clock import FARM_TZ, farm_today
 from app.db.models import ExtractionRun, Import, MediaAsset, User
-from app.services.event_extraction import EventExtractor
+from app.services.event_extraction import (
+    EventExtractor,
+    ReaderUnavailableError,
+    UnreadableContentError,
+)
 from app.services.event_proposals import create_proposals
 from app.services.media_sniffing import reading_kind
 from app.services.storage import ObjectStorage
@@ -42,6 +50,75 @@ _LABELS = {"photo": "Foto", "audio": "Áudio"}
 
 class MediaReadingError(Exception):
     """O arquivo não pôde virar proposta. A mensagem explica o que faltou."""
+
+
+class UnknownSenderError(MediaReadingError):
+    """Ninguém responde pela leitura: quem enviou não existe mais, ou está
+    desativado."""
+
+
+def failure_code(error: BaseException) -> str:
+    """O motivo guardado na leitura que falhou (ver `FAILURE_CODES`).
+
+    Sai do tipo do erro, e os leitores de foto e de fala falam a mesma língua
+    (`app.services.event_extraction`): este módulo não precisa saber qual
+    leitor existe.
+    """
+    if isinstance(error, ReaderUnavailableError):
+        return "reader_unavailable"
+    if isinstance(error, UnreadableContentError):
+        return "unreadable"
+    if isinstance(error, UnknownSenderError):
+        return "sender_unknown"
+    return "internal"
+
+
+@dataclass(frozen=True)
+class ReadingStatus:
+    """Como está a leitura de um arquivo enviado, para quem enviou."""
+
+    import_id: UUID
+    kind: str
+    #: `pending`, `processing`, `extracted` ou `failed`.
+    status: str
+    #: Quantas propostas saíram — só quando a leitura terminou bem.
+    proposals: int | None
+    #: O motivo — só quando falhou.
+    failure: str | None
+
+
+async def reading_status(
+    session: AsyncSession, *, import_id: UUID, farm_id: UUID
+) -> ReadingStatus | None:
+    """A leitura mais recente do arquivo, ou `None` se o envio não existe
+    nesta fazenda. Depois de um "ler de novo", vale a leitura nova."""
+    import_row = await session.get(Import, import_id)
+    if import_row is None or import_row.farm_id != farm_id:
+        return None
+    media = await session.scalar(select(MediaAsset).where(MediaAsset.import_id == import_id))
+    if media is None:
+        return None
+    run = await session.scalar(
+        select(ExtractionRun)
+        .where(ExtractionRun.media_asset_id == media.id)
+        .order_by(ExtractionRun.created_at.desc(), ExtractionRun.id.desc())
+        .limit(1)
+    )
+    if run is None:
+        return None
+    proposals = None
+    if run.status == "extracted":
+        events = (run.raw_response or {}).get("events")
+        proposals = len(events) if isinstance(events, list) else None
+    # Leitura que falhou antes de existir o motivo: sem ele, "internal".
+    failure = (run.failure_code or "internal") if run.status == "failed" else None
+    return ReadingStatus(
+        import_id=import_id,
+        kind=reading_kind(media.media_type),
+        status=run.status,
+        proposals=proposals,
+        failure=failure,
+    )
 
 
 async def read_upload_into_proposals(
@@ -95,8 +172,8 @@ async def read_media_into_proposals(
         user = await _sender(session, media)
         content = storage.load(media.object_key)
         extraction = reader.extract(content, kind=kind)
-    except Exception:
-        await _mark_failed(session, run)
+    except Exception as error:
+        await _mark_failed(session, run, error)
         logger.exception("leitura falhou kind=%s extraction_run_id=%s", kind, run.id)
         raise
 
@@ -125,11 +202,11 @@ async def read_media_into_proposals(
             media_asset_id=media.id,
         )
         await session.commit()
-    except Exception:
+    except Exception as error:
         # Descarta propostas inseridas pela metade; `raw_response` já foi
         # gravado acima e não é tocado por este rollback.
         await session.rollback()
-        await _mark_failed(session, run)
+        await _mark_failed(session, run, error)
         logger.exception("propostas falharam kind=%s extraction_run_id=%s", kind, run.id)
         raise
 
@@ -152,7 +229,7 @@ async def _sender(session: AsyncSession, media: MediaAsset) -> User:
         else None
     )
     if user is None:
-        raise MediaReadingError(
+        raise UnknownSenderError(
             "Não foi possível identificar quem enviou o arquivo; a leitura não foi feita."
         )
     return user
@@ -177,7 +254,8 @@ def _farm_date(enviado: datetime | None):
     return farm_today() if enviado is None else _farm_time(enviado).date()
 
 
-async def _mark_failed(session: AsyncSession, run: ExtractionRun) -> None:
+async def _mark_failed(session: AsyncSession, run: ExtractionRun, error: BaseException) -> None:
     run.status = "failed"
+    run.failure_code = failure_code(error)
     run.completed_at = datetime.now(timezone.utc)
     await session.commit()

@@ -20,6 +20,7 @@ from collections.abc import Callable
 from typing import Protocol
 
 from app.core.local_url import ensure_local_url
+from app.services.event_extraction import ReaderUnavailableError, UnreadableContentError
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 SKIP_GAP_SECONDS = 8.0
 
 
-class TranscriberUnavailable(RuntimeError):
+class TranscriberUnavailable(ReaderUnavailableError):
     """O transcritor local não respondeu (desligado, sem modelo)."""
 
 
@@ -36,7 +37,7 @@ class TranscriberTimeout(TranscriberUnavailable):
     """A transcrição passou do tempo."""
 
 
-class TranscriberFormatError(ValueError):
+class TranscriberFormatError(UnreadableContentError):
     """O transcritor respondeu algo que não é transcrição, ou a gravação não
     tem fala que se possa transcrever."""
 

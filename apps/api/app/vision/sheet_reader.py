@@ -35,7 +35,11 @@ from urllib.parse import urlsplit
 from PIL import Image
 
 from app.core.local_url import ensure_local_url
-from app.services.event_extraction import EventExtraction
+from app.services.event_extraction import (
+    EventExtraction,
+    ReaderUnavailableError,
+    UnreadableContentError,
+)
 from app.services.image_preprocessing import PreprocessedImage
 from app.services.production_files import parse_number_br
 from app.services.reading_to_events import (
@@ -89,7 +93,7 @@ MARGIN_TIMEOUT = 120.0
 DEFAULT_TIMEOUT = 600.0
 
 
-class ReaderUnavailable(RuntimeError):
+class ReaderUnavailable(ReaderUnavailableError):
     """O leitor local não respondeu (desligado, sem modelo, sem memória)."""
 
 
@@ -97,7 +101,7 @@ class ReaderTimeout(ReaderUnavailable):
     """A leitura passou do tempo: folha longa demais para uma resposta só."""
 
 
-class ReaderFormatError(ValueError):
+class ReaderFormatError(UnreadableContentError):
     """O leitor respondeu algo fora do esquema da transcrição."""
 
 
