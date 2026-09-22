@@ -259,6 +259,16 @@ describe("AnimalDetailPanel — vincular brinco", () => {
     expect(screen.getByLabelText(/motivo da baixa/i)).toBeInTheDocument();
   });
 
+  it("abrir um formulário leva o cursor ao primeiro campo", () => {
+    // No celular o formulário abre abaixo da dobra: sem isto, tocar em
+    // "Mudar de lote" parecia não fazer nada.
+    render(<AnimalDetailPanel token={TOKEN} animal={animal()} canEdit onChanged={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /mudar de lote/i }));
+
+    expect(document.activeElement).toBe(screen.getByLabelText(/novo lote/i));
+  });
+
   it("exige evidência antes de enviar", async () => {
     const link = vi.fn();
 

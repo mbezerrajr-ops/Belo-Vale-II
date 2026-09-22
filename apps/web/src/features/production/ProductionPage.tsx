@@ -470,7 +470,11 @@ export function ProductionPage({
           </div>
         }
       >
-        Cada valor é salvo ao sair do campo; Enter passa para a próxima vaca.
+        {/* A frase fala do modo escolhido: "Enter passa para a próxima vaca"
+            não diz nada a quem está importando uma planilha. */}
+        {how === "digitar"
+          ? "Cada valor é salvo ao sair do campo; Enter passa para a próxima vaca."
+          : "Planilha (CSV ou XLSX) ou PDF com o brinco na primeira coluna e os litros. Nada é gravado antes da prévia."}
       </PageHeader>
 
       {how === "importar" && (

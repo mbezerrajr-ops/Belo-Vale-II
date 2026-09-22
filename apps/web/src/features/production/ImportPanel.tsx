@@ -166,11 +166,6 @@ export function ImportPanel({
 
   return (
     <section className="import-panel">
-      <h3>Importar arquivo da coleta</h3>
-      <p className="muted">
-        Planilha (CSV ou XLSX) ou PDF com texto, com o brinco na primeira coluna e os
-        litros de cada vaca. Nada é gravado antes de você ver a prévia.
-      </p>
 
       <div className="import-controls">
         <div>

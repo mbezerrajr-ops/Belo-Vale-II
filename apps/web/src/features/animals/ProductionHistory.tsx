@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { correctReading, getAnimalProduction, voidReading } from "../../api/client";
 import type { ProductionHistoryEntry, Provenance, Reading } from "../../api/types";
@@ -94,6 +94,15 @@ export function ProductionHistory({
   const [entries, setEntries] = useState<ProductionHistoryEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
+  // Abrir a correção leva a tela até o formulário e o cursor ao campo.
+  const fixForm = useRef<HTMLFormElement>(null);
+  const editingKey = editing ? `${editing.id}-${editing.mode}` : null;
+  useEffect(() => {
+    if (editingKey === null) return;
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    fixForm.current?.scrollIntoView?.({ behavior: still ? "auto" : "smooth", block: "nearest" });
+    fixForm.current?.querySelector<HTMLElement>("input")?.focus({ preventScroll: true });
+  }, [editingKey]);
   const [busy, setBusy] = useState(false);
 
   async function reload(): Promise<void> {
@@ -195,7 +204,7 @@ export function ProductionHistory({
                 {active.map((entry) => (
                   <tr key={entry.id}>
                     <td>{brDate(entry.measured_on)}</td>
-                    <td className="num">{entry.producao === null ? "—" : liters(entry.producao)}</td>
+                    <td className="num">{entry.producao === null ? "—" : `${liters(entry.producao)} L`}</td>
                     <td>
                       {origin(entry)}
                       {entry.reason && <small className="import-note">Motivo: {entry.reason}</small>}
@@ -241,6 +250,7 @@ export function ProductionHistory({
       {editing !== null && editingEntry && (
         <form
           className="row-fix"
+          ref={fixForm}
           onSubmit={(event) => {
             event.preventDefault();
             void submit();
