@@ -5,6 +5,7 @@ import { SendUpload, type SendUploadProps, type Variant } from "./SendUpload";
 const FOTO: Variant = {
   arquivo: "foto",
   id: "foto-folha",
+  icone: "camera",
   abrir: "Enviar foto",
   titulo: "Enviar foto da folha",
   rotulo: "Foto da folha",

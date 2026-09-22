@@ -106,6 +106,8 @@ interface StatTileProps {
   hint?: string;
   color?: string;
   index?: number;
+  /** "hero": o número principal da tela, maior. */
+  size?: "hero";
 }
 
 export function StatTile({
@@ -115,12 +117,13 @@ export function StatTile({
   hint,
   color,
   index = 0,
+  size,
 }: StatTileProps): JSX.Element {
   const animated = useCountUp(value ?? 0);
   const shown = value === null ? "—" : format(animated);
   return (
     <div
-      className="kpi"
+      className={size === "hero" ? "kpi kpi-hero" : "kpi"}
       style={{ "--i": index, "--kpi-color": color } as CSSProperties}
     >
       <span>{label}</span>

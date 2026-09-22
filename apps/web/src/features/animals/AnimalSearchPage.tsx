@@ -4,6 +4,7 @@ import { createAnimal, searchAnimals } from "../../api/client";
 import { EXIT_REASON_LABEL, type Animal, type AnimalPage, type AnimalSearch } from "../../api/types";
 import { Icons } from "../../ui/Brand";
 import { brDate, farmToday } from "../../ui/dates";
+import { PageHeader } from "../../ui/PageHeader";
 
 /**
  * Busca de animais.
@@ -130,6 +131,9 @@ export function AnimalSearchPage({
     }
   }
 
+  // "Todos" marcado quando nenhum recorte nem busca está valendo.
+  const searching = Object.values(lastSearch).some((value) => value !== undefined);
+
   function handleSearch(): void {
     const trimmed = term.trim();
     if (!trimmed) {
@@ -162,8 +166,23 @@ export function AnimalSearchPage({
 
   return (
     <section className="animals">
-      <h2>Animais</h2>
-      <p className="muted">Digite o brinco ou o nome e abra a ficha do animal.</p>
+      <PageHeader
+        title="Animais"
+        actions={
+          canEdit && (
+            <button
+              type="button"
+              className="secondary"
+              aria-expanded={creating}
+              onClick={() => setCreating((open) => !open)}
+            >
+              <Icons.novo /> Cadastrar animal
+            </button>
+          )
+        }
+      >
+        Digite o brinco ou o nome e abra a ficha.
+      </PageHeader>
 
       <div className="search-row">
         <label htmlFor="animal-term">Brinco ou nome</label>
@@ -183,25 +202,33 @@ export function AnimalSearchPage({
         </button>
       </div>
 
-      <div className="search-shortcuts">
-        <button type="button" onClick={() => void run({ semBrinco: true })} disabled={busy}>
-          Sem brinco
-        </button>
-        <button type="button" onClick={() => void run({})} disabled={busy}>
+      {/* Recortes do rebanho, com o escolhido marcado: antes, os três e o
+          "Cadastrar" tinham a mesma cara e nada dizia o que estava na tela. */}
+      <div className="search-shortcuts" role="group" aria-label="Recorte do rebanho">
+        <button
+          type="button"
+          aria-pressed={!searching}
+          onClick={() => void run({})}
+          disabled={busy}
+        >
           Todos
         </button>
         <button
           type="button"
+          aria-pressed={lastSearch.semBrinco === true}
+          onClick={() => void run({ semBrinco: true })}
+          disabled={busy}
+        >
+          Sem brinco
+        </button>
+        <button
+          type="button"
+          aria-pressed={lastSearch.rebanho === "baixados"}
           onClick={() => void run({ rebanho: "baixados" })}
           disabled={busy}
         >
           Baixados
         </button>
-        {canEdit && (
-          <button type="button" onClick={() => setCreating((open) => !open)}>
-            Cadastrar animal
-          </button>
-        )}
       </div>
 
       {creating && canEdit && (

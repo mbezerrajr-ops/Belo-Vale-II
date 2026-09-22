@@ -15,6 +15,8 @@ import {
 } from "../../api/types";
 import { brDate, liters, farmToday } from "../../ui/dates";
 import { ImportPanel } from "./ImportPanel";
+import { Icons } from "../../ui/Brand";
+import { PageHeader } from "../../ui/PageHeader";
 
 /**
  * Lançamento de produção, vaca a vaca.
@@ -332,28 +334,29 @@ export function ProductionPage({
 
   return (
     <section className="production">
-      <h2>Produção do dia</h2>
-      <p className="muted">
-        Digite os litros de cada vaca ou importe o arquivo da coleta. Digitando, cada
-        valor é salvo sozinho ao sair do campo; Enter passa para a próxima.
-      </p>
-
-      <div className="search-shortcuts" role="group" aria-label="Como lançar">
-        <button
-          type="button"
-          aria-pressed={how === "digitar"}
-          onClick={() => setHow("digitar")}
-        >
-          Digitar
-        </button>
-        <button
-          type="button"
-          aria-pressed={how === "importar"}
-          onClick={() => setHow("importar")}
-        >
-          Importar arquivo
-        </button>
-      </div>
+      <PageHeader
+        title="Produção do dia"
+        actions={
+          <div className="segmented" role="group" aria-label="Como lançar">
+            <button
+              type="button"
+              aria-pressed={how === "digitar"}
+              onClick={() => setHow("digitar")}
+            >
+              Digitar
+            </button>
+            <button
+              type="button"
+              aria-pressed={how === "importar"}
+              onClick={() => setHow("importar")}
+            >
+              Importar arquivo
+            </button>
+          </div>
+        }
+      >
+        Cada valor é salvo ao sair do campo; Enter passa para a próxima vaca.
+      </PageHeader>
 
       {how === "importar" && (
         <ImportPanel
@@ -414,12 +417,14 @@ export function ProductionPage({
                 {brDate(day)}
               </span>
             </div>
+            {/* Coisa de véspera, não do lançamento: discreto, ao lado do total. */}
             <button
               type="button"
-              className="secondary prod-print"
+              className="link-btn prod-print"
+              aria-label="Imprimir folha em branco"
               onClick={() => setPrinting(true)}
             >
-              Imprimir folha em branco
+              <Icons.imprimir /> <span className="wide-only">Imprimir folha</span>
             </button>
             <div
               className="prod-progress"

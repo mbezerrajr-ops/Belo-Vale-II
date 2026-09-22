@@ -2,6 +2,8 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 import { createUser, listUsers, resetUserPassword, updateUser } from "../../api/client";
 import type { PasswordReset, Role, UserAccount, UserPage } from "../../api/types";
+import { Icons } from "../../ui/Brand";
+import { PageHeader } from "../../ui/PageHeader";
 
 /**
  * Gestão de contas, só para o dono.
@@ -93,6 +95,9 @@ export function UsersPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  // A lista primeiro: é o que se consulta. Criar conta é de vez em quando.
+  const [creating, setCreating] = useState(false);
+
   async function handleCreate(): Promise<void> {
     setBusy(true);
     setError(null);
@@ -102,6 +107,7 @@ export function UsersPage({
       setNotice(`Conta criada para ${created.email}.`);
       setEmail("");
       setPassword("");
+      setCreating(false);
       await reload();
     } catch (caught) {
       setError(errorMessage(caught));
@@ -150,52 +156,67 @@ export function UsersPage({
 
   return (
     <section className="users">
-      <h2>Contas</h2>
-      <p className="muted">Cada pessoa com a sua conta: é o que dá nome a cada alteração.</p>
-
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          void handleCreate();
-        }}
+      <PageHeader
+        title="Contas"
+        actions={
+          <button
+            type="button"
+            className="secondary"
+            aria-expanded={creating}
+            onClick={() => setCreating((open) => !open)}
+          >
+            <Icons.novo /> Nova conta
+          </button>
+        }
       >
-        <h3>Criar conta</h3>
-        <label htmlFor="user-email">E-mail</label>
-        <input
-          id="user-email"
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          autoComplete="off"
-          inputMode="email"
-        />
-        <label htmlFor="user-password">Senha</label>
-        <input
-          id="user-password"
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          autoComplete="new-password"
-        />
-        <p className="hint">
-          Senha inicial, com pelo menos 8 caracteres. A pessoa escolhe a própria
-          senha no primeiro acesso — esta serve só para entrar a primeira vez.
-        </p>
-        <label htmlFor="user-role">Função</label>
-        <select
-          id="user-role"
-          value={role}
-          onChange={(event) => setRole(event.target.value as Role)}
+        Cada pessoa com a sua conta: é o que dá nome a cada alteração.
+      </PageHeader>
+
+      {creating && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleCreate();
+          }}
         >
-          <option value="operator">Operador</option>
-          <option value="reviewer">Revisor</option>
-          <option value="admin">Administrador</option>
-        </select>
-        <p className="hint">{ROLE_LABEL[role]}</p>
-        <button type="submit" disabled={busy}>
-          Criar conta
-        </button>
-      </form>
+          <h3>Criar conta</h3>
+          <label htmlFor="user-email">E-mail</label>
+          <input
+            id="user-email"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            autoComplete="off"
+            inputMode="email"
+          />
+          <label htmlFor="user-password">Senha</label>
+          <input
+            id="user-password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="new-password"
+          />
+          <p className="hint">
+            Senha inicial, com pelo menos 8 caracteres. A pessoa escolhe a própria
+            senha no primeiro acesso — esta serve só para entrar a primeira vez.
+          </p>
+          <label htmlFor="user-role">Função</label>
+          <select
+            id="user-role"
+            value={role}
+            onChange={(event) => setRole(event.target.value as Role)}
+          >
+            <option value="operator">Operador</option>
+            <option value="reviewer">Revisor</option>
+            <option value="admin">Administrador</option>
+          </select>
+          <p className="hint">{ROLE_LABEL[role]}</p>
+          <button type="submit" disabled={busy}>
+            Criar conta
+          </button>
+        </form>
+      )}
 
       {error && <p role="alert">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
@@ -242,7 +263,7 @@ export function UsersPage({
         </div>
       )}
 
-      <h3>Contas existentes</h3>
+      <h3 className="sr-only">Contas existentes</h3>
       {page === null ? (
         error ? (
           <button type="button" className="secondary" onClick={() => void reload()}>

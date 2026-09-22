@@ -37,6 +37,8 @@
   --brand: #285e4a;
   --brand-2: #3f8a5f;
   --brand-soft: #dcebe1;
+  /* Texto verde sobre fundo suave (filtro escolhido, trilho). */
+  --brand-ink: #1f4d3c;
   --accent: #b8632f;
   --accent-soft: #f6e3d5;
   --gold: #b8860b;
@@ -102,6 +104,7 @@
     --brand: #6fb58a;
     --brand-2: #8ccaa3;
     --brand-soft: #21332a;
+    --brand-ink: #a8dcbb;
     --accent: #d98b57;
     --accent-soft: #3a2a1f;
     --gold: #d1a13a;
@@ -478,10 +481,10 @@ a {
   justify-content: space-around;
   gap: 2px;
   padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  /* Opaca: translúcida, o texto da tela aparecia por trás dos rótulos. */
+  background: var(--surface);
   border-top: 1px solid var(--line);
+  box-shadow: 0 -6px 18px color-mix(in srgb, var(--ink) 7%, transparent);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -641,11 +644,107 @@ button.btn-ghost.danger {
   background: var(--danger-soft);
 }
 
-/* O que está escolhido num grupo de opções (aba, lote, jeito de lançar). */
+/* O filtro escolhido (lote, arquivo, recorte da busca). Tom suave, não
+   cheio: verde cheio é só da ação principal, e um filtro marcado ao lado de
+   "Enviar" ou "Aprovar" disputava com eles o lugar de "toque aqui". */
 .search-shortcuts button[aria-pressed="true"] {
-  background: var(--brand);
+  background: var(--brand-soft);
   border-color: var(--brand);
-  color: var(--on-brand);
+  color: var(--brand-ink);
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+
+/* Escolher um modo (Digitar | Importar, Pendentes | Aprovadas): um trilho
+   só, com a opção marcada em relevo. Não é filtro nem ação. */
+.segmented {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.segmented button {
+  flex: 1 1 auto;
+  min-height: 42px;
+  padding: 6px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+.segmented button:not([aria-pressed="true"]):hover {
+  color: var(--brand-ink);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  box-shadow: none;
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--brand-ink);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 14%, transparent),
+    0 0 0 1px var(--line);
+}
+
+/* ---------- topo de cada área ---------- */
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 4px 0 16px;
+}
+
+.page-head-text {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.page-head h2 {
+  margin: 0;
+  text-wrap: balance;
+}
+
+.page-lede {
+  max-width: 64ch;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Sair: no topo só no computador; no celular, dentro de Minha conta. */
+.logout-account {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 899px) {
+  .who .logout-top {
+    display: none;
+  }
+}
+
+@media (min-width: 900px) {
+  .logout-account {
+    display: none;
+  }
 }
 
 .link-btn {
@@ -971,6 +1070,37 @@ form h3 {
   }
 }
 
+/* Painel: produção e lucro em destaque, lado a lado em qualquer largura. */
+.kpis.kpis-hero {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 0;
+}
+
+.kpis-hero + .kpis {
+  margin-top: 10px;
+}
+
+.kpi.kpi-hero {
+  padding: 16px 16px 14px;
+}
+
+.kpi.kpi-hero strong {
+  font-size: clamp(1.5rem, 2.6vw + 0.8rem, 2.2rem);
+  font-variant-numeric: tabular-nums;
+}
+
+/* No Painel, receita e custo dividem a linha (são o par que explica o
+   lucro); Animais, que é contagem, fica com a linha de baixo. */
+@media (max-width: 639px) {
+  .dashboard .kpis-trio > :first-child {
+    grid-column: auto;
+  }
+
+  .dashboard .kpis-trio > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
 .kpi {
   position: relative;
   padding: 14px 14px 12px;
@@ -1026,7 +1156,7 @@ form h3 {
 }
 
 /* Painel relendo depois de um filtro: o que está na tela é o anterior. */
-.dashboard[aria-busy="true"] > :not(.row-between, .filters) {
+.dashboard[aria-busy="true"] > :not(.page-head, .filters) {
   opacity: 0.55;
   transition: opacity var(--dur-fast);
 }
@@ -1061,7 +1191,8 @@ form h3 {
 
 .chart-card > header {
   display: flex;
-  align-items: baseline;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 8px;
@@ -1605,16 +1736,33 @@ tbody tr:hover td {
   margin: 8px 0 4px;
 }
 
-/* Duas colunas no celular; o filtro que sobra fica com a linha toda, em vez
-   de meia largura solto no canto. */
+/* Os três filtros numa linha também no celular: em duas, ocupavam metade
+   da primeira tela antes de qualquer número. */
 @media (max-width: 639px) {
   .filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
   }
 
-  .filters > :last-child:nth-child(odd) {
-    grid-column: 1 / -1;
+  .filters label {
+    font-size: 0.74rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
+
+  /* 16 px: abaixo disso o iPhone amplia a tela ao tocar no campo. */
+  .filters select {
+    padding-inline: 8px 2px;
+    font-size: 16px;
+  }
+}
+
+/* O aviso de cobertura é contexto dos números, não um alerta: uma faixa. */
+.warning.coverage {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  font-size: 0.86rem;
 }
 
 .filters label {
@@ -1746,10 +1894,20 @@ p.count {
 
 .animal-detail header.detail-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
   gap: 12px;
-  margin-top: 8px;
+  margin: 8px 0 14px;
+}
+
+.tag.tag-lg {
+  flex: 0 0 auto;
+  min-width: 64px;
+  padding: 10px 12px;
+  font-size: 1.05rem;
+}
+
+.tag.tag-lg.none {
+  font-size: 0.8rem;
 }
 
 .animal-detail header.detail-head h2 {
@@ -1757,8 +1915,9 @@ p.count {
 }
 
 .animal-detail .brinco {
-  margin: 4px 0 12px;
+  margin: 2px 0 0;
   color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .animal-fields {
@@ -1819,6 +1978,38 @@ p.count {
 
 .actions button {
   flex: 1 1 150px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.actions button svg {
+  flex: 0 0 auto;
+  color: var(--brand);
+}
+
+/* Celular: quatro botões numa grade 2 × 2, todos da mesma altura. */
+@media (max-width: 899px) {
+  .animal-detail .actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.actions-toggle[aria-expanded="true"] {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+/* As raras abrem logo abaixo, num fundo de bandeja: é outro grupo. */
+.actions.actions-more {
+  margin-top: -4px;
+  padding: 8px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  animation: rise var(--dur-fast) var(--ease-out) both;
 }
 
 /* No computador, cada botão do tamanho do texto: esticados, "Juntar com
@@ -1930,6 +2121,73 @@ p.count {
 
 .supply-list > li h3 {
   margin-top: 0;
+}
+
+/* Nome e preço numa linha; o custo do dia logo abaixo, em apoio. */
+.supply-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 10px;
+}
+
+.supply-head h3,
+.supply-head .price {
+  margin: 0;
+}
+
+.supply-total {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.supply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.supply-actions .secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.supply-actions .secondary[aria-expanded="true"] {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+/* Campo curto com o botão ao lado (preço do leite). */
+.inline-field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.inline-field input {
+  flex: 1 1 8rem;
+  max-width: 14rem;
+  margin: 0;
+}
+
+.inline-field button,
+.inline-field button[type="submit"] {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+}
+
+form.milk-price .hint {
+  margin: -4px 0 4px;
 }
 
 .price {
@@ -2102,6 +2360,15 @@ p.count {
 
 /* ---------- lançamento de produção ---------- */
 
+/* No computador, a linha inteira de 1.000 px punha o campo de litros longe
+   do nome da vaca: a lista fica na largura de quem lê uma linha. */
+@media (min-width: 900px) {
+  .production {
+    max-width: 50rem;
+    margin-inline: auto;
+  }
+}
+
 .prod-controls {
   display: flex;
   flex-wrap: wrap;
@@ -2123,24 +2390,23 @@ p.count {
   margin: 0;
 }
 
+/* O total acompanha a rolagem: com 60 vacas no lote, quem lança quer ver
+   quanto falta sem voltar ao topo. */
 .prod-summary {
+  position: sticky;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  z-index: 5;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px 16px;
-  padding: 14px 16px;
-  margin-bottom: 14px;
+  gap: 10px 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-lift);
 }
 
 .prod-summary .prod-progress {
   grid-column: 1 / -1;
-}
-
-/* No celular o total ocupa a linha; imprimir desce, sem disputar espaço. */
-@media (max-width: 519px) {
-  .prod-summary {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .prod-summary > div:first-child {
@@ -2182,15 +2448,17 @@ p.count {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
+/* Coluna do brinco com largura fixa: com a largura do conteúdo, um brinco
+   longo (B1-016VD) empurrava o nome e o partia no meio da palavra. */
 .prod-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto 1.6rem;
+  grid-template-columns: 5.25rem minmax(0, 1fr) auto 1.4rem;
   align-items: center;
-  gap: 6px 12px;
-  padding: 10px 12px;
+  gap: 4px 12px;
+  padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
@@ -2199,12 +2467,22 @@ p.count {
   transition: border-color var(--dur-fast), background var(--dur-fast);
 }
 
+.prod-row .tag {
+  min-width: 0;
+  padding: 6px 4px;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
 .prod-row .name {
   display: flex;
   flex-direction: column;
   min-width: 0;
   font-weight: 600;
-  overflow-wrap: anywhere;
+  line-height: 1.25;
+  /* Quebra entre palavras; só parte a palavra que sozinha não cabe. */
+  overflow-wrap: break-word;
 }
 
 .prod-row .name small {
@@ -2232,13 +2510,13 @@ p.count {
    cedem alguns pixels para ele não quebrar a cada palavra. */
 @media (max-width: 519px) {
   .prod-row {
-    gap: 6px 10px;
-    padding: 10px;
+    grid-template-columns: 4.5rem minmax(0, 1fr) auto 1.2rem;
+    gap: 4px 8px;
+    padding: 8px 10px;
   }
 
   .prod-row .tag {
-    min-width: 44px;
-    padding: 6px 8px;
+    font-size: 0.74rem;
   }
 
   .prod-input input {
@@ -2299,17 +2577,18 @@ p.count {
 
 /* "Anular" junto da situação, sob o nome: texto pequeno, sem peso de
    botão. Abre o motivo — não anula nada sozinho. */
+/* Aparece em toda linha lançada: em cinza e sem sublinhado, para 60
+   "Anular" não virarem o que mais chama atenção na folha. O alvo de toque
+   é maior que o texto (margem negativa), sem aumentar a linha. */
 .row-void {
   min-height: 0;
-  margin-left: 10px;
-  padding: 2px 0;
+  margin: -10px 0 -10px 4px;
+  padding: 10px 8px;
   border: 0;
   background: none;
-  color: var(--brand);
+  color: var(--muted);
   font-size: 0.8rem;
   font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 .row-void:hover {
@@ -2589,11 +2868,19 @@ p.count {
 
 .prod-print {
   justify-self: end;
+  border-color: transparent;
 }
 
 @media (max-width: 519px) {
   .prod-print {
-    justify-self: start;
+    width: var(--touch);
+    height: var(--touch);
+    justify-content: center;
+    padding: 0;
+  }
+
+  .prod-summary strong {
+    font-size: 1.6rem;
   }
 }
 
@@ -2851,8 +3138,36 @@ p.count {
   gap: 8px 12px;
 }
 
-.inbox-toolbar .search-shortcuts {
+.inbox-toolbar .segmented {
   margin: 0;
+}
+
+/* Situação e Atualizar cabem numa linha no celular: Atualizar vira ícone. */
+@media (max-width: 519px) {
+  .inbox-toolbar {
+    flex-wrap: nowrap;
+  }
+
+  .inbox-toolbar .segmented {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .inbox-toolbar .segmented button {
+    padding: 6px 10px;
+  }
+
+  .refresh-inbox {
+    flex: 0 0 auto;
+    width: var(--touch);
+    height: var(--touch);
+    justify-content: center;
+    padding: 0;
+  }
+
+  .wide-only {
+    display: none;
+  }
 }
 
 .proposal-card {
@@ -2943,10 +3258,16 @@ p.count {
   font-size: 0.88rem;
 }
 
+/* Data e litros lado a lado também no celular: empilhados, cada cartão
+   dobrava de altura. Texto longo (observação) ocupa a linha. */
 .proposal-fields {
   display: grid;
   gap: 8px 12px;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+}
+
+.proposal-fields > div:has(textarea) {
+  grid-column: 1 / -1;
 }
 
 .proposal-fields label {
@@ -2997,12 +3318,20 @@ p.count {
 
 /* ---------- revisão: filtro por arquivo e data do arquivo ---------- */
 
-/* Muitos arquivos: no celular a fileira rola de lado em vez de empilhar. */
+/* Muitos arquivos: no celular a fileira rola de lado em vez de empilhar, e
+   a borda direita esmaece para dizer que há mais. */
 .file-filter {
   flex-wrap: nowrap;
   overflow-x: auto;
-  scrollbar-width: thin;
-  padding-bottom: 4px;
+  scrollbar-width: none;
+  padding: 2px 24px 4px 2px;
+  margin: 0;
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+
+.file-filter::-webkit-scrollbar {
+  display: none;
 }
 
 .file-filter button {
@@ -3017,6 +3346,9 @@ p.count {
   .file-filter {
     flex-wrap: wrap;
     overflow-x: visible;
+    padding-right: 0;
+    mask-image: none;
+    -webkit-mask-image: none;
   }
 }
 
@@ -3139,12 +3471,66 @@ form.send-photo {
   color: var(--muted);
 }
 
-/* Foto e gravação lado a lado; no celular, um abaixo do outro. */
+/* Foto e gravação lado a lado, como duas portas de entrada: contorno e
+   ícone, não verde cheio — na caixa, a ação principal é aprovar. O que está
+   aberto ocupa a linha inteira. */
 .send-uploads {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.send-uploads > .send-photo {
+  margin: 0;
+  min-width: 0;
+}
+
+.send-uploads > form.send-photo {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 900px) {
+  .send-uploads {
+    grid-template-columns: repeat(2, minmax(0, 17rem));
+  }
+}
+
+.send-open {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: flex-start;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 14px 8px 8px;
+  border-color: var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+}
+
+.send-open:hover {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand-soft) 50%, var(--surface));
+}
+
+.send-open-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+/* Link de apoio (trocar data do arquivo): sem contorno, não é filtro. */
+.link-btn.quiet {
+  border-color: transparent;
+  background: transparent;
+  padding-inline: 4px;
 }
 
 /* ---------- revisão: gravar a ordenha no próprio app ---------- */

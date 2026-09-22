@@ -195,6 +195,7 @@ describe("Baixa de animal", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: /mais ações/i }));
     fireEvent.click(screen.getByRole("button", { name: /dar baixa/i }));
     fireEvent.change(screen.getByLabelText(/motivo da baixa/i), {
       target: { value: "morte" },

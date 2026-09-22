@@ -41,6 +41,7 @@ test.beforeAll(() => {
 test("conta nova escolhe a própria senha no primeiro acesso", async ({ page }) => {
   await loginAsAdmin(page);
   await openArea(page, "Contas");
+  await page.getByRole("button", { name: "Nova conta" }).click();
   await page.getByLabel("E-mail").fill(OPERATOR);
   await page.getByLabel("Senha", { exact: true }).fill(INITIAL);
   await page.getByLabel("Função").selectOption("operator");
@@ -131,6 +132,7 @@ test("baixa de animal e desfazer", async ({ page }) => {
   await page.getByRole("button", { name: "Buscar" }).click();
   await page.getByRole("button", { name: new RegExp(importedCow.name) }).click();
 
+  await page.getByRole("button", { name: "Mais ações" }).click();
   await page.getByRole("button", { name: "Dar baixa" }).click();
   await page.getByLabel("Motivo da baixa").selectOption("venda");
   await page.getByRole("button", { name: "Confirmar baixa" }).click();

@@ -143,13 +143,20 @@ describe("HerdDashboard", () => {
     expect(screen.getByText("0-100")).toBeInTheDocument();
   });
 
-  it("mostra maiores e menores produções", async () => {
+  it("mostra maiores e menores produções no mesmo cartão", async () => {
     render(
       <HerdDashboard token={TOKEN} onLoad={vi.fn().mockResolvedValue(summary())} />,
     );
 
     expect(await screen.findByText("ÁGATA")).toBeInTheDocument();
+    expect(screen.queryByText("SEREIA")).not.toBeInTheDocument();
+
+    const menores = screen.getByRole("button", { name: "Menores" });
+    fireEvent.click(menores);
+
+    expect(menores).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("SEREIA")).toBeInTheDocument();
+    expect(screen.queryByText("ÁGATA")).not.toBeInTheDocument();
   });
 
   it("filtra por lote", async () => {
@@ -164,6 +171,35 @@ describe("HerdDashboard", () => {
 
     await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
     expect(load.mock.calls[1][1]).toMatchObject({ lote: "LOTE 1" });
+  });
+
+  it("com um lote escolhido, os outros lotes continuam na lista", async () => {
+    // O painel filtrado só traz o lote escolhido: a lista encolhia para
+    // "Todos" e ele, e trocar de lote exigia voltar a Todos antes.
+    const doisLotes = summary({
+      lots: [
+        { ...summary().lots[0], lote: "LOTE 1" },
+        { ...summary().lots[0], lote: "LOTE 2" },
+      ],
+    });
+    const soLote2 = summary({ lots: [{ ...summary().lots[0], lote: "LOTE 2" }] });
+    const load = vi
+      .fn()
+      .mockImplementation((_token: string, filters: { lote?: string }) =>
+        Promise.resolve(filters.lote ? soLote2 : doisLotes),
+      );
+
+    render(<HerdDashboard token={TOKEN} onLoad={load} />);
+    await screen.findAllByText("LOTE 1");
+    fireEvent.change(screen.getByLabelText("Lote de ordenha"), { target: { value: "LOTE 2" } });
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+
+    const filtro = screen.getByLabelText("Lote de ordenha");
+    await waitFor(() => expect(filtro).toHaveValue("LOTE 2"));
+    const opcoes = within(filtro)
+      .getAllByRole("option")
+      .map((option) => option.textContent);
+    expect(opcoes).toEqual(["Todos", "LOTE 1", "LOTE 2"]);
   });
 
   it("permite escolher a data da coleta", async () => {
@@ -305,7 +341,9 @@ describe("SuppliesPage", () => {
       />,
     );
 
-    fireEvent.change(await screen.findByLabelText(/pre[çc]o.*concentrado/i), {
+    // O preço abre pelo botão do insumo: fechado, cada insumo cabe numa olhada.
+    fireEvent.click(await screen.findByRole("button", { name: /alterar preço/i }));
+    fireEvent.change(screen.getByLabelText(/pre[çc]o.*concentrado/i), {
       target: { value: "2.50" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Salvar preço" }));
@@ -322,7 +360,8 @@ describe("SuppliesPage", () => {
       />,
     );
 
-    expect(await screen.findByText(/pre[çc]o anterior fica no hist[óo]rico/i)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: /alterar preço/i }));
+    expect(screen.getByText(/pre[çc]o anterior fica no hist[óo]rico/i)).toBeInTheDocument();
   });
 
   it("esconde a edição de quem não pode editar", async () => {
@@ -338,6 +377,7 @@ describe("SuppliesPage", () => {
     expect(
       screen.queryByRole("button", { name: "Salvar preço" }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /alterar preço|novo insumo/i })).not.toBeInTheDocument();
   });
 });
 

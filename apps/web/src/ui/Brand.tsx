@@ -154,6 +154,58 @@ export const Icons = {
       <path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M15 8l5 4-5 4M20 12H9" />
     </svg>
   ),
+  // Os de ação, no tamanho do texto do botão.
+  imprimir: (): JSX.Element => (
+    <svg {...ICON_PROPS} width={18} height={18}>
+      <path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
+      <path d="M7 14h10v7H7z" />
+    </svg>
+  ),
+  camera: (): JSX.Element => (
+    <svg {...ICON_PROPS}>
+      <path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
+      <circle cx="12" cy="13.5" r="3.5" />
+    </svg>
+  ),
+  microfone: (): JSX.Element => (
+    <svg {...ICON_PROPS}>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7" />
+    </svg>
+  ),
+  novo: (): JSX.Element => (
+    <svg {...ICON_PROPS} width={18} height={18}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  ),
+  editar: (): JSX.Element => (
+    <svg {...ICON_PROPS} width={18} height={18}>
+      <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />
+    </svg>
+  ),
+  lote: (): JSX.Element => (
+    <svg {...ICON_PROPS} width={18} height={18}>
+      <path d="M4 8h13l-3-3M20 16H7l3 3" />
+    </svg>
+  ),
+  brinco: (): JSX.Element => (
+    <svg {...ICON_PROPS} width={18} height={18}>
+      <path d="M12 3l7 4v6c0 4-3 7-7 8-4-1-7-4-7-8V7l7-4z" />
+      <circle cx="12" cy="9.5" r="1.6" />
+    </svg>
+  ),
+  juntar: (): JSX.Element => (
+    <svg {...ICON_PROPS} width={18} height={18}>
+      <path d="M6 4v4a4 4 0 0 0 4 4h4a4 4 0 0 1 4 4v4M18 4v4a4 4 0 0 1-4 4" />
+    </svg>
+  ),
+  menu: (): JSX.Element => (
+    <svg {...ICON_PROPS} width={18} height={18}>
+      <circle cx="5" cy="12" r="1.4" />
+      <circle cx="12" cy="12" r="1.4" />
+      <circle cx="19" cy="12" r="1.4" />
+    </svg>
+  ),
 };
 
 export type IconName = keyof typeof Icons;

@@ -27,6 +27,7 @@ import { SendPhoto } from "./SendPhoto";
 import { SourceMedia } from "./SourceMedia";
 import { brDate, liters } from "../../ui/dates";
 import { Icons } from "../../ui/Brand";
+import { PageHeader } from "../../ui/PageHeader";
 
 /**
  * Caixa de revisão: cada evento lido de uma foto, áudio ou texto espera aqui
@@ -605,8 +606,8 @@ function SourceDate({
         </p>
       )}
       {canDecide && !editing && (
-        <button type="button" className="link-btn" onClick={() => setEditing(true)}>
-          Trocar data do arquivo
+        <button type="button" className="link-btn quiet" onClick={() => setEditing(true)}>
+          <Icons.editar /> Trocar data do arquivo
         </button>
       )}
       {canDecide && editing && (
@@ -728,14 +729,12 @@ export function ReviewInbox({
 
   return (
     <section className="review-inbox">
-      <h2>Revisão</h2>
-      <p className="muted">
-        Cada evento lido de uma foto, áudio ou texto espera aqui. Nada entra no rebanho sem
-        aprovação.
-      </p>
+      <PageHeader title="Revisão">
+        O que foi lido de fotos e áudios espera aqui: nada entra no rebanho sem aprovação.
+      </PageHeader>
 
       <div className="inbox-toolbar">
-        <div className="search-shortcuts" role="group" aria-label="Situação">
+        <div className="segmented" role="group" aria-label="Situação">
           {TABS.map((option) => (
             <button
               key={option.status}
@@ -749,8 +748,13 @@ export function ReviewInbox({
         </div>
         {/* A leitura termina em segundo plano, e a caixa avisa o que chega;
             Atualizar relê na hora — clicar na aba já escolhida não relê. */}
-        <button type="button" className="link-btn refresh-inbox" onClick={() => void reload(tab)}>
-          <Icons.atualizar /> Atualizar
+        <button
+          type="button"
+          className="link-btn refresh-inbox"
+          aria-label="Atualizar"
+          onClick={() => void reload(tab)}
+        >
+          <Icons.atualizar /> <span className="wide-only">Atualizar</span>
         </button>
       </div>
 

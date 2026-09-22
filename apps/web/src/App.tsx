@@ -30,6 +30,7 @@ import { ReviewInbox } from "./features/review/ReviewInbox";
 import { ChangePasswordForm } from "./features/users/ChangePasswordForm";
 import { UsersPage } from "./features/users/UsersPage";
 import { Cows, Hills, Icons, LogoMark, type IconName } from "./ui/Brand";
+import { PageHeader } from "./ui/PageHeader";
 
 type SessionState =
   | { status: "checking" }
@@ -377,6 +378,9 @@ function AuthenticatedApp({
     "minha-conta",
   ];
   const moreAreas = areas.filter((name) => !PRIMARY_AREAS.includes(name));
+  // No computador, Minha conta é o avatar com o e-mail, ao lado de Sair;
+  // na barra seria um terceiro caminho para o mesmo lugar.
+  const barAreas = areas.filter((name) => name !== "minha-conta");
 
   return (
     <main className="shell">
@@ -399,14 +403,16 @@ function AuthenticatedApp({
             {initials(user.email)}
           </button>
           <span className="email">{user.email}</span>
-          <button type="button" className="link-btn" onClick={onLogout}>
+          {/* No celular, Sair fica em Minha conta: no topo, ao lado do
+              polegar, era o botão mais fácil de tocar sem querer. */}
+          <button type="button" className="link-btn logout-top" onClick={onLogout}>
             <Icons.logout /> Sair
           </button>
         </div>
       </header>
 
       <nav className="areanav" aria-label="Áreas">
-        {areas.map((name) => {
+        {barAreas.map((name) => {
           const Icon = Icons[name as IconName];
           return (
             <button
@@ -555,8 +561,16 @@ function AuthenticatedApp({
 
         {area === "minha-conta" && (
           <>
-            <h2>Minha conta</h2>
-            <p className="muted">{user.email}</p>
+            <PageHeader
+              title="Minha conta"
+              actions={
+                <button type="button" className="secondary logout-account" onClick={onLogout}>
+                  <Icons.logout /> Sair
+                </button>
+              }
+            >
+              {user.email}
+            </PageHeader>
             <ChangePasswordForm token={token} />
           </>
         )}

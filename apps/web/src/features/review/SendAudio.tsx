@@ -13,6 +13,7 @@ import { SendUpload, type SendUploadProps, type Variant } from "./SendUpload";
 const GRAVACAO: Variant = {
   arquivo: "gravação",
   id: "gravacao-ordenha",
+  icone: "microfone",
   abrir: "Enviar áudio",
   titulo: "Enviar gravação da ordenha",
   rotulo: "Gravação da ordenha",

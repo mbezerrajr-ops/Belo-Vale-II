@@ -104,6 +104,23 @@ describe("App", () => {
     );
   });
 
+  it("Minha conta abre pelo avatar, não pela barra, e tem o Sair do celular", async () => {
+    // Na barra seria um terceiro caminho para o mesmo lugar; e o Sair do
+    // topo, no celular, era o botão mais fácil de tocar sem querer.
+    signedIn({ role: "admin", email: "dono@belovale" });
+    render(<App />);
+    const nav = await screen.findByRole("navigation", { name: "Áreas" });
+    expect(within(nav).queryByRole("button", { name: /minha conta/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Minha conta" }));
+
+    expect(await screen.findByRole("heading", { name: "Minha conta" })).toBeInTheDocument();
+    const sair = screen.getAllByRole("button", { name: /sair/i });
+    expect(sair.map((button) => button.className)).toEqual(
+      expect.arrayContaining([expect.stringContaining("logout-top"), expect.stringContaining("logout-account")]),
+    );
+  });
+
   it("Esc fecha o Mais", async () => {
     signedIn({ role: "admin", email: "dono@belovale" });
     render(<App />);
