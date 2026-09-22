@@ -803,7 +803,9 @@ levando três vacas junto — sem erro, sem aviso. Busca em feixe não resolveu.
 Sem marcas de tempo o salto some, mas o modelo erra mais dígito ("462" virou
 "4162"). O transcritor agora pergunta com marcas, e se houver buraco de mais
 de 8 s entre trechos (numa gravação boa o maior foi 0,44 s), pergunta de novo
-sem elas.
+sem elas. *(Trocado em 22/09: a pergunta sem marcas também pulou numa
+gravação feita pelo navegador; agora só o trecho pulado é ouvido de novo —
+ver "Gravar no app e acompanhar a leitura".)*
 
 O que importa na tabela é a última coluna: **nenhum nível produziu leitura
 errada**. Quando o ruído atrapalha, a vaca falta — não chega com número
@@ -881,3 +883,83 @@ Start-ScheduledTask  -TaskName "BeloVale-Whisper"
 Se voltar a acontecer, ligar o registro do Agendador ajuda a achar a causa:
 `wevtutil set-log Microsoft-Windows-TaskScheduler/Operational /enabled:true`
 (terminal de administrador).
+
+Às 17:34 de 21/09 a tarefa já estava de novo ativa e rodando — reativada fora
+desta sessão de trabalho.
+
+## Gravar no app e acompanhar a leitura (22/09/2026)
+
+### O que mudou para quem usa
+
+- **Gravar no próprio app:** "Enviar áudio → Gravar agora", Parar, ouvir o
+  que gravou, Enviar. No iPhone é o único jeito de gravar pelo app: o Safari
+  não abre gravador num campo de arquivo.
+- **A tela acompanha a leitura até o fim** — foto e áudio — e diz o
+  resultado. Antes, "as propostas aparecem aqui quando terminar" ficava na
+  tela para sempre, mesmo com a leitura falhada.
+- **A leitura que falha guarda o motivo** (leitor fora do ar, ou arquivo sem
+  o que ler), e **quem enviou pode tentar de novo** a leitura que falhou.
+  Ler de novo uma leitura que deu certo continua sendo de revisor.
+
+### Medido com o avaliador novo
+
+`app.core.evaluate_transcriber`, com as 3 gravações do titular (11 vacas),
+limpas e com ruído grave somado, e com as mesmas 3 gravadas pelo gravador do
+navegador (o microfone falso do Chromium tocando cada gravação):
+
+| voz / ruído | 1ª rodada (fala-v2) | depois das correções (fala-v4) |
+|---|---|---|
+| limpo | 11/11 | 11/11 |
+| ~25 dB | 10/11 | 11/11 |
+| ~17 dB | 11/11 | 11/11 |
+| ~11 dB | 10/11 | 11/11 |
+| ~5 dB | 9/11 | 11/11 |
+| pelo gravador do navegador | 9/11 | 11/11 |
+
+Nenhuma leitura errada em nenhuma rodada: quando falhava, a vaca faltava.
+Observações a mais (propostas inúteis na caixa): de 5 para 0.
+
+**A ressalva que importa:** as regras foram corrigidas olhando para estas
+mesmas gravações. Cada correção é uma regra geral, com teste próprio, mas o
+número acima é de desenvolvimento. O número que vale sai de gravações feitas
+no curral, com a ordenhadeira ligada — que ainda não existem.
+
+### O que o avaliador achou
+
+1. **O brinco dito depois de uma pausa era descartado.** "a vaca aceitona"
+   / "117": a vaca chegava sem brinco. Pior: em "Vaca Pandora" / "649,
+   redonda, produziu 5 litros", o 649 sumia e os litros da Redonda iam para a
+   Pandora.
+2. **O salto do whisper também acontece pelo navegador**, sem ruído nenhum:
+   a gravação 1 saiu "Mensagem de teste" e saltou para 29,98 s, levando duas
+   vacas. A pergunta sem marcas de tempo pulou igual. O que resolveu foi
+   recortar o trecho pulado e ouvi-lo sozinho. Não era o processamento de
+   áudio do navegador: sem ele o salto foi o mesmo.
+3. **Nome depois de uma pausa virava observação:** "vaca 417" / "Pandora", e
+   "Pequina" / "Pequina produziu".
+4. **Palavra partida entre trechos** ("...8 lit" / "ros no total") virava a
+   observação "lit; ros".
+
+### Limites conhecidos
+
+- **O microfone só existe em conexão segura** (https, ou `localhost` na
+  própria máquina). No celular pela rede da fazenda, até o deploy com HTTPS,
+  fica o campo de arquivo, como antes.
+- **A gravação só existe na tela até ser enviada.** Fechar a aba perde o
+  áudio — a página avisa antes de sair, e o envio que falha deixa a gravação
+  ali para tentar de novo. Guardar no celular para enviar quando o sinal
+  voltar é a pendência "envio sem sinal", que depende de saber como é o sinal
+  no curral.
+- **5 minutos por gravação**, o mesmo limite do worker (`AUDIO_MAX_SECONDS`).
+  O gravador do app para sozinho e avisa. Um arquivo mais longo, escolhido no
+  campo, é cortado pelo worker em 5 minutos, sem aviso.
+- **A tela fica acesa enquanto grava** onde o navegador deixa (Chrome no
+  Android; Safari no iPhone a partir do iOS 16.4). Em outros, a tela pode
+  apagar e parar a gravação no meio.
+- **A caixa se atualiza sozinha só para quem enviou.** O que outra pessoa
+  enviou continua aparecendo com "Atualizar".
+- **Leituras que falharam antes desta mudança não têm motivo guardado:** a API
+  responde "internal" para elas.
+- O Chromium grava MP4 fragmentado; o Firefox, Ogg; Chrome mais antigo, WebM.
+  Os três entram, conferidos com arquivos reais, e WebM ou Ogg com vídeo são
+  recusados como o MP4 com vídeo.
