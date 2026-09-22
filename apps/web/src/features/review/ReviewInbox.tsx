@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   approveProposal,
@@ -108,6 +108,15 @@ const TABS: { status: ProposalStatus; label: string }[] = [
 
 /** Abaixo disto, a leitura merece atenção redobrada. */
 const LOW_CONFIDENCE = 0.6;
+
+/** De quanto em quanto tempo a caixa aberta pergunta o que chegou. */
+export const INBOX_POLL_MS = 30_000;
+
+interface Incoming {
+  items: Proposal[];
+  added: number;
+  gone: number;
+}
 
 interface FieldSpec {
   key: string;
@@ -632,9 +641,15 @@ export function ReviewInbox({
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [items, setItems] = useState<Proposal[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [incoming, setIncoming] = useState<Incoming | null>(null);
+  // A consulta periódica compara com o que está na tela agora, sem refazer o
+  // relógio a cada mudança da lista.
+  const shown = useRef<Proposal[] | null>(null);
+  shown.current = items;
 
   async function reload(status: ProposalStatus = tab): Promise<void> {
     setError(null);
+    setIncoming(null);
     try {
       setItems(await onList(token, status));
     } catch (caught) {
@@ -647,6 +662,35 @@ export function ReviewInbox({
     void reload(tab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, tab]);
+
+  // O que chegou enquanto a caixa estava aberta. A tela não se reorganiza
+  // sozinha no meio de uma revisão: o aviso oferece mostrar, e quem revisa
+  // decide quando. Com a tela escondida, não pergunta nada.
+  const loaded = items !== null;
+  useEffect(() => {
+    if (tab !== "pending" || !loaded) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      onList(token, "pending")
+        .then((fresh) => {
+          const current = new Set((shown.current ?? []).map((item) => item.id));
+          const next = new Set(fresh.map((item) => item.id));
+          const added = fresh.filter((item) => !current.has(item.id)).length;
+          const gone = [...current].filter((id) => !next.has(id)).length;
+          if (added === 0 && gone === 0) {
+            setIncoming(null);
+            return;
+          }
+          setIncoming({ items: fresh, added, gone });
+          onChanged?.();
+        })
+        .catch(() => {
+          // Sem sinal agora: a próxima pergunta resolve.
+        });
+    }, INBOX_POLL_MS);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, tab, loaded]);
 
   // Um botão por arquivo, na ordem em que aparecem, com quantas propostas têm.
   const files: { id: string; label: string; count: number }[] = [];
@@ -698,6 +742,35 @@ export function ReviewInbox({
       <button type="button" className="link-btn refresh-inbox" onClick={() => void reload(tab)}>
         Atualizar
       </button>
+
+      {incoming && (
+        <div role="status" className="inbox-news">
+          <span>
+            {[
+              incoming.added > 0 &&
+                (incoming.added === 1
+                  ? "Chegou 1 proposta nova."
+                  : `Chegaram ${incoming.added} propostas novas.`),
+              incoming.gone > 0 &&
+                (incoming.gone === 1
+                  ? "1 já foi decidida por outra pessoa."
+                  : `${incoming.gone} já foram decididas por outra pessoa.`),
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          </span>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => {
+              setItems(incoming.items);
+              setIncoming(null);
+            }}
+          >
+            Mostrar agora
+          </button>
+        </div>
+      )}
 
       {farmId && (
         <div className="send-uploads">

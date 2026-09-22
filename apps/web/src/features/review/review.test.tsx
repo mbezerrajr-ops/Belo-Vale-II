@@ -418,3 +418,91 @@ describe("ReviewInbox — arquivos", () => {
     expect(screen.queryByRole("button", { name: /trocar data do arquivo/i })).not.toBeInTheDocument();
   });
 });
+
+describe("ReviewInbox — o que chegou enquanto a caixa estava aberta", () => {
+  // Quem revisa deixa a caixa aberta enquanto o funcionário manda fotos e
+  // gravações do curral. Sem aviso, só apertando "Atualizar" se descobria o
+  // que chegou. E a tela não pode se reorganizar sozinha no meio de uma
+  // revisão: o aviso oferece mostrar, e quem revisa decide quando.
+  const ESPERA = 30_000;
+
+  async function passar(ms: number): Promise<void> {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  }
+
+  it("avisa quantas chegaram, sem mexer na tela, e mostra quando pedirem", async () => {
+    vi.useFakeTimers();
+    try {
+      const primeira = proposal();
+      const nova = proposal({ id: "p-2", brinco_lido: "633", nome_lido: "GIGANTE" });
+      const onList = vi.fn().mockResolvedValueOnce([primeira]).mockResolvedValue([primeira, nova]);
+      const { onChanged } = setup({ onList });
+      await passar(0);
+      expect(screen.getAllByRole("article")).toHaveLength(1);
+
+      await passar(ESPERA);
+
+      expect(screen.getByRole("status")).toHaveTextContent(/chegou 1 proposta nova/i);
+      expect(screen.getAllByRole("article")).toHaveLength(1); // nada se mexeu sozinho
+      expect(onChanged).toHaveBeenCalled(); // o contador da navegação atualiza
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /mostrar agora/i }));
+      });
+      expect(screen.getAllByRole("article")).toHaveLength(2);
+      expect(screen.queryByText(/chegou 1 proposta nova/i)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("avisa também o que outra pessoa já decidiu", async () => {
+    vi.useFakeTimers();
+    try {
+      const primeira = proposal();
+      const outra = proposal({ id: "p-2", brinco_lido: "633", nome_lido: "GIGANTE" });
+      const onList = vi.fn().mockResolvedValueOnce([primeira, outra]).mockResolvedValue([primeira]);
+      setup({ onList });
+      await passar(0);
+
+      await passar(ESPERA);
+
+      expect(screen.getByRole("status")).toHaveTextContent(/1 já foi decidida por outra pessoa/i);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("sem novidade, não avisa nada", async () => {
+    vi.useFakeTimers();
+    try {
+      const { onList } = setup();
+      await passar(0);
+
+      await passar(ESPERA * 2);
+
+      expect(onList.mock.calls.length).toBeGreaterThan(1);
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("não pergunta com a tela escondida", async () => {
+    vi.useFakeTimers();
+    const visibilidade = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    try {
+      const { onList } = setup();
+      await passar(0);
+      const chamadas = onList.mock.calls.length;
+
+      await passar(ESPERA * 3);
+
+      expect(onList.mock.calls.length).toBe(chamadas);
+    } finally {
+      visibilidade.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+});

@@ -2968,3 +2968,13 @@ form.send-photo {
 .merged-list .link-btn {
   margin-left: auto;
 }
+
+/* O que chegou com a caixa aberta: aviso, não reorganização da tela. */
+.inbox-news {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.inbox-news span {
+  flex: 1 1 200px;
+}
