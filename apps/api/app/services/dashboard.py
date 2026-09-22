@@ -231,11 +231,14 @@ async def build_dashboard(
         point.animals += 1
     production_by_date = [by_date[day] for day in sorted(by_date)]
 
-    # Animal com baixa (vendido, morto, descartado) não é mais rebanho.
+    # Animal com baixa (vendido, morto, descartado) não é mais rebanho — nem a
+    # ficha duplicada juntada a outra.
     animals = list(
         await session.scalars(
             select(Animal).where(
-                Animal.farm_id == farm_id, Animal.exited_on.is_(None)
+                Animal.farm_id == farm_id,
+                Animal.exited_on.is_(None),
+                Animal.merged_into_id.is_(None),
             )
         )
     )

@@ -171,28 +171,23 @@ antigo ambiente Linux. Eles foram preservados como histórico; não são o gate 
 baseline. Use os dois comandos de módulos explícitos documentados no runbook e o teste
 Playwright TypeScript `apps/web/e2e/legacy-platform.spec.ts`.
 
-## npm audit — esbuild (dependência de desenvolvimento)
+## npm audit — esbuild e Vitest (ferramentas de desenvolvimento) — resolvido
 
-- **Dependência:** `esbuild` (via `vite`/`vitest`/`vite-node`/`@vitest/mocker`,
-  todas dependências de desenvolvimento do frontend).
-- **Advisory:** [GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99)
-  — o servidor de desenvolvimento do esbuild aceita requisições de qualquer
-  origem e devolve a resposta.
-- **Escopo:** exclusivamente o servidor de desenvolvimento local (`vite dev`
-  / `npm run dev`). Não afeta o bundle de produção gerado por `npm run
-  build` nem a imagem Docker do serviço `web` (que só serve arquivos
-  estáticos via nginx, sem o servidor de dev do Vite).
-- **Impacto:** um site malicioso aberto no mesmo navegador enquanto alguém
-  roda `npm run dev` localmente poderia, em teoria, ler respostas do
-  servidor de dev. Não há exposição em produção nem em CI (que roda `npm
-  run build`, não `npm run dev`).
-- **Mitigação atual:** nenhuma ação além de não expor o servidor de dev em
-  rede não confiável (comportamento padrão — ele só escuta em localhost).
-- **Upgrade necessário para resolver:** `vite@8` (major, breaking change),
-  que arrasta `vitest`/`@vitest/mocker`/`vite-node` juntos.
-- **Prioridade:** baixa. Deliberadamente não aplicado nesta task para não
-  trocar a stack de build/teste no meio de uma integração — ver instrução
-  explícita da Task 8 de não fazer upgrade major só para zerar o audit.
+Resolvido em 22/09/2026. Os avisos eram todos das ferramentas de
+desenvolvimento e teste, nunca do que vai para produção (o `web` só serve os
+arquivos gerados pelo `npm run build`, pelo nginx):
+
+- `esbuild` <= 0.24.2 ([GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99)):
+  o servidor de desenvolvimento aceitava requisição de qualquer origem;
+- `@vitest/mocker` <= 4.1.10 ([GHSA-82fw-gwwq-j7x9](https://github.com/advisories/GHSA-82fw-gwwq-j7x9)):
+  leitura de arquivo fora do projeto por um mock malicioso.
+
+A correção pedia versão principal nova: Vite 8, Vitest 5 e
+`@vitejs/plugin-react` 6. O Vitest 5 exige Node 22.12 ou mais novo, então o
+Node do CI e do `Dockerfile.web` subiu de 20 para 22 — o Node 20 já tinha
+saído de suporte em abril de 2026. O jsdom ficou na 25: a 30 exige Node
+22.22, mais novo que o da máquina do titular. `npm audit`: 0
+vulnerabilidades.
 
 ## Duas seções "Fazenda" na tela principal — resolvido
 
@@ -963,3 +958,70 @@ no curral, com a ordenhadeira ligada — que ainda não existem.
 - O Chromium grava MP4 fragmentado; o Firefox, Ogg; Chrome mais antigo, WebM.
   Os três entram, conferidos com arquivos reais, e WebM ou Ogg com vídeo são
   recusados como o MP4 com vídeo.
+
+## Juntar fichas, reforços e análise visual (22/09/2026)
+
+### Juntar duas fichas do mesmo animal
+
+A pendência "ainda falta um jeito de juntar duas fichas" (ver a conferência
+de 25/08, acima) foi resolvida com as regras de sempre:
+
+- **A ficha que fica é a que tem o brinco.** Duas fichas com brinco são dois
+  animais: tirar um brinco errado é um ato com evidência, feito antes.
+- **Nada se apaga.** Cada produção ativa da ficha duplicada é relançada na
+  que fica, como lançamento manual de quem juntou, apontando para a original
+  (que passa a `superseded`). A duplicada fica arquivada (`merged_into_id`,
+  migração 0015) — fora do rebanho, das buscas, das sugestões e do painel,
+  sem aceitar edição, produção ou aprovação — e o banco garante que ela nunca
+  tem brinco, para nenhum arquivo novo a alcançar.
+- **Nada se decide em silêncio.** Produção das duas no mesmo dia bloqueia; a
+  duplicada com produção depois da baixa da que fica, também.
+- Campo vazio na que fica é preenchido pela duplicada; lote que a que fica
+  não tem, ela passa a ter a partir de hoje; proposta pendente passa a
+  apontar para a que ficou.
+
+**Limite:** a junção não se desfaz pela tela. As medições movidas e a
+auditoria dizem exatamente o que aconteceu, e desfazer é anular as
+relançadas e relançar na outra — como era antes de existir a junção.
+
+### Reforços
+
+- **O envio vai para a fazenda do servidor.** `POST /api/imports` confiava no
+  `farm_id` mandado pelo navegador; agora usa a fazenda resolvida no
+  servidor e recusa outra (404 `farm_not_found`).
+- **A Revisão avisa quem revisa** do que chegou com a caixa aberta, a cada
+  30 s com a tela visível.
+- **Gravação escolhida acima de 5 minutos** é avisada na hora de escolher.
+- **npm audit zerado** (ver a seção do esbuild, acima): Vite 8, Vitest 5,
+  Node 22.
+
+### A análise visual
+
+Todas as telas foram fotografadas no celular (390 px) e no computador
+(1366 px), em tema claro e escuro, com a baseline real. Achados e
+correções, além dos já listados nos commits:
+
+- **Defeito funcional achado pela análise:** o campo do preço do leite
+  aparecia vazio com o preço definido — `GET /api/farms/current` não o
+  mandava.
+- **Contraste no escuro:** texto branco sobre o verde claro dos botões dava
+  ~2:1. Agora há tokens de texto sobre cor cheia por tema.
+- **A página do Painel rolava para o lado no celular** por causa dos balões
+  de dica escondidos, que ainda ocupavam lugar.
+- **O gráfico de produção saía verde sólido** por um choque de nomes de
+  classe (`area`) com o contêiner de cada tela.
+- **Escalas honestas:** maiores e menores produções na mesma escala (8,5 L
+  aparecia quase cheio), e o comparativo por lote com os valores ao lado das
+  linhas de grade.
+- **Barra do celular:** quatro áreas e "Mais", em vez de oito destinos
+  espremidos com o último rótulo cortado.
+
+### Limpeza do legado — aguardando decisão do titular
+
+Sem referência em código, teste, CI ou documentação por nome, em
+`belo-vale-ii-projeto-completo/plataforma/`: `dashboard_template.html`,
+`v1_full.html`, `v1_publicado.html` e `v1_template.html` (~730 KB). Mas o
+README os cita em grupo ("`v1_*.html`... mantida como histórico/referência")
+— uma decisão registrada de guardá-los. Não foram apagados. Apagar é
+reversível pelo Git (o histórico guarda tudo), e tira do HEAD cópias antigas
+dos dados reais do rebanho embutidas nesses HTMLs; a decisão é do titular.

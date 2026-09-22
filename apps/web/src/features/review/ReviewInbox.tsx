@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   approveProposal,
@@ -26,6 +26,7 @@ import { SendAudio } from "./SendAudio";
 import { SendPhoto } from "./SendPhoto";
 import { SourceMedia } from "./SourceMedia";
 import { brDate, liters } from "../../ui/dates";
+import { Icons } from "../../ui/Brand";
 
 /**
  * Caixa de revisão: cada evento lido de uma foto, áudio ou texto espera aqui
@@ -100,6 +101,17 @@ const SOURCE_LABEL: Record<string, string> = {
   text: "Texto",
 };
 
+/**
+ * Origem e data do arquivo, sem repetir o que o título já diz: "Foto de
+ * 22/09" não precisa de "Foto" de novo ao lado.
+ */
+function sourceMeta(source: Proposal["source"]): string {
+  const kind = SOURCE_LABEL[source.kind] ?? source.kind;
+  const repeats = source.label.toLowerCase().startsWith(kind.toLowerCase());
+  const date = source.reference_date ? `data da leitura ${brDate(source.reference_date)}` : "sem data";
+  return repeats ? date : `${kind} · ${date}`;
+}
+
 const TABS: { status: ProposalStatus; label: string }[] = [
   { status: "pending", label: "Pendentes" },
   { status: "approved", label: "Aprovadas" },
@@ -108,6 +120,15 @@ const TABS: { status: ProposalStatus; label: string }[] = [
 
 /** Abaixo disto, a leitura merece atenção redobrada. */
 const LOW_CONFIDENCE = 0.6;
+
+/** De quanto em quanto tempo a caixa aberta pergunta o que chegou. */
+export const INBOX_POLL_MS = 30_000;
+
+interface Incoming {
+  items: Proposal[];
+  added: number;
+  gone: number;
+}
 
 interface FieldSpec {
   key: string;
@@ -632,9 +653,15 @@ export function ReviewInbox({
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [items, setItems] = useState<Proposal[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [incoming, setIncoming] = useState<Incoming | null>(null);
+  // A consulta periódica compara com o que está na tela agora, sem refazer o
+  // relógio a cada mudança da lista.
+  const shown = useRef<Proposal[] | null>(null);
+  shown.current = items;
 
   async function reload(status: ProposalStatus = tab): Promise<void> {
     setError(null);
+    setIncoming(null);
     try {
       setItems(await onList(token, status));
     } catch (caught) {
@@ -647,6 +674,35 @@ export function ReviewInbox({
     void reload(tab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, tab]);
+
+  // O que chegou enquanto a caixa estava aberta. A tela não se reorganiza
+  // sozinha no meio de uma revisão: o aviso oferece mostrar, e quem revisa
+  // decide quando. Com a tela escondida, não pergunta nada.
+  const loaded = items !== null;
+  useEffect(() => {
+    if (tab !== "pending" || !loaded) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      onList(token, "pending")
+        .then((fresh) => {
+          const current = new Set((shown.current ?? []).map((item) => item.id));
+          const next = new Set(fresh.map((item) => item.id));
+          const added = fresh.filter((item) => !current.has(item.id)).length;
+          const gone = [...current].filter((id) => !next.has(id)).length;
+          if (added === 0 && gone === 0) {
+            setIncoming(null);
+            return;
+          }
+          setIncoming({ items: fresh, added, gone });
+          onChanged?.();
+        })
+        .catch(() => {
+          // Sem sinal agora: a próxima pergunta resolve.
+        });
+    }, INBOX_POLL_MS);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, tab, loaded]);
 
   // Um botão por arquivo, na ordem em que aparecem, com quantas propostas têm.
   const files: { id: string; label: string; count: number }[] = [];
@@ -678,26 +734,54 @@ export function ReviewInbox({
         aprovação.
       </p>
 
-      <div className="search-shortcuts" role="group" aria-label="Situação">
-        {TABS.map((option) => (
-          <button
-            key={option.status}
-            type="button"
-            aria-pressed={tab === option.status}
-            onClick={() => setTab(option.status)}
-          >
-            {option.label}
-          </button>
-        ))}
+      <div className="inbox-toolbar">
+        <div className="search-shortcuts" role="group" aria-label="Situação">
+          {TABS.map((option) => (
+            <button
+              key={option.status}
+              type="button"
+              aria-pressed={tab === option.status}
+              onClick={() => setTab(option.status)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {/* A leitura termina em segundo plano, e a caixa avisa o que chega;
+            Atualizar relê na hora — clicar na aba já escolhida não relê. */}
+        <button type="button" className="link-btn refresh-inbox" onClick={() => void reload(tab)}>
+          <Icons.atualizar /> Atualizar
+        </button>
       </div>
 
-      {/* A leitura termina em segundo plano. Quem enviou vê a caixa se
-          atualizar sozinha quando a SUA leitura termina; o que outra pessoa
-          enviou aparece aqui — clicar na aba já escolhida não recarrega
-          nada. */}
-      <button type="button" className="link-btn refresh-inbox" onClick={() => void reload(tab)}>
-        Atualizar
-      </button>
+      {incoming && (
+        <div role="status" className="inbox-news">
+          <span>
+            {[
+              incoming.added > 0 &&
+                (incoming.added === 1
+                  ? "Chegou 1 proposta nova."
+                  : `Chegaram ${incoming.added} propostas novas.`),
+              incoming.gone > 0 &&
+                (incoming.gone === 1
+                  ? "1 já foi decidida por outra pessoa."
+                  : `${incoming.gone} já foram decididas por outra pessoa.`),
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          </span>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => {
+              setItems(incoming.items);
+              setIncoming(null);
+            }}
+          >
+            Mostrar agora
+          </button>
+        </div>
+      )}
 
       {farmId && (
         <div className="send-uploads">
@@ -748,7 +832,7 @@ export function ReviewInbox({
       {items !== null && items.length === 0 && (
         <p className="chart-empty">
           {tab === "pending"
-            ? "Nada esperando revisão. Quando as leituras de fotos e áudios estiverem ligadas, cada evento lido aparece aqui."
+            ? "Nada esperando revisão. Envie a foto da folha ou a gravação da ordenha: o que for lido aparece aqui para aprovar."
             : "Nenhuma proposta nesta situação."}
         </p>
       )}
@@ -756,13 +840,16 @@ export function ReviewInbox({
       {tab === "pending" &&
         groups.map((group) => (
           <div key={group.source.id} className="proposal-group">
-            <h3>
-              {group.source.label}
-              <small>
-                {SOURCE_LABEL[group.source.kind] ?? group.source.kind}
-                {group.source.reference_date ? ` · ${brDate(group.source.reference_date)}` : ""} ·{" "}
-                {group.items.length} {group.items.length === 1 ? "evento" : "eventos"}
-              </small>
+            <header className="source-head">
+              <div className="source-title">
+                <h3>{group.source.label}</h3>
+                <small>
+                  {sourceMeta(group.source)} · {group.items.length}{" "}
+                  {group.items.length === 1 ? "evento" : "eventos"}
+                </small>
+              </div>
+              {/* A folha ou a gravação ao lado do título, fora dele: um
+                  tocador dentro do título tinha largura zero no celular. */}
               {group.source.media_url && (
                 <SourceMedia
                   url={group.source.media_url}
@@ -771,7 +858,7 @@ export function ReviewInbox({
                   onFetch={onFetchMedia}
                 />
               )}
-            </h3>
+            </header>
             <SourceDate
               source={group.source}
               pending={group.items.length}

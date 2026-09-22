@@ -160,6 +160,9 @@ export interface Animal {
   exited_on?: string | null;
   exit_reason?: ExitReason | null;
   exit_notes?: string | null;
+  /** Ficha duplicada juntada a outra: aponta para a que ficou. */
+  merged_into_id?: string | null;
+  merged_at?: string | null;
 }
 
 export type ExitReason = "venda" | "morte" | "descarte" | "doacao" | "outro";
@@ -174,6 +177,32 @@ export const EXIT_REASON_LABEL: Record<ExitReason, string> = {
 
 export interface AnimalDetail extends Animal {
   historico_lotes: LotAssignment[];
+  /** Fichas duplicadas juntadas a esta. */
+  fichas_juntadas?: MergedFicha[];
+}
+
+export interface MergedFicha {
+  id: string;
+  name: string | null;
+  numero_legado: string | null;
+  merged_at: string | null;
+}
+
+/** O que juntar duas fichas faria, antes de fazer. */
+export interface MergePreview {
+  keep: Animal;
+  drop: Animal;
+  /** Produções da ficha duplicada que passam para a que fica. */
+  moves: { measured_on: string; producao: number | null }[];
+  /** Dias com produção nas duas: bloqueiam a junção. */
+  conflicts: { measured_on: string; keep: number | null; drop: number | null }[];
+  /** Campos vazios da que fica que a duplicada preenche. */
+  fills: Record<string, string | number | null>;
+  /** Lotes que a que fica passa a ter. */
+  lots: string[];
+  pending_proposals: number;
+  /** O que impede juntar — só uma pessoa resolve. */
+  blockers: string[];
 }
 
 export interface AnimalPage {

@@ -6,7 +6,7 @@
  * dá para calcular" — que é o caso quando falta o preço do leite.
  */
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { HerdDashboard } from "./HerdDashboard";
@@ -241,6 +241,45 @@ describe("HerdDashboard", () => {
 });
 
 describe("SuppliesPage", () => {
+  it("mostra o preço do leite em vigor, mesmo quando ele chega depois", async () => {
+    // A fazenda é buscada junto com a tela; antes o campo ficava vazio mesmo
+    // com o preço definido.
+    const view = render(
+      <SuppliesPage token={TOKEN} canEdit onList={vi.fn().mockResolvedValue([])} milkPrice={null} />,
+    );
+    expect(screen.getByLabelText(/pre[çc]o por litro/i)).toHaveValue(null);
+
+    view.rerender(
+      <SuppliesPage token={TOKEN} canEdit onList={vi.fn().mockResolvedValue([])} milkPrice={2.45} />,
+    );
+
+    expect(screen.getByLabelText(/pre[çc]o por litro/i)).toHaveValue(2.45);
+  });
+
+  it("salvar o preço do leite avisa e devolve o valor novo", async () => {
+    const onSetMilkPrice = vi.fn().mockResolvedValue(undefined);
+    const onMilkPriceSaved = vi.fn();
+    render(
+      <SuppliesPage
+        token={TOKEN}
+        canEdit
+        milkPrice={2.45}
+        onList={vi.fn().mockResolvedValue([])}
+        onSetMilkPrice={onSetMilkPrice}
+        onMilkPriceSaved={onMilkPriceSaved}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/pre[çc]o por litro/i), { target: { value: "2.6" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /salvar pre[çc]o do leite/i }));
+    });
+
+    expect(onSetMilkPrice).toHaveBeenCalledWith(TOKEN, 2.6);
+    expect(onMilkPriceSaved).toHaveBeenCalledWith(2.6);
+    expect(screen.getByRole("status")).toHaveTextContent(/pre[çc]o do leite salvo/i);
+  });
+
   it("lista os insumos com preço e dieta", async () => {
     render(
       <SuppliesPage

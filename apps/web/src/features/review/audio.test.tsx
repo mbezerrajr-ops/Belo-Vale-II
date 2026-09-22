@@ -256,3 +256,37 @@ describe("Acompanhar a leitura até o fim", () => {
     expect(onWatch.mock.calls.length).toBe(chamadas);
   });
 });
+
+describe("Gravação mais longa que o limite", () => {
+  // O worker ouve só os primeiros 5 minutos. O gravador do app para sozinho;
+  // um arquivo escolhido do celular não, e o resto era cortado sem aviso.
+  it("avisa na hora de escolher, e deixa enviar mesmo assim", async () => {
+    const measureDuration = vi.fn().mockResolvedValue(7 * 60 + 12);
+    setup({ measureDuration });
+
+    abrirEEscolher();
+    await act(async () => {}); // a medida da duração chega
+
+    expect(measureDuration).toHaveBeenCalledWith(expect.any(File));
+    expect(screen.getByText(/tem 7:12; s[óo] os primeiros 5:00 ser[ãa]o ouvidos/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^enviar$/i })).toBeEnabled();
+  });
+
+  it("dentro do limite, não avisa nada", async () => {
+    setup({ measureDuration: vi.fn().mockResolvedValue(4 * 60) });
+
+    abrirEEscolher();
+    await act(async () => {}); // a medida da duração chega
+
+    expect(screen.queryByText(/primeiros 5:00/i)).not.toBeInTheDocument();
+  });
+
+  it("sem como medir, não avisa nada", async () => {
+    setup({ measureDuration: vi.fn().mockResolvedValue(null) });
+
+    abrirEEscolher();
+    await act(async () => {}); // a medida da duração chega
+
+    expect(screen.queryByText(/primeiros 5:00/i)).not.toBeInTheDocument();
+  });
+});

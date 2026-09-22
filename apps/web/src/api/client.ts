@@ -9,6 +9,7 @@ import {
   type CurrentUser,
   type Farm,
   type LotKind,
+  type MergePreview,
   type DashboardFilters,
   type DashboardSummary,
   type ApproveProposalInput,
@@ -307,6 +308,34 @@ export async function linkBrinco(
 }
 
 /** Tira o brinco: caiu da orelha, ou estava na vaca errada. */
+/** O que juntar esta ficha com a outra faria — sem fazer nada. */
+export async function previewMerge(
+  token: string,
+  animalId: string,
+  otherId: string,
+): Promise<MergePreview> {
+  const params = new URLSearchParams({ other_id: otherId });
+  const response = await fetch(`${API_BASE_URL}/api/animals/${animalId}/merge?${params}`, {
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow<MergePreview>(response);
+}
+
+/** Junta as duas fichas e devolve a que ficou. */
+export async function mergeAnimals(
+  token: string,
+  animalId: string,
+  otherId: string,
+  reason: string,
+): Promise<Animal> {
+  const response = await fetch(`${API_BASE_URL}/api/animals/${animalId}/merge`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ other_id: otherId, reason }),
+  });
+  return parseJsonOrThrow<Animal>(response);
+}
+
 export async function unlinkBrinco(
   token: string,
   animalId: string,

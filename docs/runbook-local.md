@@ -178,6 +178,12 @@ Para chamadas diretas à API (sem passar pelo proxy do nginx):
   brinco que caiu da orelha ou que estava na vaca errada. Exige evidência, como
   vincular. O número fica livre para a vaca certa, e esta deixa de receber
   leitura automática até ganhar outro.
+- **Juntar duas fichas do mesmo animal** (revisor ou administrador, na ficha):
+  "Juntar com outra ficha", busca a outra pelo brinco ou pelo nome e mostra,
+  antes de juntar, tudo o que vai acontecer. A ficha com brinco é a que fica;
+  as produções da outra são relançadas nela (apontando para a original), e a
+  outra fica arquivada, só para consulta. Produção das duas no mesmo dia
+  bloqueia: anule a errada antes. O motivo é obrigatório e fica na auditoria.
 - **Dar baixa** (venda, morte, descarte, doação): revisor ou administrador, na
   ficha do animal. Encerra o lote na data e tira o animal do painel; a
   produção já lançada fica. "Desfazer baixa" traz o animal de volta sem lote.
@@ -217,6 +223,10 @@ Para chamadas diretas à API (sem passar pelo proxy do nginx):
   - **Tentar de novo uma leitura que falhou:** qualquer conta. Ler de novo
     um arquivo que já foi lido com sucesso é de revisor ou administrador —
     criaria outra cópia de cada proposta.
+  - **O que chegou com a caixa aberta:** a cada 30 s a caixa confere o que
+    está pendente e avisa ("Chegaram 3 propostas novas", "1 já foi decidida
+    por outra pessoa"), com "Mostrar agora". A tela não se reorganiza
+    sozinha no meio de uma revisão.
 - **Imprimir**: em Produção, "Imprimir folha em branco" gera a folha do lote
   para preencher no curral; em Animais, "Imprimir lista" imprime todos os
   animais do filtro.

@@ -120,6 +120,19 @@ export const Icons = {
       <path d="M4 21c0-4 3.5-7 8-7s8 3 8 7" />
     </svg>
   ),
+  mais: (): JSX.Element => (
+    <svg {...ICON_PROPS}>
+      <rect x="4" y="4" width="6.5" height="6.5" rx="1.6" />
+      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6" />
+      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6" />
+      <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6" />
+    </svg>
+  ),
+  atualizar: (): JSX.Element => (
+    <svg {...ICON_PROPS} width={18} height={18}>
+      <path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4" />
+    </svg>
+  ),
   back: (): JSX.Element => (
     <svg {...ICON_PROPS}>
       <path d="M15 5l-7 7 7 7" />

@@ -4,7 +4,7 @@
  * Complementa os testes de cada tela com o que esta etapa acrescentou.
  */
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LoginForm } from "../auth/LoginForm";
@@ -266,6 +266,7 @@ describe("Baixa de animal", () => {
     });
 
     render(<AnimalSearchPage token={TOKEN} canEdit onOpen={vi.fn()} onSearch={search} />);
+    await act(async () => {}); // a lista do rebanho, que abre sozinha
 
     fireEvent.click(screen.getByRole("button", { name: /baixados/i }));
 

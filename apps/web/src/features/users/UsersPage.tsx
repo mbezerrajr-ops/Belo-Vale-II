@@ -280,6 +280,7 @@ export function UsersPage({
                   )}
                   <button
                     type="button"
+                    className={user.is_active ? "secondary danger" : "secondary"}
                     onClick={() => void toggleActive(user)}
                     disabled={busy}
                   >

@@ -8,11 +8,13 @@ autorização de domínio delegada ao navegador.
 from __future__ import annotations
 
 from dataclasses import asdict
+from decimal import Decimal
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.farm_clock import farm_today
@@ -33,7 +35,13 @@ from app.schemas.registry import (
     FarmRead,
     LotAssign,
     LotAssignmentRead,
+    MergeConflict,
+    MergedFicha,
+    MergeIn,
+    MergeMove,
+    MergePreview,
 )
+from app.services.animal_merge import MergeBlocked, MergeNotFound, merge_animals, plan_merge
 from app.services.animal_registry import (
     AnimalRegistryError,
     assign_lot,
@@ -47,6 +55,7 @@ from app.services.animal_registry import (
     update_animal,
 )
 from app.services.brinco import normalize_brinco
+from app.services.production_entry import producao_of
 from app.services.production_history import animal_production_history
 from app.services.lot_kind import KIND_DIET, KIND_MANAGEMENT
 
@@ -163,7 +172,9 @@ async def list_animals(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> AnimalPage:
-    filters = [Animal.farm_id == farm.id]
+    # Ficha juntada a outra não é animal do rebanho em nenhuma lista: abre só
+    # pelo link da ficha que ficou.
+    filters = [Animal.farm_id == farm.id, Animal.merged_into_id.is_(None)]
     if rebanho == "ativos":
         filters.append(Animal.exited_on.is_(None))
     elif rebanho == "baixados":
@@ -218,10 +229,80 @@ async def read_animal(
     animal = await _load_or_404(session, animal_id, farm.id)
     history = await lot_history(session, animal_id=animal.id)
     base = await _read_model(session, animal)
+    joined = await session.scalars(
+        select(Animal).where(Animal.merged_into_id == animal.id).order_by(Animal.merged_at)
+    )
     return AnimalDetail(
         **base.model_dump(),
         historico_lotes=[LotAssignmentRead.model_validate(row) for row in history],
+        fichas_juntadas=[MergedFicha.model_validate(row) for row in joined],
     )
+
+
+def _plain(value: Any) -> Any:
+    # O JSON da prévia mostra peso como número, não como texto decimal.
+    return float(value) if isinstance(value, Decimal) else value
+
+
+@router.get("/animals/{animal_id}/merge", response_model=MergePreview)
+async def merge_preview(
+    animal_id: UUID,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    farm: Annotated[Farm, Depends(resolve_current_farm)],
+    _: Annotated[User, Depends(require_minimum_role("reviewer"))],
+    other_id: UUID = Query(description="A outra ficha, que seria juntada a esta."),
+) -> MergePreview:
+    """O que juntar as duas fichas faria — sem fazer nada."""
+    try:
+        plan = await plan_merge(session, farm_id=farm.id, animal_id=animal_id, other_id=other_id)
+    except MergeNotFound as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    return MergePreview(
+        keep=await _read_model(session, plan.keep),
+        drop=await _read_model(session, plan.drop),
+        moves=[MergeMove(measured_on=m.measured_on, producao=producao_of(m)) for m in plan.moves],
+        conflicts=[
+            MergeConflict(measured_on=day, keep=keep, drop=drop) for day, keep, drop in plan.conflicts
+        ],
+        fills={field: _plain(value) for field, value in plan.fills.items()},
+        lots=[lot.lote for lot in plan.lot_fills],
+        pending_proposals=plan.pending_proposals,
+        blockers=plan.blockers,
+    )
+
+
+@router.post("/animals/{animal_id}/merge", response_model=AnimalRead)
+async def merge_endpoint(
+    animal_id: UUID,
+    payload: MergeIn,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    farm: Annotated[Farm, Depends(resolve_current_farm)],
+    user: Annotated[User, Depends(require_minimum_role("reviewer"))],
+) -> AnimalRead:
+    """Junta a ficha duplicada à que fica e devolve a que ficou."""
+    try:
+        keep = await merge_animals(
+            session,
+            farm_id=farm.id,
+            user=user,
+            animal_id=animal_id,
+            other_id=payload.other_id,
+            reason=payload.reason,
+        )
+    except MergeNotFound as error:
+        await session.rollback()
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except MergeBlocked as error:
+        await session.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except IntegrityError as error:
+        # Alguém lançou produção numa das fichas no mesmo instante.
+        await session.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail="Uma das fichas mudou agora mesmo. Abra de novo e confira antes de juntar.",
+        ) from error
+    return await _read_model(session, keep)
 
 
 @router.patch("/animals/{animal_id}", response_model=AnimalRead)

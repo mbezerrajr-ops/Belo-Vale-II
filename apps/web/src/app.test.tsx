@@ -2,7 +2,7 @@
  * Casca do aplicativo: para onde cada pessoa vai ao entrar.
  */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
@@ -79,6 +79,39 @@ describe("App", () => {
 
     expect(await screen.findByLabelText("2 pendentes")).toBeInTheDocument();
     expect(api.listProposals).toHaveBeenCalledWith("token-de-teste", "pending");
+  });
+
+  it("no celular, o que não cabe na barra fica em Mais", async () => {
+    // Oito destinos numa barra de 390 px cortavam o último rótulo e
+    // escondiam os seguintes, sem sinal de que existiam.
+    signedIn({ role: "admin", email: "dono@belovale" });
+    api.listSupplies.mockResolvedValue([]);
+    render(<App />);
+    const mais = await screen.findByRole("button", { name: /^mais$/i });
+    expect(mais).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(mais);
+    const painel = screen.getByRole("group", { name: /mais áreas/i });
+    expect(within(painel).getByRole("button", { name: /contas/i })).toBeInTheDocument();
+    expect(within(painel).queryByRole("button", { name: /produção/i })).not.toBeInTheDocument();
+    fireEvent.click(within(painel).getByRole("button", { name: /insumos/i }));
+
+    expect(screen.queryByRole("group", { name: /mais áreas/i })).not.toBeInTheDocument();
+    // O botão diz em que área a pessoa está.
+    expect(screen.getByRole("button", { name: /^insumos$/i, expanded: false })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+  });
+
+  it("Esc fecha o Mais", async () => {
+    signedIn({ role: "admin", email: "dono@belovale" });
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /^mais$/i }));
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(screen.queryByRole("group", { name: /mais áreas/i })).not.toBeInTheDocument();
   });
 
   it("não há mais área Fichas: a foto é enviada pela Revisão", async () => {

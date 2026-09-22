@@ -16,10 +16,10 @@ import type { Animal, AnimalPage, ProductionSheet } from "../api/types";
 
 const TOKEN = "token-de-teste";
 
-let print: ReturnType<typeof vi.fn>;
+let print: ReturnType<typeof vi.fn<() => void>>;
 
 beforeEach(() => {
-  print = vi.fn();
+  print = vi.fn<() => void>();
   window.print = print;
 });
 

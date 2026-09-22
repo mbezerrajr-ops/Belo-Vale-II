@@ -378,6 +378,9 @@ async def list_proposals(
 
     animals = list(await session.scalars(select(Animal).where(Animal.farm_id == farm_id)))
     by_id = {animal.id: animal for animal in animals}
+    # Ficha juntada a outra nunca é sugerida: a decidida continua mostrando o
+    # animal em que foi aplicada, mas a sugestão é sempre a ficha que ficou.
+    herd = [animal for animal in animals if animal.merged_into_id is None]
     items = []
     for proposal, source, email, corrected_by in rows:
         animal_id = proposal.applied_animal_id or proposal.candidate_animal_id
@@ -387,7 +390,7 @@ async def list_proposals(
                 proposal=proposal,
                 source=source,
                 candidate=candidate,
-                suggestions=_suggestions_for(animals, proposal, candidate),
+                suggestions=_suggestions_for(herd, proposal, candidate),
                 decided_by=email,
                 corrected_by=corrected_by,
             )
@@ -635,6 +638,8 @@ async def approve_proposal(
     )
     if animal is None:
         raise ProposalInvalid("Escolha um animal desta fazenda antes de aprovar.")
+    if animal.merged_into_id is not None:
+        raise ProposalInvalid("Esta ficha foi juntada a outra: escolha a ficha que ficou.")
     validated = validate_payload(proposal.event_type, payload)
     applied = validated.model_dump(mode="json")
     source = await session.get(EventProposalSource, proposal.source_id)

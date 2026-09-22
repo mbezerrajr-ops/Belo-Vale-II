@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.core.config import Settings, get_settings
 from app.core.security import create_access_token, hash_password
 from app.db.models import ExtractionRun, Farm, MediaAsset, User
+from app.routers.registry import resolve_current_farm
 from app.db.session import get_db_session
 from app.main import create_app
 from app.services.media_sniffing import sniff_image_media_type
@@ -242,7 +243,12 @@ def _build_client(
     app.dependency_overrides[get_object_storage] = lambda: InMemoryObjectStorage()
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_extraction_dispatcher] = lambda: dispatcher
+    # A fazenda vem do servidor; aqui, uma fixa, sem banco.
+    app.dependency_overrides[resolve_current_farm] = lambda: _FARM
     return TestClient(app), dispatcher
+
+
+_FARM = Farm(id=uuid4(), name="Fazenda Modelo")
 
 
 def _operator() -> User:
@@ -275,7 +281,7 @@ def test_upload_creates_a_queued_import_and_dispatches_extraction() -> None:
 
     response = client.post(
         "/api/imports",
-        data={"farm_id": str(uuid4())},
+        data={"farm_id": str(_FARM.id)},
         files={"file": ("sheet.jpg", _JPEG_BYTES, "image/jpeg")},
         headers={"Authorization": f"Bearer {token}"},
     )

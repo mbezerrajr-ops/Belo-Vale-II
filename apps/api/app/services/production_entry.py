@@ -105,6 +105,8 @@ async def _load_animal(session: AsyncSession, *, farm_id: UUID, animal_id: UUID)
     )
     if animal is None:
         raise AnimalNotFound("Animal não encontrado.")
+    if animal.merged_into_id is not None:
+        raise AnimalNotFound("Esta ficha foi juntada a outra: lance a produção na ficha que ficou.")
     return animal
 
 

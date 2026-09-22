@@ -449,7 +449,23 @@ export function ProductionPage({
                   </span>
                   <span className="name">
                     {item.name ?? "sem nome"}
-                    {item.situacao && <small>{item.situacao}</small>}
+                    <small>
+                      {item.situacao}
+                      {/* Anular fica junto do nome: numa linha própria, cada
+                          vaca ocupava o dobro da altura. */}
+                      {canCorrect && row.status === "saved" && row.measurementId && (
+                        <button
+                          type="button"
+                          className="row-void"
+                          aria-label={`Anular o lançamento de ${label(item)}`}
+                          onClick={() =>
+                            patch(item.animal_id, { status: "voiding", message: null, reason: "" })
+                          }
+                        >
+                          Anular
+                        </button>
+                      )}
+                    </small>
                   </span>
                   <span className="prod-input">
                     <input
@@ -498,18 +514,6 @@ export function ProductionPage({
                     </button>
                   )}
 
-                  {canCorrect && row.status === "saved" && row.measurementId && (
-                    <button
-                      type="button"
-                      className="link-btn row-void"
-                      onClick={() =>
-                        patch(item.animal_id, { status: "voiding", message: null, reason: "" })
-                      }
-                    >
-                      Anular
-                    </button>
-                  )}
-
                   {adjusting && (
                     <div className="row-fix">
                       <label htmlFor={`reason-${item.animal_id}`}>
@@ -533,6 +537,7 @@ export function ProductionPage({
                       <div className="row-fix-actions">
                         <button
                           type="button"
+                          className={row.status === "voiding" ? "danger" : undefined}
                           onClick={() =>
                             void (row.status === "correcting"
                               ? submitCorrection(item.animal_id)

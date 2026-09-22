@@ -87,6 +87,12 @@ export function HerdDashboard({
 
   const lotsWithData = panel.lots.filter((lot) => lot.animals > 0 || lot.feed_cost > 0);
   const lotsWithCost = lotsWithData.filter((lot) => lot.feed_cost > 0);
+  // Topo comum das duas listas de produção (maiores e menores).
+  const producerScale = Math.max(
+    1,
+    ...panel.top_producers.map((item) => item.production),
+    ...panel.bottom_producers.map((item) => item.production),
+  );
 
   return (
     <section className="dashboard">
@@ -279,10 +285,11 @@ export function HerdDashboard({
           <p className="chart-empty">Nenhum lote com dieta cadastrada.</p>
         ) : (
           <Columns
-            series={["Custo", "Receita"]}
+            // Mesmas cores dos indicadores acima: receita verde, custo terracota.
+            series={["Receita", "Custo"]}
             groups={lotsWithCost.map((lot) => ({
               label: lot.lote,
-              values: [lot.feed_cost, lot.revenue ?? 0],
+              values: [lot.revenue ?? 0, lot.feed_cost],
               note:
                 lot.profit === null
                   ? undefined
@@ -313,11 +320,14 @@ export function HerdDashboard({
           description="Áreas e categorias da fazenda. Não são lotes de ordenha: não têm dieta nem custo."
         >
           <BarList
-            data={Object.entries(panel.by_management_group).map(([label, value]) => ({
-              label,
-              value,
-              series: 4,
-            }))}
+            // Os maiores grupos primeiro: é onde está a maior parte do rebanho.
+            data={Object.entries(panel.by_management_group)
+              .sort(([, a], [, b]) => b - a)
+              .map(([label, value]) => ({
+                label,
+                value,
+                series: 4,
+              }))}
           />
         </ChartCard>
       )}
@@ -356,6 +366,8 @@ export function HerdDashboard({
         </ChartCard>
       </div>
 
+      {/* As duas listas medem a mesma coisa: mesma cor e mesma escala. Com a
+          escala de cada uma, 8,5 L aparecia com a barra quase cheia. */}
       <div className="grid2">
         <ChartCard index={6} title="Maiores produções" description="Nesta data de coleta.">
           {panel.top_producers.length === 0 ? (
@@ -369,6 +381,7 @@ export function HerdDashboard({
               }))}
               format={fmt.liters}
               tip={(d) => `${d.label}: ${fmt.liters(d.value)}`}
+              max={producerScale}
             />
           )}
         </ChartCard>
@@ -381,10 +394,11 @@ export function HerdDashboard({
               data={panel.bottom_producers.map((item) => ({
                 label: item.name ?? item.brinco ?? "—",
                 value: item.production,
-                series: 3,
+                series: 2,
               }))}
               format={fmt.liters}
               tip={(d) => `${d.label}: ${fmt.liters(d.value)}`}
+              max={producerScale}
             />
           )}
         </ChartCard>

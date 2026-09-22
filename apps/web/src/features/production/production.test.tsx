@@ -248,6 +248,56 @@ describe("ProductionPage", () => {
     expect(field).toHaveValue("21,5");
   });
 
+  it("revisor anula pela própria linha, com motivo", async () => {
+    const onVoid = vi.fn().mockResolvedValue(undefined);
+    setup(
+      { canCorrect: true, onVoid },
+      sheet({
+        items: [
+          {
+            animal_id: "a-027",
+            brinco: "027",
+            name: "BORBOREMA",
+            situacao: "Em lactação",
+            producao: 21.5,
+            measurement_id: "m-1",
+            provenance: "manual_entry",
+          },
+        ],
+      }),
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Anular o lançamento de BORBOREMA" }));
+    fireEvent.change(screen.getByLabelText(/motivo para anular/i), {
+      target: { value: "lançado na vaca errada" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Anular lançamento" }));
+
+    await waitFor(() => expect(onVoid).toHaveBeenCalledWith(TOKEN, "m-1", "lançado na vaca errada"));
+  });
+
+  it("operador não vê anular", async () => {
+    setup(
+      { canCorrect: false },
+      sheet({
+        items: [
+          {
+            animal_id: "a-027",
+            brinco: "027",
+            name: "BORBOREMA",
+            situacao: "Em lactação",
+            producao: 21.5,
+            measurement_id: "m-1",
+            provenance: "manual_entry",
+          },
+        ],
+      }),
+    );
+
+    await screen.findByLabelText("Litros de BORBOREMA");
+    expect(screen.queryByRole("button", { name: /anular/i })).not.toBeInTheDocument();
+  });
+
   it("trocar de lote recarrega a folha", async () => {
     const { onLoadSheet } = setup();
 

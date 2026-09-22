@@ -7,7 +7,13 @@ import {
   type ReadingFailure,
   type UploadResult,
 } from "../../api/types";
-import { AudioRecorder, browserRecorder, type RecorderApi } from "./AudioRecorder";
+import {
+  AudioRecorder,
+  MAX_RECORDING_SECONDS,
+  browserRecorder,
+  clock,
+  type RecorderApi,
+} from "./AudioRecorder";
 import { uploadErrorMessage } from "./uploadErrors";
 
 /**
@@ -32,6 +38,8 @@ export type UploadFn = (
 ) => Promise<UploadResult>;
 export type ReprocessFn = (importId: string, token: string) => Promise<UploadResult>;
 export type WatchFn = (importId: string, token: string) => Promise<ImportReading>;
+/** Duração da gravação escolhida, em segundos — ou `null` se não der para saber. */
+export type MeasureFn = (file: File) => Promise<number | null>;
 
 export interface Variant {
   arquivo: "foto" | "gravação";
@@ -72,6 +80,32 @@ export interface SendUploadProps {
   recorder?: RecorderApi | null;
   /** Pergunta antes de jogar fora uma gravação que não foi enviada. */
   confirmDiscard?: (message: string) => boolean;
+  /** Mede a gravação escolhida; dublê nos testes. */
+  measureDuration?: MeasureFn;
+}
+
+/** A duração que o navegador lê do arquivo, sem tocar nada. */
+function browserDuration(file: File): Promise<number | null> {
+  if (typeof URL.createObjectURL !== "function" || typeof Audio === "undefined") {
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const audio = new Audio();
+    let answered = false;
+    const answer = (seconds: number | null): void => {
+      if (answered) return;
+      answered = true;
+      URL.revokeObjectURL(url);
+      resolve(seconds);
+    };
+    audio.preload = "metadata";
+    // Gravação sem duração no cabeçalho (comum no WebM) dá Infinity: sem aviso.
+    audio.onloadedmetadata = () => answer(Number.isFinite(audio.duration) ? audio.duration : null);
+    audio.onerror = () => answer(null);
+    window.setTimeout(() => answer(null), 5_000);
+    audio.src = url;
+  });
 }
 
 /** Espera entre as perguntas ao servidor: rápido no começo, depois com calma. */
@@ -105,6 +139,7 @@ export function SendUpload({
   onSent,
   recorder,
   confirmDiscard = (message) => window.confirm(message),
+  measureDuration = browserDuration,
 }: SendUploadProps & { variant: Variant }): JSX.Element {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -114,6 +149,9 @@ export function SendUpload({
   const [lote, setLote] = useState("");
   const [state, setState] = useState<State>({ status: "idle" });
   const [hasRecorder, setHasRecorder] = useState(false);
+  // Gravação escolhida mais longa que o limite: o worker ouve só o começo.
+  const [tooLong, setTooLong] = useState<number | null>(null);
+  const chosenAt = useRef(0);
 
   // O token é renovado enquanto a leitura roda: cada pergunta usa o atual.
   const currentToken = useRef(token);
@@ -277,10 +315,27 @@ export function SendUpload({
         // No celular, abre direto a câmera (foto) ou o gravador (áudio).
         capture={variant.capture}
         onChange={(event) => {
-          setFile(event.target.files?.[0] ?? null);
+          const chosen = event.target.files?.[0] ?? null;
+          setFile(chosen);
           setRecorded(false);
+          setTooLong(null);
+          if (chosen !== null && variant.arquivo === "gravação") {
+            const attempt = ++chosenAt.current;
+            void measureDuration(chosen).then((seconds) => {
+              // Só vale a medida do último arquivo escolhido.
+              if (attempt === chosenAt.current && seconds !== null && seconds > MAX_RECORDING_SECONDS) {
+                setTooLong(seconds);
+              }
+            });
+          }
         }}
       />
+      {tooLong !== null && (
+        <p className="warning">
+          Esta gravação tem {clock(tooLong)}; só os primeiros {clock(MAX_RECORDING_SECONDS)} serão
+          ouvidos. Grave o resto em outra, ou divida o arquivo.
+        </p>
+      )}
       {variant.gravador && hasRecorder ? (
         <p className="hint">Ou escolha uma gravação feita em outro app.</p>
       ) : (
