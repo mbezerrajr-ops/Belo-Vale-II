@@ -132,8 +132,11 @@ test("filtra por arquivo e troca a data do arquivo inteiro", async ({ page }) =>
   await page.getByLabel("Nova data do arquivo").fill(DAY);
   await page.getByRole("button", { name: /Aplicar às 1 pendente/ }).click();
 
-  const heading = page.getByRole("heading", { name: new RegExp(SHEET_LABEL) });
-  await expect(heading).toContainText(br(DAY));
+  // A data do arquivo fica nos detalhes, logo abaixo do título.
+  const header = page
+    .getByRole("heading", { name: new RegExp(SHEET_LABEL) })
+    .locator("xpath=ancestor::header[1]");
+  await expect(header).toContainText(br(DAY));
   await expect(page.getByText(`lida como ${br(WRONG_DAY)}`, { exact: false })).toBeVisible();
   await expect(card).not.toContainText("mais de 6 meses");
 });
