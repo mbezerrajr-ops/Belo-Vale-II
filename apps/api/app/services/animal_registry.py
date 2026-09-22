@@ -107,6 +107,10 @@ async def _load_animal(
     )
     if animal is None:
         raise AnimalRegistryError("Animal não encontrado nesta fazenda.")
+    if animal.merged_into_id is not None:
+        raise AnimalRegistryError(
+            "Esta ficha foi juntada a outra e não muda mais: abra a ficha que ficou."
+        )
     return animal
 
 

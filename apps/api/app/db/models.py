@@ -118,6 +118,15 @@ class Animal(TimestampedModel, Base):
             "(exited_on IS NULL) = (exit_reason IS NULL)",
             name="ck_animals_exit_complete",
         ),
+        CheckConstraint(
+            "(merged_into_id IS NULL) = (merged_at IS NULL)", name="ck_animals_merge_complete"
+        ),
+        CheckConstraint(
+            "merged_into_id IS NULL OR merged_into_id <> id", name="ck_animals_merge_not_self"
+        ),
+        CheckConstraint(
+            "merged_into_id IS NULL OR brinco IS NULL", name="ck_animals_merged_without_brinco"
+        ),
         Index("uq_animals_farm_identifier", "farm_id", "identifier", unique=True),
         Index(
             "uq_animals_farm_brinco",
@@ -155,6 +164,13 @@ class Animal(TimestampedModel, Base):
     exited_on: Mapped[date | None] = mapped_column(Date)
     exit_reason: Mapped[str | None] = mapped_column(String(16))
     exit_notes: Mapped[str | None] = mapped_column(Text)
+    #: Ficha duplicada juntada a outra: aponta para a que ficou. Arquivada, fora
+    #: do rebanho e das buscas, mas não apagada — as medições anuladas nela
+    #: continuam sendo prova. Ver `app/services/animal_merge.py`.
+    merged_into_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("animals.id", ondelete="RESTRICT", name="fk_animals_merged_into_id")
+    )
+    merged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     farm: Mapped[Farm] = relationship(back_populates="animals")
     lot_assignments: Mapped[list[AnimalLotAssignment]] = relationship(
         back_populates="animal"

@@ -7,8 +7,8 @@ ignorados em vez de aceitos silenciosamente como identidade.
 
 from __future__ import annotations
 
-from datetime import date
-from typing import Literal
+from datetime import date, datetime
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -122,10 +122,61 @@ class AnimalRead(BaseModel):
     exited_on: date | None = None
     exit_reason: str | None = None
     exit_notes: str | None = None
+    #: Ficha duplicada juntada a outra: aponta para a que ficou.
+    merged_into_id: UUID | None = None
+    merged_at: datetime | None = None
+
+
+class MergedFicha(BaseModel):
+    """Uma ficha duplicada que foi juntada a esta."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str | None
+    numero_legado: str | None
+    merged_at: datetime | None
 
 
 class AnimalDetail(AnimalRead):
     historico_lotes: list[LotAssignmentRead] = []
+    fichas_juntadas: list[MergedFicha] = []
+
+
+class MergeIn(BaseModel):
+    other_id: UUID
+    reason: str = Field(max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def _required(cls, value: str) -> str:
+        if len(value.strip()) < 3:
+            raise ValueError("Diga em poucas palavras por que as fichas são do mesmo animal.")
+        return value.strip()
+
+
+class MergeMove(BaseModel):
+    measured_on: date
+    producao: float | None
+
+
+class MergeConflict(BaseModel):
+    measured_on: date
+    keep: float | None
+    drop: float | None
+
+
+class MergePreview(BaseModel):
+    """O que a junção faria, antes de fazer."""
+
+    keep: AnimalRead
+    drop: AnimalRead
+    moves: list[MergeMove]
+    conflicts: list[MergeConflict]
+    fills: dict[str, Any]
+    lots: list[str]
+    pending_proposals: int
+    blockers: list[str]
 
 
 class AnimalPage(BaseModel):
