@@ -41,6 +41,13 @@ test("lança sem sinal, recarrega sem sinal e o valor chega quando o sinal volta
   await expect(page.getByLabel(`Litros de ${cow.name}`)).toHaveValue("23,5");
   await expect(page.getByText(/folha guardada/i)).toBeVisible();
 
+  // Uma tela nunca aberta também abre sem sinal: as partes do app que são
+  // baixadas sob demanda já estavam guardadas no celular.
+  await openArea(page, "Insumos");
+  await expect(page.getByRole("heading", { name: "Insumos e dieta" })).toBeVisible();
+  await openArea(page, "Produção");
+  await page.getByRole("group", { name: "Lote de ordenha" }).getByRole("button", { name: "LOTE 3" }).click();
+
   // O sinal volta: vai sozinho.
   await context.setOffline(false);
   await expect(page.getByRole("button", { name: /guardado/ })).toHaveCount(0, { timeout: 45_000 });

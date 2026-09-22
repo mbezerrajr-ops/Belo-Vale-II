@@ -4,6 +4,11 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // A lista de todas as partes do app, para o service worker guardar até
+    // as telas que ainda não foram abertas (e elas abrirem sem sinal).
+    manifest: "asset-manifest.json",
+  },
   server: {
     // Local `npm run dev` proxies /api the same way nginx does in Docker, so
     // the browser always talks to one origin and VITE_API_BASE_URL can stay

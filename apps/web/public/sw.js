@@ -6,27 +6,50 @@
  * guardado por este arquivo (o que precisa esperar sinal vai para a fila do
  * próprio app).
  *
+ * - Todas as partes do app, pela lista que o build gera (asset-manifest.json):
+ *   as telas são baixadas sob demanda, e uma tela nunca aberta também
+ *   precisa abrir sem sinal.
  * - Página: da rede primeiro, para cada abertura com sinal pegar a versão
- *   nova; sem sinal, a última guardada.
+ *   nova; sem sinal, a última guardada. Versão nova detectada: guarda as
+ *   partes novas antes da página nova, e tira as que ninguém usa mais.
  * - /assets/: têm o conteúdo no nome, então a guardada é sempre a certa.
- *   Quando uma página nova é guardada, os arquivos que ela não usa mais saem.
  */
 
 const CACHE = "belo-vale-app";
 
-/**
- * Na instalação, guarda a página e os arquivos que ela usa. Sem isto, a
- * primeira visita (que o service worker ainda não controla) não guardava
- * nada, e recarregar sem sinal logo depois falhava.
- */
+async function appFiles() {
+  const response = await fetch("/asset-manifest.json", { cache: "no-store" });
+  if (!response.ok) return null;
+  const manifest = await response.json();
+  const files = new Set();
+  for (const entry of Object.values(manifest)) {
+    if (entry.file) files.add(`/${entry.file}`);
+    for (const css of entry.css ?? []) files.add(`/${css}`);
+    for (const asset of entry.assets ?? []) files.add(`/${asset}`);
+  }
+  return files;
+}
+
+/** Guarda a versão atual inteira. A página por último: ela só passa a valer
+ *  quando tudo o que ela usa já está guardado. */
 async function precache() {
   const cache = await caches.open(CACHE);
-  const response = await fetch("/", { cache: "no-store" });
-  if (!response.ok) return;
-  const html = await response.clone().text();
-  await cache.put("/", response);
-  const assets = Array.from(new Set(Array.from(html.matchAll(/\/assets\/[^"'\s)]+/g), (match) => match[0])));
-  await cache.addAll(assets);
+  const page = await fetch("/", { cache: "no-store" });
+  const files = await appFiles();
+  if (!page.ok || files === null) return;
+  // Um a um: uma parte que falhar não impede as outras de ficar.
+  await Promise.all(
+    [...files].map(async (file) => {
+      if (await cache.match(file)) return;
+      const response = await fetch(file);
+      if (response.ok) await cache.put(file, response);
+    }),
+  );
+  await cache.put("/", page);
+  for (const request of await cache.keys()) {
+    const path = new URL(request.url).pathname;
+    if (path.startsWith("/assets/") && !files.has(path)) await cache.delete(request);
+  }
 }
 
 self.addEventListener("install", (event) => {
@@ -50,24 +73,18 @@ function isAppRequest(request, url) {
   );
 }
 
-/** Tira do cache os /assets/ que a página nova não referencia. */
-async function prune(cache, html) {
-  const used = new Set(Array.from(html.matchAll(/\/assets\/[^"'\s)]+/g), (match) => match[0]));
-  for (const request of await cache.keys()) {
-    const path = new URL(request.url).pathname;
-    if (path.startsWith("/assets/") && !used.has(path)) await cache.delete(request);
-  }
-}
-
-async function page(request) {
+async function page(event) {
   const cache = await caches.open(CACHE);
   try {
-    const response = await fetch(request);
+    const response = await fetch(event.request);
     if (response.ok) {
-      const copy = response.clone();
-      // Toda rota do app é a mesma página: guarda uma vez só, como "/".
-      await cache.put("/", copy.clone());
-      await prune(cache, await copy.text());
+      const saved = await cache.match("/");
+      const [fresh, old] = await Promise.all([
+        response.clone().text(),
+        saved ? saved.text() : Promise.resolve(""),
+      ]);
+      // Versão nova do app: guarda tudo dela, em segundo plano.
+      if (fresh !== old) event.waitUntil(precache().catch(() => undefined));
     }
     return response;
   } catch (error) {
@@ -104,10 +121,10 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (!isAppRequest(request, url)) return;
   if (request.mode === "navigate") {
-    event.respondWith(page(request));
+    event.respondWith(page(event));
   } else if (url.pathname.startsWith("/assets/")) {
     event.respondWith(asset(request));
-  } else if (/\.(svg|png|json|webmanifest)$/.test(url.pathname)) {
+  } else if (/\.(svg|png|json|webmanifest)$/.test(url.pathname) && url.pathname !== "/asset-manifest.json") {
     event.respondWith(other(request));
   }
 });

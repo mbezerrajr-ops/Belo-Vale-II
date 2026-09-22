@@ -4718,3 +4718,13 @@ h2[tabindex="-1"]:focus,
 .topbar h1.wordmark {
   font-size: inherit;
 }
+
+.area-failed {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.area-failed p {
+  margin: 0;
+}

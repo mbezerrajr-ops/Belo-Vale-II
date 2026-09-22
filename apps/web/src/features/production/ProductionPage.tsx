@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Suspense, lazy, memo, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import {
   correctReading,
@@ -14,7 +14,8 @@ import {
   type SheetItem,
 } from "../../api/types";
 import { brDate, liters, farmToday } from "../../ui/dates";
-import { ImportPanel } from "./ImportPanel";
+// A importação é de escritório: só baixa quando alguém escolhe "Importar".
+const ImportPanel = lazy(() => import("./ImportPanel").then((m) => ({ default: m.ImportPanel })));
 import { Icons } from "../../ui/Brand";
 import { PageHeader } from "../../ui/PageHeader";
 import { isTransient, withTimeout } from "../../offline/outbox";
@@ -161,6 +162,154 @@ function isConflict(detail: unknown): detail is ReadingConflict {
 function label(item: SheetItem): string {
   return item.name ?? item.brinco ?? "animal sem identificação";
 }
+
+interface RowActions {
+  patch: (animalId: string, changes: Partial<RowState>) => void;
+  commit: (animalId: string) => void;
+  submitCorrection: (animalId: string) => void;
+  submitVoid: (animalId: string) => void;
+  cancelAdjust: (animalId: string) => void;
+  registerInput: (index: number, element: HTMLInputElement | null) => void;
+  focusNext: (index: number, current: HTMLInputElement) => void;
+}
+
+/**
+ * Uma vaca da folha. Só redesenha quando a linha dela muda: antes, cada
+ * tecla redesenhava as 60 vacas do lote, e no celular simples do curral isso
+ * pesava no digitar.
+ */
+const ProductionRow = memo(function ProductionRow({
+  item,
+  index,
+  row,
+  canCorrect,
+  actions,
+}: {
+  item: SheetItem;
+  index: number;
+  row: RowState;
+  canCorrect: boolean;
+  actions: RowActions;
+}): JSX.Element {
+  const adjusting = row.status === "correcting" || row.status === "voiding";
+  return (
+      <li
+        key={item.animal_id}
+        className={`prod-row is-${row.status}`}
+        style={{ "--i": index } as CSSProperties}
+      >
+        <span className={item.brinco ? "tag" : "tag none"}>
+          {item.brinco ?? "sem brinco"}
+        </span>
+        <span className="name">
+          {item.name ?? "sem nome"}
+          <small>
+            {item.situacao}
+            {/* Anular fica junto do nome: numa linha própria, cada
+                vaca ocupava o dobro da altura. */}
+            {canCorrect && row.status === "saved" && row.measurementId && (
+              <button
+                type="button"
+                className="row-void"
+                aria-label={`Anular o lançamento de ${label(item)}`}
+                onClick={() =>
+              actions.patch(item.animal_id, { status: "voiding", message: null, reason: "" })
+                }
+              >
+                Anular
+              </button>
+            )}
+          </small>
+        </span>
+        <span className="prod-input">
+          <input
+            ref={(element) => actions.registerInput(index, element)}
+            aria-label={`Litros de ${label(item)}`}
+            inputMode="decimal"
+            enterKeyHint="next"
+            autoComplete="off"
+            value={row.value}
+            disabled={row.status === "saving"}
+            onChange={(event) => actions.patch(item.animal_id, { value: event.target.value })}
+            onBlur={() => actions.commit(item.animal_id)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              // Sair do campo salva; aqui só se decide para onde ir.
+              actions.focusNext(index, event.currentTarget);
+            }}
+          />
+          <span className="unit">L</span>
+        </span>
+        <span className="prod-state" aria-live="polite">
+          {row.status === "saving" && "salvando…"}
+          {row.status === "queued" && (
+            <span className="queued" aria-label="guardado no celular" title="Guardado no celular">
+              <Icons.guardado />
+            </span>
+          )}
+          {row.status === "saved" && (
+            <span className="ok" aria-label="salvo">
+              ✓
+            </span>
+          )}
+        </span>
+
+        {row.message && <p className="row-msg">{row.message}</p>}
+
+        {row.status === "offline" && (
+          <button
+            type="button"
+            className="row-retry"
+            onClick={() => actions.commit(item.animal_id)}
+          >
+            Tentar de novo
+          </button>
+        )}
+
+        {adjusting && (
+          <div className="row-fix">
+            <label htmlFor={`reason-${item.animal_id}`}>
+              {row.status === "correcting"
+                ? `Motivo da correção (${show(row.saved)} → ${row.value} L)`
+                : "Motivo para anular este lançamento"}
+            </label>
+            <input
+              id={`reason-${item.animal_id}`}
+              value={row.reason}
+              onChange={(event) => actions.patch(item.animal_id, { reason: event.target.value })}
+              placeholder={
+                row.status === "correcting"
+                  ? "Ex.: anotado errado no caderno"
+                  : "Ex.: lançado na vaca errada"
+              }
+              autoComplete="off"
+            />
+            <div className="row-fix-actions">
+              <button
+                type="button"
+                className={row.status === "voiding" ? "danger" : undefined}
+                onClick={() =>
+                  row.status === "correcting"
+                ? actions.submitCorrection(item.animal_id)
+                : actions.submitVoid(item.animal_id)
+                }
+              >
+                {row.status === "correcting" ? "Salvar correção" : "Anular lançamento"}
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => actions.cancelAdjust(item.animal_id)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+      </li>
+  );
+});
 
 export function ProductionPage({
   token,
@@ -441,6 +590,29 @@ export function ProductionPage({
     });
   }
 
+  // As linhas recebem ações estáveis, que chamam sempre as funções da hora:
+  // assim a linha memorizada não redesenha só porque a função foi recriada.
+  const latest = useRef({ patch, commit, submitCorrection, submitVoid, cancelAdjust });
+  latest.current = { patch, commit, submitCorrection, submitVoid, cancelAdjust };
+  const actions = useMemo<RowActions>(
+    () => ({
+      patch: (animalId, changes) => latest.current.patch(animalId, changes),
+      commit: (animalId) => latest.current.commit(animalId),
+      submitCorrection: (animalId) => void latest.current.submitCorrection(animalId),
+      submitVoid: (animalId) => void latest.current.submitVoid(animalId),
+      cancelAdjust: (animalId) => latest.current.cancelAdjust(animalId),
+      registerInput: (position, element) => {
+        inputs.current[position] = element;
+      },
+      focusNext: (position, currentInput) => {
+        const next = inputs.current[position + 1];
+        if (next) next.focus();
+        else currentInput.blur();
+      },
+    }),
+    [],
+  );
+
   const items = sheet?.items ?? [];
   const savedRows = items.filter((item) => rows[item.animal_id]?.saved != null);
   const total = savedRows.reduce((sum, item) => sum + (rows[item.animal_id].saved ?? 0), 0);
@@ -478,12 +650,14 @@ export function ProductionPage({
       </PageHeader>
 
       {how === "importar" && (
-        <ImportPanel
-          token={token}
-          canReplace={canCorrect}
-          today={today}
-          onImported={() => setReloadKey((key) => key + 1)}
-        />
+        <Suspense fallback={<div className="skeleton" style={{ height: 180 }} aria-label="Carregando" />}>
+          <ImportPanel
+            token={token}
+            canReplace={canCorrect}
+            today={today}
+            onImported={() => setReloadKey((key) => key + 1)}
+          />
+        </Suspense>
       )}
 
       {how === "digitar" && (
@@ -571,131 +745,15 @@ export function ProductionPage({
             {items.map((item, index) => {
               const row = rows[item.animal_id];
               if (!row) return null;
-              const adjusting = row.status === "correcting" || row.status === "voiding";
               return (
-                <li
+                <ProductionRow
                   key={item.animal_id}
-                  className={`prod-row is-${row.status}`}
-                  style={{ "--i": index } as CSSProperties}
-                >
-                  <span className={item.brinco ? "tag" : "tag none"}>
-                    {item.brinco ?? "sem brinco"}
-                  </span>
-                  <span className="name">
-                    {item.name ?? "sem nome"}
-                    <small>
-                      {item.situacao}
-                      {/* Anular fica junto do nome: numa linha própria, cada
-                          vaca ocupava o dobro da altura. */}
-                      {canCorrect && row.status === "saved" && row.measurementId && (
-                        <button
-                          type="button"
-                          className="row-void"
-                          aria-label={`Anular o lançamento de ${label(item)}`}
-                          onClick={() =>
-                            patch(item.animal_id, { status: "voiding", message: null, reason: "" })
-                          }
-                        >
-                          Anular
-                        </button>
-                      )}
-                    </small>
-                  </span>
-                  <span className="prod-input">
-                    <input
-                      ref={(element) => {
-                        inputs.current[index] = element;
-                      }}
-                      aria-label={`Litros de ${label(item)}`}
-                      inputMode="decimal"
-                      enterKeyHint="next"
-                      autoComplete="off"
-                      value={row.value}
-                      disabled={row.status === "saving"}
-                      onChange={(event) =>
-                        patch(item.animal_id, { value: event.target.value })
-                      }
-                      onBlur={() => commit(item.animal_id)}
-                      onKeyDown={(event) => {
-                        if (event.key !== "Enter") return;
-                        event.preventDefault();
-                        // Sair do campo salva; aqui só se decide para onde ir.
-                        const next = inputs.current[index + 1];
-                        if (next) next.focus();
-                        else event.currentTarget.blur();
-                      }}
-                    />
-                    <span className="unit">L</span>
-                  </span>
-                  <span className="prod-state" aria-live="polite">
-                    {row.status === "saving" && "salvando…"}
-                    {row.status === "queued" && (
-                      <span className="queued" aria-label="guardado no celular" title="Guardado no celular">
-                        <Icons.guardado />
-                      </span>
-                    )}
-                    {row.status === "saved" && (
-                      <span className="ok" aria-label="salvo">
-                        ✓
-                      </span>
-                    )}
-                  </span>
-
-                  {row.message && <p className="row-msg">{row.message}</p>}
-
-                  {row.status === "offline" && (
-                    <button
-                      type="button"
-                      className="row-retry"
-                      onClick={() => commit(item.animal_id)}
-                    >
-                      Tentar de novo
-                    </button>
-                  )}
-
-                  {adjusting && (
-                    <div className="row-fix">
-                      <label htmlFor={`reason-${item.animal_id}`}>
-                        {row.status === "correcting"
-                          ? `Motivo da correção (${show(row.saved)} → ${row.value} L)`
-                          : "Motivo para anular este lançamento"}
-                      </label>
-                      <input
-                        id={`reason-${item.animal_id}`}
-                        value={row.reason}
-                        onChange={(event) =>
-                          patch(item.animal_id, { reason: event.target.value })
-                        }
-                        placeholder={
-                          row.status === "correcting"
-                            ? "Ex.: anotado errado no caderno"
-                            : "Ex.: lançado na vaca errada"
-                        }
-                        autoComplete="off"
-                      />
-                      <div className="row-fix-actions">
-                        <button
-                          type="button"
-                          className={row.status === "voiding" ? "danger" : undefined}
-                          onClick={() =>
-                            void (row.status === "correcting"
-                              ? submitCorrection(item.animal_id)
-                              : submitVoid(item.animal_id))
-                          }
-                        >
-                          {row.status === "correcting" ? "Salvar correção" : "Anular lançamento"}
-                        </button>
-                        <button
-                          type="button"
-                          className="secondary"
-                          onClick={() => cancelAdjust(item.animal_id)}
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </li>
+                  item={item}
+                  index={index}
+                  row={row}
+                  canCorrect={canCorrect}
+                  actions={actions}
+                />
               );
             })}
           </ul>

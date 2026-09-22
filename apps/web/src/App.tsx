@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 
 import {
   enterReading,
@@ -27,24 +27,48 @@ import {
   storeToken,
   storeUser,
 } from "./auth/session";
-import { AnimalDetailPanel } from "./features/animals/AnimalDetailPanel";
-import { AnimalSearchPage } from "./features/animals/AnimalSearchPage";
-import { HerdDashboard } from "./features/dashboard/HerdDashboard";
-import { OfficialMeasurements } from "./features/dashboard/OfficialMeasurements";
-import { SuppliesPage } from "./features/dashboard/SuppliesPage";
-import { ReviewWorkspace } from "./features/imports/ReviewWorkspace";
-import { UploadForm } from "./features/imports/UploadForm";
 import { ProductionPage } from "./features/production/ProductionPage";
-import { ReviewInbox } from "./features/review/ReviewInbox";
 import { ChangePasswordForm } from "./features/users/ChangePasswordForm";
-import { UsersPage } from "./features/users/UsersPage";
 import { Cows, Hills, Icons, LogoMark, type IconName } from "./ui/Brand";
 import { PageHeader } from "./ui/PageHeader";
+import { AreaBoundary } from "./ui/AreaBoundary";
 import { closeAndReturn, usePanelFocus } from "./ui/usePanelFocus";
 import { useRoute, type AreaRoute } from "./router";
 import { deviceOutbox } from "./offline/outbox";
 import { OutboxProvider, useOutbox } from "./offline/OutboxContext";
 import { OfflineBanner, OutboxButton } from "./offline/OutboxStatus";
+
+// O login e a Produção (o curral) vêm no pacote principal; o resto só é
+// baixado quando aberto. No 3G do curral, abrir o app baixava de uma vez os
+// gráficos do Painel, o gravador da Revisão e as telas de escritório. Sem
+// sinal, tudo abre igual: o service worker guarda todas as partes.
+const HerdDashboard = lazy(() =>
+  import("./features/dashboard/HerdDashboard").then((m) => ({ default: m.HerdDashboard })),
+);
+const ReviewInbox = lazy(() =>
+  import("./features/review/ReviewInbox").then((m) => ({ default: m.ReviewInbox })),
+);
+const AnimalSearchPage = lazy(() =>
+  import("./features/animals/AnimalSearchPage").then((m) => ({ default: m.AnimalSearchPage })),
+);
+const AnimalDetailPanel = lazy(() =>
+  import("./features/animals/AnimalDetailPanel").then((m) => ({ default: m.AnimalDetailPanel })),
+);
+const SuppliesPage = lazy(() =>
+  import("./features/dashboard/SuppliesPage").then((m) => ({ default: m.SuppliesPage })),
+);
+const OfficialMeasurements = lazy(() =>
+  import("./features/dashboard/OfficialMeasurements").then((m) => ({
+    default: m.OfficialMeasurements,
+  })),
+);
+const UsersPage = lazy(() => import("./features/users/UsersPage").then((m) => ({ default: m.UsersPage })));
+const UploadForm = lazy(() =>
+  import("./features/imports/UploadForm").then((m) => ({ default: m.UploadForm })),
+);
+const ReviewWorkspace = lazy(() =>
+  import("./features/imports/ReviewWorkspace").then((m) => ({ default: m.ReviewWorkspace })),
+);
 
 type SessionState =
   | { status: "checking" }
@@ -644,119 +668,123 @@ function AppShell({
       {farmError && <p role="alert">{farmError}</p>}
 
       <main className="area" id="conteudo" tabIndex={-1} key={area} ref={content}>
-        {area === "painel" && <HerdDashboard token={token} />}
+        <AreaBoundary>
+          <Suspense fallback={<div className="skeleton skeleton-card" aria-label="Carregando" />}>
+          {area === "painel" && <HerdDashboard token={token} />}
 
-        {area === "producao" && <ProductionPage token={token} canCorrect={canEdit} />}
+          {area === "producao" && <ProductionPage token={token} canCorrect={canEdit} />}
 
-        {area === "revisao" && (
-          <ReviewInbox
-            token={token}
-            farmId={farm?.id}
-            canDecide={canEdit}
-            onChanged={refreshPending}
-          />
-        )}
+          {area === "revisao" && (
+            <ReviewInbox
+              token={token}
+              farmId={farm?.id}
+              canDecide={canEdit}
+              onChanged={refreshPending}
+            />
+          )}
 
-        {area === "insumos" && (
-          <SuppliesPage
-            token={token}
-            canEdit={canEdit}
-            milkPrice={farm?.milk_price_per_liter ?? null}
-            onMilkPriceSaved={(price) =>
-              setFarm((current) => (current ? { ...current, milk_price_per_liter: price } : current))
-            }
-          />
-        )}
-
-        {area === "animais" && (
-          <>
-            {/* A busca fica montada por trás da ficha: voltar devolve a lista
-                como estava, com o recorte e o que já tinha carregado. */}
-            <div hidden={openAnimalId !== null}>
-              <AnimalSearchPage token={token} canEdit={canEdit} onOpen={openAnimal} />
-            </div>
-            {openAnimalId !== null && (
-              <>
-                <button
-                  type="button"
-                  className="link-btn"
-                  onClick={() => {
-                    // Veio da lista: volta nela (o voltar do celular faz o
-                    // mesmo). Chegou por link: não há o que voltar, abre a lista.
-                    if ((window.history.state as { inApp?: boolean } | null)?.inApp) {
-                      window.history.back();
-                    } else {
-                      replace({ area: "animais", animalId: null });
-                    }
-                  }}
-                >
-                  <Icons.back /> Voltar à busca
-                </button>
-                {animalError && <p role="alert">{animalError}</p>}
-                {animal === null && !animalError && (
-                  <div className="skeleton skeleton-card" aria-label="Carregando a ficha" />
-                )}
-                {animal !== null && (
-                  <AnimalDetailPanel
-                    key={animal.id}
-                    token={token}
-                    animal={animal}
-                    canEdit={canEdit}
-                    onChanged={() => setAnimalReload((count) => count + 1)}
-                    onOpenAnimal={openAnimal}
-                  />
-                )}
-              </>
-            )}
-          </>
-        )}
-
-        {area === "fichas" && farm !== null && (
-          <>
-            <h2>Fichas de medição</h2>
-            <p className="muted">
-              Envie a foto da ficha. O sistema lê as linhas e deixa cada uma para
-              conferência antes de virar medição oficial.
-            </p>
-            <UploadForm token={token} farmId={farm.id} onUploaded={handleUploaded} />
-            {review !== null && (
-              <div>
-                <button
-                  type="button"
-                  className="link-btn"
-                  onClick={() => refreshReview(review.import_id)}
-                >
-                  Atualizar revisão
-                </button>
-                <ReviewWorkspace review={review} token={token} onDecided={handleDecided} />
-              </div>
-            )}
-          </>
-        )}
-
-        {area === "medicoes" && farm !== null && (
-          <OfficialMeasurements farmId={farm.id} token={token} />
-        )}
-
-        {area === "contas" && isAdmin && (
-          <UsersPage token={token} currentUserId={user.id} />
-        )}
-
-        {area === "minha-conta" && (
-          <>
-            <PageHeader
-              title="Minha conta"
-              actions={
-                <button type="button" className="secondary logout-account" onClick={onLogout}>
-                  <Icons.logout /> Sair
-                </button>
+          {area === "insumos" && (
+            <SuppliesPage
+              token={token}
+              canEdit={canEdit}
+              milkPrice={farm?.milk_price_per_liter ?? null}
+              onMilkPriceSaved={(price) =>
+                setFarm((current) => (current ? { ...current, milk_price_per_liter: price } : current))
               }
-            >
-              {user.email}
-            </PageHeader>
-            <ChangePasswordForm token={token} />
-          </>
-        )}
+            />
+          )}
+
+          {area === "animais" && (
+            <>
+              {/* A busca fica montada por trás da ficha: voltar devolve a lista
+                  como estava, com o recorte e o que já tinha carregado. */}
+              <div hidden={openAnimalId !== null}>
+                <AnimalSearchPage token={token} canEdit={canEdit} onOpen={openAnimal} />
+              </div>
+              {openAnimalId !== null && (
+                <>
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() => {
+                      // Veio da lista: volta nela (o voltar do celular faz o
+                      // mesmo). Chegou por link: não há o que voltar, abre a lista.
+                      if ((window.history.state as { inApp?: boolean } | null)?.inApp) {
+                        window.history.back();
+                      } else {
+                        replace({ area: "animais", animalId: null });
+                      }
+                    }}
+                  >
+                    <Icons.back /> Voltar à busca
+                  </button>
+                  {animalError && <p role="alert">{animalError}</p>}
+                  {animal === null && !animalError && (
+                    <div className="skeleton skeleton-card" aria-label="Carregando a ficha" />
+                  )}
+                  {animal !== null && (
+                    <AnimalDetailPanel
+                      key={animal.id}
+                      token={token}
+                      animal={animal}
+                      canEdit={canEdit}
+                      onChanged={() => setAnimalReload((count) => count + 1)}
+                      onOpenAnimal={openAnimal}
+                    />
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {area === "fichas" && farm !== null && (
+            <>
+              <h2>Fichas de medição</h2>
+              <p className="muted">
+                Envie a foto da ficha. O sistema lê as linhas e deixa cada uma para
+                conferência antes de virar medição oficial.
+              </p>
+              <UploadForm token={token} farmId={farm.id} onUploaded={handleUploaded} />
+              {review !== null && (
+                <div>
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() => refreshReview(review.import_id)}
+                  >
+                    Atualizar revisão
+                  </button>
+                  <ReviewWorkspace review={review} token={token} onDecided={handleDecided} />
+                </div>
+              )}
+            </>
+          )}
+
+          {area === "medicoes" && farm !== null && (
+            <OfficialMeasurements farmId={farm.id} token={token} />
+          )}
+
+          {area === "contas" && isAdmin && (
+            <UsersPage token={token} currentUserId={user.id} />
+          )}
+
+          {area === "minha-conta" && (
+            <>
+              <PageHeader
+                title="Minha conta"
+                actions={
+                  <button type="button" className="secondary logout-account" onClick={onLogout}>
+                    <Icons.logout /> Sair
+                  </button>
+                }
+              >
+                {user.email}
+              </PageHeader>
+              <ChangePasswordForm token={token} />
+            </>
+          )}
+          </Suspense>
+        </AreaBoundary>
       </main>
     </div>
   );
