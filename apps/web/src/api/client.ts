@@ -39,7 +39,12 @@ import {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 async function parseJsonOrThrow<T>(response: Response): Promise<T> {
-  const body = await response.json();
+  // Nem toda resposta vem da nossa API: um envio grande demais morre no
+  // proxy, que responde HTML. Ler isso como JSON estourava um erro de
+  // sintaxe, e a tela dizia "confira a conexão" para um arquivo pesado.
+  const body = await response
+    .json()
+    .catch(() => ({ code: response.status === 413 ? "upload_too_large" : "server_error" }));
   if (!response.ok) {
     throw new ApiError(response.status, body);
   }
@@ -127,6 +132,19 @@ export async function uploadImport(
     body: formData,
   });
   return parseJsonOrThrow<UploadResult>(response);
+}
+
+/**
+ * O arquivo (folha ou gravação) de uma leitura, com o login da pessoa. O
+ * navegador não manda o token num `<img src>`, então a tela busca aqui e
+ * mostra como `blob:`.
+ */
+export async function fetchSourceMedia(url: string, token: string): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}${url}`, { headers: authHeaders(token) });
+  if (!response.ok) {
+    throw new ApiError(response.status, { code: "media_unavailable" });
+  }
+  return response.blob();
 }
 
 export async function reprocessImport(

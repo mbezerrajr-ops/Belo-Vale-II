@@ -763,3 +763,121 @@ identidade e contagem de linhas idênticas. Três candidatos foram
   números mal lidos ("37,5" lido "33,5"), nenhum vazio;
 - **não são as guardas de anotação**: com elas desligadas, a folha dá
   exatamente os mesmos números.
+
+## Fase 3: a gravação da ordenha vira proposta — decisões e limites (21/09/2026)
+
+### Medido com as gravações do titular
+
+Três gravações de teste (40 a 49 s cada, fora do Git), com 11 vacas ditas em
+frase natural. Pelo caminho real inteiro — envio pela API, fila, worker com
+ffmpeg, whisper na GPU, tradutor, propostas no banco:
+
+- **as 11 vacas** com brinco, nome e total certos;
+- as **4 ordens de secar** e a **troca para o 1º lote**;
+- "secar ela daqui a 7 meses" como ordem de secagem **e** observação com o
+  prazo;
+- nenhuma proposta de conversa ("bora lá, meu amigo", "certo? obrigado");
+- leitura de 7 a 20 s por gravação.
+
+É um número bom e **otimista**: as gravações são de teste, ditas com calma. O
+número de verdade sai de gravações no curral, com a ordenhadeira ligada.
+
+### Com ruído somado — e o salto do whisper que ele revelou
+
+Enquanto não há gravação do curral, as mesmas três gravações foram medidas
+com ruído grave (marrom, parecido com motor) somado em quatro níveis. Vacas
+com brinco e total certos, de 11:
+
+| voz / ruído | antes | depois do conserto | leituras erradas |
+|---|---|---|---|
+| limpo | — | 11 | 0 |
+| ~25 dB | 7 | 10 | 0 |
+| ~17 dB | 7 | 10 | 0 |
+| ~11 dB | 11 | 11 | 0 |
+| ~5 dB | 10 | 10 | 0 |
+
+O "antes" tinha uma anomalia: ruído **leve** ia pior que ruído forte. A causa
+era o **salto de marca de tempo** do whisper: numa das gravações ele
+transcreveu "Mensagem de teste" (0 a 1,7 s) e pulou direto para 29,98 s,
+levando três vacas junto — sem erro, sem aviso. Busca em feixe não resolveu.
+Sem marcas de tempo o salto some, mas o modelo erra mais dígito ("462" virou
+"4162"). O transcritor agora pergunta com marcas, e se houver buraco de mais
+de 8 s entre trechos (numa gravação boa o maior foi 0,44 s), pergunta de novo
+sem elas.
+
+O que importa na tabela é a última coluna: **nenhum nível produziu leitura
+errada**. Quando o ruído atrapalha, a vaca falta — não chega com número
+trocado. Ruído sintético não é o curral; a medição de verdade continua
+pendente.
+
+### O jeito real de falar mudou o tradutor
+
+O primeiro desenho separava vaca por ponto final. As gravações mostraram que
+o whisper põe ponto no MEIO de uma vaca, que o nome vem junto, que o brinco às
+vezes vem em outra frase ("o número dela é 462") e que há conversa no meio.
+Agora uma vaca começa numa âncora — "vaca", um número com cara de brinco, ou
+um nome no começo da frase seguido de "produziu" — e vai até a próxima.
+
+**Limites que decorrem disso, conhecidos:**
+
+- **Brinco de menos de três dígitos só é reconhecido depois de "vaca".** A
+  regra que separa brinco de litro é "três dígitos ou mais, ou zero à
+  esquerda" (litro nunca passa de 100 por dia). "A 16 deu 5" não acha o
+  brinco 16; "vaca 16 deu 5" acha. O cadastro desta fazenda guarda brincos com
+  zero à esquerda ("016"), e o whisper preserva o zero quando ele é dito.
+- **A lista de conversa descarta palavras soltas** ("assim", "bem", "certo",
+  "depois"...). Uma observação feita só dessas palavras some. Isso evita
+  proposta de lixo, e o custo é perder uma observação que só dissesse, por
+  exemplo, "bem".
+- **Parto, baixa e DEL falados não têm análise estruturada**: viram
+  observação com o texto dito. Escrever gramática para eles sem gravação real
+  para medir seria adivinhação, e adivinhação errada em "baixa" é o erro mais
+  caro que pode chegar à caixa.
+- **"meia" sozinha não é lida** (é 0,5 ou é 6).
+- **"Secar daqui a 7 meses" gera a ordem de secagem com a data da
+  gravação**, mais a observação com o prazo. É o mesmo comportamento da folha
+  ("SECAR 7 MES."): quem revisa lê o prazo e ajusta.
+
+### A data da gravação
+
+A fala não tem cabeçalho. A data de referência é o dia da fazenda em que a
+gravação foi **enviada** — não o da leitura, que pode ser um reprocessamento
+dias depois. Quem revisa corrige o arquivo inteiro de uma vez se precisar.
+
+### iPhone
+
+O Safari não oferece gravação num campo de arquivo de áudio: no iPhone a
+pessoa grava no app Gravador e escolhe o arquivo. A tela avisa. Gravar dentro
+do próprio app (MediaRecorder) ficou para uma fase seguinte, por decisão do
+titular.
+
+### Três defeitos que já existiam e que o áudio expôs
+
+- **O teto de upload era 1 MB, não 15 MB.** O nginx não declarava
+  `client_max_body_size`. Uma gravação de um minuto passa disso sempre, e a
+  foto passava às vezes — e o que morria no proxy voltava como HTML, que o app
+  lia como erro de conexão. Agora o limite é 20 MB no proxy, e cada motivo de
+  falha tem o seu texto na tela.
+- **O link da foto na Revisão nunca abriu na pilha real** (fase 2c): era uma
+  URL do armazenamento interno (`http://minio:9000`), que nenhum navegador
+  resolve. Agora o arquivo abre pela própria API, com o login.
+- **A hora no nome do arquivo saía em UTC** ("Foto de ... 20:16" para um envio
+  das 17:16). Agora é a hora da fazenda.
+
+### A tarefa do whisper apareceu desativada
+
+Durante o trabalho de 21/09 a tarefa `BeloVale-Whisper` foi encontrada
+**desativada**, com o servidor encerrado por um Ctrl+C (o log termina em
+`^C`). O registro operacional do Agendador está desligado (padrão do
+Windows), então não dá para saber quem desativou: pode ter sido o titular, o
+antivírus ou o próprio Windows. Não foi reativada automaticamente — é
+configuração da máquina, e a decisão é do titular. Se foi acidental:
+
+```powershell
+Enable-ScheduledTask -TaskName "BeloVale-Whisper"
+Start-ScheduledTask  -TaskName "BeloVale-Whisper"
+```
+
+Se voltar a acontecer, ligar o registro do Agendador ajuda a achar a causa:
+`wevtutil set-log Microsoft-Windows-TaskScheduler/Operational /enabled:true`
+(terminal de administrador).

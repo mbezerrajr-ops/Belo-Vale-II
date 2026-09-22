@@ -12,12 +12,12 @@ from datetime import date
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import require_minimum_role
-from app.db.models import Farm, ImageAsset, User
+from app.db.models import EventProposalSource, Farm, MediaAsset, User
 from app.db.session import get_db_session
 from app.routers.registry import resolve_current_farm
 from app.services.storage import ObjectStorage, get_object_storage
@@ -39,8 +39,10 @@ from app.services.production_entry import producao_of
 
 router = APIRouter(prefix="/api/proposals", tags=["proposals"])
 
-#: Validade do link da foto na revisão, como nos recortes da ficha.
-_PHOTO_URL_TTL_SECONDS = 900
+#: Quanto tempo o navegador de quem revisa pode guardar o arquivo aberto.
+#: Só o navegador dela ("private"): é dado da fazenda, não vai para cache
+#: compartilhado.
+_MEDIA_CACHE = "private, max-age=300"
 
 
 class ApproveIn(BaseModel):
@@ -106,7 +108,6 @@ async def inbox(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     farm: Annotated[Farm, Depends(resolve_current_farm)],
     _: Annotated[User, Depends(require_minimum_role("operator"))],
-    storage: Annotated[ObjectStorage, Depends(get_object_storage)],
     status_: Annotated[
         Literal["pending", "approved", "rejected"], Query(alias="status")
     ] = "pending",
@@ -114,19 +115,6 @@ async def inbox(
 ) -> list[dict[str, Any]]:
     items = await list_proposals(session, farm_id=farm.id, status=status_, limit=limit)
 
-    photos: dict[UUID, str | None] = {}
-
-    async def photo_url(source) -> str | None:
-        if source.image_asset_id is None:
-            return None
-        if source.image_asset_id not in photos:
-            image = await session.get(ImageAsset, source.image_asset_id)
-            photos[source.image_asset_id] = (
-                storage.presigned_url(image.object_key, expires_seconds=_PHOTO_URL_TTL_SECONDS)
-                if image is not None and image.object_key
-                else None
-            )
-        return photos[source.image_asset_id]
     summaries: dict[UUID, dict[str, Any]] = {}
 
     async def summary(animal):
@@ -150,9 +138,14 @@ async def inbox(
                     "corrected_by": item.corrected_by,
                     "extractor_name": source.extractor_name,
                     "created_at": source.created_at.isoformat(),
-                    # A folha que deu origem à leitura, para conferir sem
-                    # trocar de tela. Link curto: 15 minutos.
-                    "photo_url": await photo_url(source),
+                    # A folha ou a gravação que deu origem à leitura, para
+                    # conferir sem trocar de tela. Abre pela própria API, com o
+                    # mesmo login: o armazenamento interno nunca fica exposto.
+                    "media_url": (
+                        f"/api/proposals/sources/{source.id}/media"
+                        if source.media_asset_id is not None
+                        else None
+                    ),
                 },
                 "position": proposal.position,
                 "event_type": proposal.event_type,
@@ -249,3 +242,35 @@ async def correct_source_date(
         await session.rollback()
         raise failure from error
     return {"updated": result.updated, "kept_decided": result.kept_decided}
+
+
+@router.get("/sources/{source_id}/media")
+async def source_media(
+    source_id: UUID,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    farm: Annotated[Farm, Depends(resolve_current_farm)],
+    _: Annotated[User, Depends(require_minimum_role("operator"))],
+    storage: Annotated[ObjectStorage, Depends(get_object_storage)],
+) -> Response:
+    """A foto da folha ou a gravação de onde a leitura saiu.
+
+    Mesmo login de qualquer chamada da API, e só arquivo desta fazenda. A tela
+    busca com o token e mostra como `blob:` — o navegador não manda o token
+    num `<img src>` ou `<audio src>` comum.
+    """
+    nao_achou = HTTPException(status.HTTP_404_NOT_FOUND, detail="Arquivo não encontrado.")
+    source = await session.get(EventProposalSource, source_id)
+    if source is None or source.farm_id != farm.id or source.media_asset_id is None:
+        raise nao_achou
+    media = await session.get(MediaAsset, source.media_asset_id)
+    if media is None or not media.object_key:
+        raise nao_achou
+    try:
+        content = storage.load(media.object_key)
+    except Exception as error:  # noqa: BLE001 - arquivo sumiu do armazenamento
+        raise nao_achou from error
+    return Response(
+        content=content,
+        media_type=media.media_type or "application/octet-stream",
+        headers={"Cache-Control": _MEDIA_CACHE, "Content-Disposition": "inline"},
+    )

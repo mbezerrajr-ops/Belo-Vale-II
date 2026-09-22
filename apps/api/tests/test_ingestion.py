@@ -12,10 +12,10 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.config import Settings, get_settings
 from app.core.security import create_access_token, hash_password
-from app.db.models import ExtractionRun, Farm, ImageAsset, User
+from app.db.models import ExtractionRun, Farm, MediaAsset, User
 from app.db.session import get_db_session
 from app.main import create_app
-from app.services.image_sniffing import sniff_image_media_type
+from app.services.media_sniffing import sniff_image_media_type
 from app.services.ingestion import (
     DuplicateImageError,
     ImageTooLargeError,
@@ -167,8 +167,8 @@ def test_reprocess_enqueues_a_new_run_for_an_existing_import() -> None:
                     await reprocess_import(session, import_id=created.id)
 
                 pending_run = await session.scalar(
-                    select(ExtractionRun).where(ExtractionRun.image_asset_id.in_(
-                        select(ImageAsset.id).where(ImageAsset.import_id == created.id)
+                    select(ExtractionRun).where(ExtractionRun.media_asset_id.in_(
+                        select(MediaAsset.id).where(MediaAsset.import_id == created.id)
                     ))
                 )
                 pending_run.status = "extracted"

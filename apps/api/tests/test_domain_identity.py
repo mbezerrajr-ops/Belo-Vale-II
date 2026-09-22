@@ -23,7 +23,7 @@ from app.db.models import (
     ExtractedLine,
     ExtractionRun,
     Farm,
-    ImageAsset,
+    MediaAsset,
     Import,
     OfficialMeasurement,
     ReviewDecision,
@@ -68,10 +68,10 @@ async def _make_review_decision(session: AsyncSession, farm_id: UUID) -> ReviewD
     ingestion = Import(farm_id=farm_id)
     session.add(ingestion)
     await session.flush()
-    asset = ImageAsset(farm_id=farm_id, import_id=ingestion.id, sha256="b" * 64)
+    asset = MediaAsset(farm_id=farm_id, import_id=ingestion.id, sha256="b" * 64)
     session.add(asset)
     await session.flush()
-    run = ExtractionRun(image_asset_id=asset.id)
+    run = ExtractionRun(media_asset_id=asset.id)
     session.add(run)
     await session.flush()
     line = ExtractedLine(extraction_run_id=run.id, line_number=1, raw_values={})

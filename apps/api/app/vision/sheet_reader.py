@@ -26,20 +26,26 @@ import ipaddress
 import json
 import logging
 import re
-import unicodedata
 import urllib.error
 import urllib.request
-from collections import Counter
 from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlsplit
 
 from PIL import Image
 
-from app.services.event_extraction import EventExtraction, ExtractedEvent
+from app.core.local_url import ensure_local_url
+from app.services.event_extraction import EventExtraction
 from app.services.image_preprocessing import PreprocessedImage
-from app.services.event_normalization import parse_event_date
 from app.services.production_files import parse_number_br
+from app.services.reading_to_events import (
+    SHEET_ORIGIN,
+    annotation_events as _annotation_events,
+    clean as _clean,
+    fold as _fold,
+    lines_to_events,
+    tidy_transcription,
+)
 from app.vision.pages import (
     DEFAULT_MAX_SIDE,
     MARGIN_STRIP_NARROW,
@@ -93,43 +99,6 @@ class ReaderTimeout(ReaderUnavailable):
 
 class ReaderFormatError(ValueError):
     """O leitor respondeu algo fora do esquema da transcrição."""
-
-
-# ------------------------------------------------------------ só endereço local
-
-
-#: Nomes que apontam para a própria máquina, apesar do ponto.
-#: `host.docker.internal` é o apelido que o Docker dá ao hospedeiro — é por
-#: ele que o worker em contêiner alcança um leitor rodando fora do Docker
-#: (no Windows, onde a GPU AMD não passa para o contêiner).
-_LOCAL_NAMES = frozenset({"localhost", "host.docker.internal"})
-
-
-def ensure_local_url(url: str) -> str:
-    """Aceita só a própria máquina e a rede interna. Devolve a URL sem "/" final.
-
-    Nome de serviço sem ponto ("ollama") é aceito: é assim que um contêiner
-    acha outro na rede interna do Docker Compose. Domínio com ponto é
-    recusado mesmo que resolva para IP interno — não dá para garantir que
-    continue assim.
-    """
-    parts = urlsplit(url or "")
-    if parts.scheme not in ("http", "https") or not parts.hostname:
-        raise ValueError(f"Endereço do leitor inválido: {url!r}.")
-    host = parts.hostname
-    try:
-        address = ipaddress.ip_address(host)
-    except ValueError:
-        if host in _LOCAL_NAMES or "." not in host:
-            return url.rstrip("/")
-        raise ValueError(
-            f"O leitor precisa rodar na própria infraestrutura; {host} não é endereço interno."
-        ) from None
-    if address.is_loopback or address.is_private:
-        return url.rstrip("/")
-    raise ValueError(
-        f"O leitor precisa rodar na própria infraestrutura; {host} não é endereço interno."
-    )
 
 
 # --------------------------------------------------------- etapa A: transcrição
@@ -628,128 +597,6 @@ def _check_transcription(data: Any) -> None:
 # ------------------------------------------------------ etapa B: eventos (sem IA)
 
 
-#: O modelo às vezes ESCREVE a palavra em vez de deixar o campo vazio. Numa
-#: foto real ele pôs "null" nas 14 linhas em branco do formulário, e elas
-#: viraram 14 produções fantasma com litros "null". Vazio é vazio, escrito
-#: por extenso ou não.
-_WRITTEN_EMPTY = frozenset({"null", "none", "nulo", "nula", "n/a", "na", "-", "--", "---"})
-
-
-def _clean(value: Any) -> str | None:
-    if value is None:
-        return None
-    text = re.sub(r"\s+", " ", str(value)).strip()
-    if not text or _fold(text) in _WRITTEN_EMPTY:
-        return None
-    return text
-
-
-def _fold(text: str) -> str:
-    decomposed = unicodedata.normalize("NFKD", text)
-    return "".join(c for c in decomposed if not unicodedata.combining(c)).lower()
-
-
-_SECAR = re.compile(r"\bsecar?\b|\bsecagem\b")
-#: "1º LOTE", "LOTE 2" e a abreviação da margem do formulário, "2º LOT".
-#: O "º" manuscrito sai do modelo como ":", "o" ou ".": "2: LOT" é a mesma
-#: troca de lote, e não pode virar observação só por causa da grafia — na
-#: caixa de Revisão uma é campo preenchido, a outra é texto solto.
-_LOT = re.compile(r"(\d+)\s*[ºo°ª:.=-]?\s*lote?\b|\blote?\s*(\d+)")
-
-
-def _annotation_events(anotacao: str) -> list[tuple[str, dict[str, str | None]]]:
-    """"SECAR" → ordem de secagem; "1º LOTE" → troca de lote; o que sobrar
-    (ou o que não se reconhece) → observação com o texto original."""
-    folded = _fold(anotacao)
-    events: list[tuple[str, dict[str, str | None]]] = []
-    rest = folded
-    if _SECAR.search(folded):
-        events.append(("dry_off", {"ordem": "secar"}))
-        rest = _SECAR.sub(" ", rest)
-    if match := _LOT.search(folded):
-        events.append(("lot_change", {"lote": match[1] or match[2]}))
-        rest = _LOT.sub(" ", rest)
-    if re.sub(r"[\W_]+", "", rest):
-        events.append(("note", {"texto": f"Na folha de pesagem: {anotacao}"}))
-    return events
-
-
-def _looks_like_brinco(value: str | None) -> bool:
-    return bool(value) and bool(re.fullmatch(r"(B\d+-)?\d+", value.replace(" ", "").upper()))
-
-
-def _looks_like_name(value: str | None) -> bool:
-    return bool(value) and not any(c.isdigit() for c in value)
-
-
-#: O que faz de uma linha uma leitura. Brinco sozinho não: é o número da
-#: margem ao lado de uma linha vazia ou riscada.
-_CONTENT_FIELDS = ("nome", "manha", "tarde", "total", "anotacao")
-
-
-def tidy_transcription(transcription: dict[str, Any]) -> dict[str, Any]:
-    """Correções óbvias, sem adivinhar: descarta linha em branco do
-    formulário, desfaz a troca brinco ↔ nome e apaga brinco "0".
-
-    "18 - QUARTINHA 406" tem o nome antes do número, e o modelo às vezes
-    devolve os dois na ordem da folha. Número no nome e palavra no brinco é
-    troca certa; qualquer outra combinação fica como veio.
-    """
-    lines = []
-    for line in transcription.get("linhas") or []:
-        brinco, nome = _clean(line.get("brinco")), _clean(line.get("nome"))
-        if not any(_clean(line.get(k)) for k in _CONTENT_FIELDS):
-            continue  # linha do formulário que ficou em branco
-        if _looks_like_name(brinco) and _looks_like_brinco(nome):
-            line = {**line, "brinco": nome, "nome": brinco}
-        if brinco and re.fullmatch(r"0+", brinco):
-            line = {**line, "brinco": None}  # o modelo pôs "0" onde não havia brinco
-        anotacao = _clean(line.get("anotacao"))
-        if anotacao and not re.search(r"[^\W\d_]", anotacao):
-            # Só números ou sinais: o tique de conferência ao lado do total.
-            line = {**line, "anotacao": None}
-        lines.append(line)
-    return {**transcription, "linhas": _drop_repeated_annotation(lines)}
-
-
-#: A partir de quantas linhas iguais, e de que fatia da página, a anotação
-#: deixa de ser leitura e passa a ser repetição do modelo. Seis linhas porque
-#: um lote pequeno pode mudar junto de verdade; 60% porque a margem anotada
-#: de ponta a ponta não acontece na folha, e acontece no modelo.
-_REPEAT_LINES = 6
-_REPEAT_SHARE = 0.6
-
-
-def _drop_repeated_annotation(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Apaga a anotação que aparece na folha inteira.
-
-    A anotação fica na margem direita, solta, longe da linha a que pertence.
-    O modelo às vezes copia a mesma para todas as linhas: numa foto real uma
-    seta "→ 3º LOTE" virou 23 trocas de lote, e um "SECA" virou 27 ordens de
-    secagem. Uma ordem de secar falsa é o erro mais caro que pode chegar na
-    caixa de Revisão, e vinte e três delas afogam quem revisa.
-
-    O que se perde: a folha em que muitas vacas realmente foram marcadas
-    igual entra sem a marca. O que não se perde: a produção da tabela, a
-    leitura crua (guardada no `raw_response` da execução) e a foto, que fica
-    ao lado das propostas para conferência.
-    """
-    counts = Counter(_fold(anotacao) for line in lines if (anotacao := _clean(line.get("anotacao"))))
-    repeated = {
-        text
-        for text, count in counts.items()
-        if count >= _REPEAT_LINES and count >= _REPEAT_SHARE * len(lines)
-    }
-    if not repeated:
-        return lines
-    return [
-        {**line, "anotacao": None}
-        if (anotacao := _clean(line.get("anotacao"))) and _fold(anotacao) in repeated
-        else line
-        for line in lines
-    ]
-
-
 #: Quantas linhas SEGUIDAS com a mesma anotação já são invenção. Duas ou três
 #: vacas vizinhas mudando de lote juntas acontece na folha; sete linhas
 #: seguidas no rabo em branco do formulário, não.
@@ -882,34 +729,10 @@ def _needs_retry(transcription: dict[str, Any]) -> bool:
 
 
 def sheet_to_events(transcription: dict[str, Any], *, extractor_version: str) -> EventExtraction:
-    reference = parse_event_date(_clean(transcription.get("data")), reference=None)
-    events: list[ExtractedEvent] = []
-    for line in tidy_transcription(transcription)["linhas"]:
-        brinco = _clean(line.get("brinco"))
-        nome = _clean(line.get("nome"))
-        manha, tarde, total = (_clean(line.get(k)) for k in ("manha", "tarde", "total"))
-        evidence = {"text": _clean(line.get("trecho")) or "", "linha": _clean(line.get("seq"))}
-
-        def add(event_type: str, fields: dict[str, str | None]) -> None:
-            events.append(
-                ExtractedEvent(
-                    event_type=event_type, brinco=brinco, nome=nome,
-                    fields=fields, evidence=evidence,
-                )
-            )
-
-        if total or manha or tarde:
-            fields: dict[str, str | None] = {"producao": total}
-            if manha and tarde:
-                fields["parcelas"] = f"{manha} + {tarde}"
-            add("production", fields)
-        if anotacao := _clean(line.get("anotacao")):
-            for event_type, fields in _annotation_events(anotacao):
-                add(event_type, fields)
-
-    return EventExtraction(
-        events=events,
+    """A folha lida vira eventos, pelo tradutor que a fala também usa."""
+    return lines_to_events(
+        transcription,
         extractor_name=EXTRACTOR_NAME,
         extractor_version=extractor_version,
-        reference_date=reference,
+        origem=SHEET_ORIGIN,
     )

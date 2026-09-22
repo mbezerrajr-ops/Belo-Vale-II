@@ -89,7 +89,7 @@ def db():
             ("DELETE FROM review_decisions", {}),
             ("DELETE FROM extracted_lines", {}),
             ("DELETE FROM extraction_runs", {}),
-            ("DELETE FROM image_assets", {}),
+            ("DELETE FROM media_assets", {}),
             ("DELETE FROM supply_diets", {}),
             ("DELETE FROM supply_prices", {}),
             ("DELETE FROM supplies", {}),

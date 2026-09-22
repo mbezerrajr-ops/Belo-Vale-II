@@ -11,7 +11,7 @@ from app.db.models import (
     ExtractedLine,
     ExtractionRun,
     Farm,
-    ImageAsset,
+    MediaAsset,
     Import,
     OfficialMeasurement,
     ReviewDecision,
@@ -56,7 +56,7 @@ def test_get_import_review_assembles_lines_and_alerts() -> None:
         session.add(ingestion)
         await session.commit()
 
-        image = ImageAsset(
+        image = MediaAsset(
             farm_id=farm.id,
             import_id=ingestion.id,
             sha256="f" * 64,
@@ -64,7 +64,7 @@ def test_get_import_review_assembles_lines_and_alerts() -> None:
         )
         session.add(image)
         await session.flush()
-        run = ExtractionRun(image_asset_id=image.id, status="extracted")
+        run = ExtractionRun(media_asset_id=image.id, status="extracted")
         session.add(run)
         await session.commit()
 
@@ -122,10 +122,10 @@ def test_get_import_review_surfaces_an_existing_active_measurement() -> None:
         # constraint that an active measurement's review_decision_id must
         # point at an approved decision — it must not show up in this
         # import's own review.
-        other_image = ImageAsset(farm_id=farm.id, sha256="b2" * 32)
+        other_image = MediaAsset(farm_id=farm.id, sha256="b2" * 32)
         session.add(other_image)
         await session.flush()
-        other_run = ExtractionRun(image_asset_id=other_image.id, status="extracted")
+        other_run = ExtractionRun(media_asset_id=other_image.id, status="extracted")
         session.add(other_run)
         await session.commit()
 
@@ -154,10 +154,10 @@ def test_get_import_review_surfaces_an_existing_active_measurement() -> None:
         )
         await session.commit()
 
-        image = ImageAsset(farm_id=farm.id, import_id=ingestion.id, sha256="a1" * 32)
+        image = MediaAsset(farm_id=farm.id, import_id=ingestion.id, sha256="a1" * 32)
         session.add(image)
         await session.flush()
-        run = ExtractionRun(image_asset_id=image.id, status="extracted")
+        run = ExtractionRun(media_asset_id=image.id, status="extracted")
         session.add(run)
         await session.commit()
 

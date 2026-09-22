@@ -10,7 +10,7 @@ from app.db.models import (
     ExtractedLine,
     ExtractionRun,
     Farm,
-    ImageAsset,
+    MediaAsset,
     Import,
     OfficialMeasurement,
     ReviewDecision,
@@ -47,10 +47,10 @@ async def _approved_measurement(
     total: str,
     status: str = "active",
 ) -> OfficialMeasurement:
-    image = ImageAsset(farm_id=farm.id, sha256=os.urandom(32).hex())
+    image = MediaAsset(farm_id=farm.id, sha256=os.urandom(32).hex())
     session.add(image)
     await session.flush()
-    run = ExtractionRun(image_asset_id=image.id, status="extracted")
+    run = ExtractionRun(media_asset_id=image.id, status="extracted")
     session.add(run)
     await session.flush()
     line = ExtractedLine(extraction_run_id=run.id, line_number=1, raw_values={})

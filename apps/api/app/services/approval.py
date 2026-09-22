@@ -13,7 +13,7 @@ from app.db.models import (
     AuditEvent,
     ExtractedLine,
     ExtractionRun,
-    ImageAsset,
+    MediaAsset,
     OfficialMeasurement,
     ReviewDecision,
 )
@@ -154,8 +154,8 @@ async def decide_line(
         session.add(measurement)
 
     farm_id = await session.scalar(
-        select(ImageAsset.farm_id)
-        .join(ExtractionRun, ExtractionRun.image_asset_id == ImageAsset.id)
+        select(MediaAsset.farm_id)
+        .join(ExtractionRun, ExtractionRun.media_asset_id == MediaAsset.id)
         .where(ExtractionRun.id == line.extraction_run_id)
     )
     audit_action = "line_approved" if action == "approve" else "line_rejected"

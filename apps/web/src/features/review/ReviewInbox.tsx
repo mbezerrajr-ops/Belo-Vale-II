@@ -20,7 +20,9 @@ import {
   type ProposalStatus,
   type UploadResult,
 } from "../../api/types";
+import { SendAudio } from "./SendAudio";
 import { SendPhoto } from "./SendPhoto";
+import { SourceMedia } from "./SourceMedia";
 import { brDate, liters } from "../../ui/dates";
 
 /**
@@ -65,6 +67,8 @@ interface Props {
   onRedate?: RedateFn;
   onUpload?: UploadFn;
   onReprocess?: ReprocessFn;
+  /** Busca o arquivo da leitura com o login; dublê nos testes. */
+  onFetchMedia?: (url: string, token: string) => Promise<Blob>;
   /** Chamado depois de cada decisão, para atualizar contadores. */
   onChanged?: () => void;
 }
@@ -611,6 +615,7 @@ export function ReviewInbox({
   onRedate = redateSource,
   onUpload,
   onReprocess,
+  onFetchMedia,
   farmId,
   onChanged,
 }: Props): JSX.Element {
@@ -686,13 +691,22 @@ export function ReviewInbox({
       </button>
 
       {farmId && (
-        <SendPhoto
-          token={token}
-          farmId={farmId}
-          onUpload={onUpload}
-          onReprocess={onReprocess}
-          onSent={() => void reload("pending")}
-        />
+        <div className="send-uploads">
+          <SendPhoto
+            token={token}
+            farmId={farmId}
+            onUpload={onUpload}
+            onReprocess={onReprocess}
+            onSent={() => void reload("pending")}
+          />
+          <SendAudio
+            token={token}
+            farmId={farmId}
+            onUpload={onUpload}
+            onReprocess={onReprocess}
+            onSent={() => void reload("pending")}
+          />
+        </div>
       )}
 
       {files.length > 0 && (
@@ -737,16 +751,13 @@ export function ReviewInbox({
                 {group.source.reference_date ? ` · ${brDate(group.source.reference_date)}` : ""} ·{" "}
                 {group.items.length} {group.items.length === 1 ? "evento" : "eventos"}
               </small>
-              {group.source.photo_url && (
-                <a
-                  className="source-photo"
-                  href={group.source.photo_url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <img src={group.source.photo_url} alt="" />
-                  <span>Ver a folha</span>
-                </a>
+              {group.source.media_url && (
+                <SourceMedia
+                  url={group.source.media_url}
+                  kind={group.source.kind}
+                  token={token}
+                  onFetch={onFetchMedia}
+                />
               )}
             </h3>
             <SourceDate

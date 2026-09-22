@@ -145,7 +145,7 @@ def test_the_photo_becomes_pending_proposals() -> None:
         assert source.kind == "photo"
         assert source.created_by_user_id == user.id
         # A proposta sabe de que foto veio.
-        assert source.image_asset_id is not None
+        assert source.media_asset_id is not None
 
         proposal = (await session.scalars(select(EventProposal).where(EventProposal.farm_id == farm.id))).one()
         assert proposal.status == "pending"

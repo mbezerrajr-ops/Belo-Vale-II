@@ -20,7 +20,7 @@ class ImportRead(BaseModel):
     created_at: datetime
 
 
-class ImageAssetRead(BaseModel):
+class MediaAssetRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID

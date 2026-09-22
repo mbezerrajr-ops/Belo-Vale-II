@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import (
     ExtractedLine,
     ExtractionRun,
-    ImageAsset,
+    MediaAsset,
     Import,
     OfficialMeasurement,
     ValidationAlert,
@@ -70,12 +70,12 @@ async def get_import_review(
     lines: list[ReviewLine] = []
     status = import_row.status
     image = await session.scalar(
-        select(ImageAsset).where(ImageAsset.import_id == import_id)
+        select(MediaAsset).where(MediaAsset.import_id == import_id)
     )
     if image is not None:
         latest_run = await session.scalar(
             select(ExtractionRun)
-            .where(ExtractionRun.image_asset_id == image.id)
+            .where(ExtractionRun.media_asset_id == image.id)
             .order_by(ExtractionRun.created_at.desc())
             .limit(1)
         )
