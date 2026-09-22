@@ -204,6 +204,17 @@ export const Icons = {
       <path d="M6 4v4a4 4 0 0 0 4 4h4a4 4 0 0 1 4 4v4M18 4v4a4 4 0 0 1-4 4" />
     </svg>
   ),
+  semSinal: (): JSX.Element => (
+    <svg {...ICON_PROPS} width={18} height={18}>
+      <path d="M3 3l18 18M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 5-2.7M19 13a10 10 0 0 0-2.3-1.6M2 9.5a15 15 0 0 1 4.3-2.9M22 9.5A15 15 0 0 0 11 5.1M12 20h.01" />
+    </svg>
+  ),
+  guardado: (): JSX.Element => (
+    <svg {...ICON_PROPS} width={18} height={18}>
+      <path d="M7 18a4.5 4.5 0 0 1-.6-9A6 6 0 0 1 18 9.5a4 4 0 0 1-.5 8.5H7z" />
+      <path d="M12 11v5M9.5 13.5 12 11l2.5 2.5" />
+    </svg>
+  ),
   olho: (): JSX.Element => (
     <svg {...ICON_PROPS} width={20} height={20}>
       <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />

@@ -4275,3 +4275,456 @@ h1.wordmark {
     padding: 30px 28px 26px;
   }
 }
+
+/* ---------- sem sinal: fila do celular ---------- */
+
+.offline-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--line));
+  border-radius: var(--radius-sm);
+  background: var(--warn-soft);
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.offline-banner svg {
+  flex: 0 0 auto;
+  color: var(--warn-ink);
+}
+
+/* O aviso de enviado não é alerta: tom da marca. */
+.offline-banner.is-sent {
+  border-color: color-mix(in srgb, var(--good) 45%, var(--line));
+  background: var(--brand-soft);
+}
+
+.offline-banner::before,
+.offline-banner.is-sent::before {
+  display: none;
+}
+
+.outbox-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--warn) 60%, var(--line-strong));
+  border-radius: 999px;
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.outbox-chip:hover {
+  box-shadow: none;
+  border-color: var(--warn);
+}
+
+/* Algo recusado: pede atenção de verdade. */
+.outbox-chip.has-refused {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.outbox-panel {
+  position: fixed;
+  z-index: 30;
+  left: max(10px, env(safe-area-inset-left, 0px));
+  right: max(10px, env(safe-area-inset-right, 0px));
+  top: calc(64px + env(safe-area-inset-top, 0px));
+  max-height: calc(100dvh - 160px);
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-lift);
+  animation: rise var(--dur-fast) var(--ease-out) both;
+}
+
+@media (min-width: 640px) {
+  .outbox-panel {
+    left: auto;
+    width: 26rem;
+  }
+}
+
+.outbox-panel:focus {
+  outline: none;
+}
+
+.outbox-panel h3 {
+  margin: 0 0 4px;
+}
+
+.outbox-panel ul {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.outbox-panel li {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+.outbox-panel li small {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.outbox-panel li.is-refused {
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--line));
+}
+
+.outbox-panel li.is-refused small {
+  color: var(--danger);
+}
+
+.outbox-panel li button {
+  justify-self: start;
+}
+
+/* Linha guardada no celular: tom de espera, não de erro. */
+.prod-row.is-queued {
+  border-color: color-mix(in srgb, var(--warn) 55%, var(--line));
+  background: color-mix(in srgb, var(--warn-soft) 55%, var(--surface));
+}
+
+.prod-state .queued {
+  display: inline-flex;
+  color: var(--warn-ink);
+}
+
+.queued-note {
+  background: var(--warn-soft);
+}
+
+/* No topo estreito o contador aperta o respiro, sem cortar o texto. */
+@media (max-width: 379px) {
+  .outbox-chip {
+    padding-inline: 10px;
+  }
+}
+
+.login-offline {
+  margin: 0 0 12px;
+}
+
+/* ---------- telas revistas: importar, medições, histórico, junção ---------- */
+
+/* Campo de arquivo: o botão nativo ("Escolher arquivo") com a cara dos
+   outros botões e alvo de dedo; o nome do arquivo escolhido ao lado. */
+input[type="file"] {
+  min-height: 56px;
+  /* 16 px: abaixo disso o iPhone amplia a tela ao tocar no campo. */
+  font-size: 16px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+input[type="file"]::file-selector-button {
+  min-height: 44px;
+  margin-right: 12px;
+  padding: 8px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--brand);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+input[type="file"]:hover::file-selector-button {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+/* Escolha entre duas saídas: cada opção é um cartão inteiro clicável, não
+   uma bolinha de 13 px ao lado de um texto miúdo. */
+.import-mode label {
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 0.93rem;
+  font-weight: 600;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.import-mode label:has(input:checked) {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.import-mode input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  flex: 0 0 auto;
+  accent-color: var(--brand);
+}
+
+.import-mode legend {
+  padding: 0 6px;
+  font-weight: 650;
+}
+
+/* Botões de um formulário lado a lado, na mesma linha de base: o "enviar"
+   herdava uma margem de cima que o "Cancelar" não tinha. */
+.row-fix-actions {
+  align-items: center;
+  margin-top: 14px;
+}
+
+.row-fix-actions button,
+.row-fix-actions button[type="submit"] {
+  margin-top: 0;
+}
+
+/* Número curto, campo curto. */
+.row-fix input[inputmode="decimal"] {
+  max-width: 12rem;
+}
+
+/* Ação da área só com ícone no celular (Atualizar): o texto vai para o
+   leitor de tela pelo aria-label. */
+@media (max-width: 519px) {
+  .icon-on-phone {
+    width: var(--touch);
+    height: var(--touch);
+    justify-content: center;
+    padding: 0;
+  }
+
+  .icon-on-phone .wide-only {
+    display: none;
+  }
+}
+
+/* Opção da junção: o brinco no selo, o nome, e o que tocar faz. */
+.merge-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+
+.merge-choice .tag {
+  flex: 0 0 auto;
+  min-width: 56px;
+}
+
+.merge-choice-name {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.merge-choice-name small {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.merge-choice-go {
+  flex: 0 0 auto;
+  color: var(--brand);
+  font-size: 0.85rem;
+}
+
+.merge-choices {
+  display: grid;
+  gap: 8px;
+}
+
+/* Celular: tabelas viram uma linha por registro. Rolando de lado, a prévia
+   da importação escondia justo os litros e a situação de cada vaca. */
+@media (max-width: 600px) {
+  .import-panel .scroll-x,
+  .stack-on-phone {
+    overflow: visible;
+  }
+
+  .import-table,
+  table.stack-on-phone {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .import-table thead,
+  table.stack-on-phone thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .import-table tbody tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "tag nome litros"
+      "tag situacao situacao";
+    align-items: center;
+    gap: 2px 10px;
+    padding: 10px 4px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .import-table tbody td {
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .import-table td:nth-child(1) {
+    display: none;
+  }
+
+  .import-table td:nth-child(2) {
+    grid-area: tag;
+  }
+
+  .import-table td:nth-child(3) {
+    grid-area: nome;
+    font-weight: 650;
+  }
+
+  .import-table td:nth-child(4) {
+    grid-area: litros;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .import-table td:nth-child(5) {
+    grid-area: situacao;
+  }
+
+  .import-table tr.tone-bad {
+    background: color-mix(in srgb, var(--danger-soft) 45%, transparent);
+  }
+
+  /* A cor da linha recusada fica na linha, não em cada célula. */
+  .import-table tr.tone-bad td {
+    background: none;
+  }
+
+  table.stack-on-phone tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "animal litros"
+      "data por";
+    gap: 2px 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  table.stack-on-phone tbody td {
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  table.stack-on-phone td:nth-child(1) {
+    grid-area: data;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  table.stack-on-phone td:nth-child(2) {
+    grid-area: animal;
+    font-weight: 650;
+  }
+
+  table.stack-on-phone td:nth-child(3) {
+    grid-area: litros;
+    font-weight: 700;
+  }
+
+  table.stack-on-phone td:nth-child(4) {
+    grid-area: por;
+    font-size: 0.82rem;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  /* Histórico da ficha: fundo na linha inteira, não em cada célula. */
+  .history-table tbody td {
+    background: none;
+  }
+
+  .history-table tbody tr {
+    padding-inline: 12px;
+    background: var(--surface);
+  }
+}
+
+/* ---------- teclado e leitor de tela ---------- */
+
+/* Aparece só com o foco do teclado: pula a barra de áreas. */
+.skip-link {
+  position: absolute;
+  z-index: 50;
+  left: 12px;
+  top: -80px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--brand);
+  color: var(--on-brand);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: calc(8px + env(safe-area-inset-top, 0px));
+}
+
+/* Foco levado pelo app (título da tela, área, diálogo): sem anel, porque
+   não foi a pessoa que chegou ali pelo teclado — o leitor de tela lê igual. */
+main.area:focus,
+h2[tabindex="-1"]:focus,
+[role="dialog"][tabindex="-1"]:focus {
+  outline: none;
+}
+
+.topbar h1.wordmark {
+  font-size: inherit;
+}
+
+.area-failed {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.area-failed p {
+  margin: 0;
+}

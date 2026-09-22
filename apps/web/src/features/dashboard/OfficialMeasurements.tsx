@@ -103,12 +103,12 @@ export function OfficialMeasurements({
       <PageHeader
         title="Medições oficiais"
         actions={
-          <button type="button" className="link-btn" onClick={load}>
-            <Icons.atualizar /> Atualizar
+          <button type="button" className="link-btn icon-on-phone" aria-label="Atualizar" onClick={load}>
+            <Icons.atualizar /> <span className="wide-only">Atualizar</span>
           </button>
         }
       >
-        Só entram aqui leituras aprovadas por uma pessoa ou migradas da baseline.
+        Só entram aqui leituras aprovadas por uma pessoa ou trazidas do sistema antigo.
       </PageHeader>
 
       {/* Três indicadores: no celular o total ocupa a linha, e os outros
@@ -153,7 +153,7 @@ export function OfficialMeasurements({
           <p className="chart-empty">Nenhuma medição oficial ainda.</p>
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="stack-on-phone">
               <thead>
                 <tr>
                   <th>Data</th>
@@ -167,7 +167,7 @@ export function OfficialMeasurements({
                   <tr key={record.id}>
                     <td>{br(record.measured_on)}</td>
                     <td>{record.animal_name ?? record.animal_identifier}</td>
-                    <td className="num">{fmt.dec(liters(record))}</td>
+                    <td className="num">{fmt.dec(liters(record))} L</td>
                     <td className="muted">{record.reviewed_by ?? "—"}</td>
                   </tr>
                 ))}

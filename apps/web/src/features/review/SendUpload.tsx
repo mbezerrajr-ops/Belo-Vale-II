@@ -16,6 +16,8 @@ import {
   type RecorderApi,
 } from "./AudioRecorder";
 import { uploadErrorMessage } from "./uploadErrors";
+import { isTransient, withTimeout } from "../../offline/outbox";
+import { useOutbox } from "../../offline/OutboxContext";
 
 /**
  * Enviar a foto da folha ou a gravação da ordenha pela própria Revisão, que é
@@ -110,6 +112,12 @@ function browserDuration(file: File): Promise<number | null> {
   });
 }
 
+/**
+ * Prazo do envio. Gravação longa com sinal fraco demora mesmo: o prazo é só
+ * para o pedido que ficou pendurado sem resposta.
+ */
+export const UPLOAD_TIMEOUT_MS = 90_000;
+
 /** Espera entre as perguntas ao servidor: rápido no começo, depois com calma. */
 export const WATCH_STEPS_MS = [1500, 2000, 3000, 5000, 8000];
 /** Depois disto, a tela para de perguntar e manda usar "Atualizar". */
@@ -123,6 +131,7 @@ type State =
   | { status: "failed"; importId: string; failure: ReadingFailure }
   | { status: "slow" }
   | { status: "duplicate"; importId: string; notice?: string }
+  | { status: "queued" }
   | { status: "error"; message: string };
 
 const DISCARD = "Descartar a gravação? Ela ainda não foi enviada.";
@@ -154,6 +163,7 @@ export function SendUpload({
   // Gravação escolhida mais longa que o limite: o worker ouve só o começo.
   const [tooLong, setTooLong] = useState<number | null>(null);
   const chosenAt = useRef(0);
+  const queue = useOutbox();
 
   // O token é renovado enquanto a leitura roda: cada pergunta usa o atual.
   const currentToken = useRef(token);
@@ -234,12 +244,30 @@ export function SendUpload({
     if (file === null) return;
     setState({ status: "sending" });
     try {
-      const result = await onUpload(
-        { farmId, file, declaredLot: variant.comLote && lote ? lote : undefined },
-        token,
+      const result = await withTimeout(
+        onUpload({ farmId, file, declaredLot: variant.comLote && lote ? lote : undefined }, token),
+        UPLOAD_TIMEOUT_MS,
       );
       sent(result.id);
     } catch (error) {
+      // Sem sinal: o arquivo inteiro fica guardado no celular e sobe sozinho
+      // quando der. A gravação da ordenha não se perde mais ao sair da tela.
+      if (queue && isTransient(error)) {
+        await queue.outbox.addUpload({
+          userId: queue.userId,
+          arquivo: variant.arquivo,
+          farmId,
+          blob: file,
+          fileName: file.name,
+          declaredLot: variant.comLote && lote ? lote : undefined,
+        });
+        setState({ status: "queued" });
+        setFile(null);
+        setRecorded(false);
+        setInputKey((key) => key + 1);
+        setOpen(false);
+        return;
+      }
       // O mesmo arquivo já está guardado: em vez de criar outra cópia, o
       // caminho certo é mandar ler de novo aquele.
       if (error instanceof ApiError && error.code === "duplicate_image") {
@@ -440,6 +468,13 @@ function Outcome({
             {variant.deNovo}
           </button>
         </div>
+      );
+    case "queued":
+      return (
+        <p role="status" className="queued-note">
+          Sem sinal — {variant.arquivo === "foto" ? "a foto ficou guardada" : "a gravação ficou guardada"}{" "}
+          neste celular. Vai sozinha quando o sinal voltar, e o que for lido aparece aqui.
+        </p>
       );
     case "error":
       return <p role="alert">{state.message}</p>;

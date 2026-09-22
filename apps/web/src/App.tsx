@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 
 import {
+  enterReading,
+  uploadImport,
   getAnimal,
   getCurrentFarm,
   getCurrentUser,
@@ -16,21 +18,57 @@ import type {
   ImportReview,
   UploadResult,
 } from "./api/types";
+import { ApiError } from "./api/types";
 import { LoginForm } from "./auth/LoginForm";
-import { clearStoredToken, loadStoredToken, storeToken } from "./auth/session";
-import { AnimalDetailPanel } from "./features/animals/AnimalDetailPanel";
-import { AnimalSearchPage } from "./features/animals/AnimalSearchPage";
-import { HerdDashboard } from "./features/dashboard/HerdDashboard";
-import { OfficialMeasurements } from "./features/dashboard/OfficialMeasurements";
-import { SuppliesPage } from "./features/dashboard/SuppliesPage";
-import { ReviewWorkspace } from "./features/imports/ReviewWorkspace";
-import { UploadForm } from "./features/imports/UploadForm";
+import {
+  clearStoredToken,
+  loadStoredToken,
+  loadStoredUser,
+  storeToken,
+  storeUser,
+} from "./auth/session";
 import { ProductionPage } from "./features/production/ProductionPage";
-import { ReviewInbox } from "./features/review/ReviewInbox";
 import { ChangePasswordForm } from "./features/users/ChangePasswordForm";
-import { UsersPage } from "./features/users/UsersPage";
 import { Cows, Hills, Icons, LogoMark, type IconName } from "./ui/Brand";
 import { PageHeader } from "./ui/PageHeader";
+import { AreaBoundary } from "./ui/AreaBoundary";
+import { closeAndReturn, usePanelFocus } from "./ui/usePanelFocus";
+import { useRoute, type AreaRoute } from "./router";
+import { deviceOutbox } from "./offline/outbox";
+import { OutboxProvider, useOutbox } from "./offline/OutboxContext";
+import { OfflineBanner, OutboxButton } from "./offline/OutboxStatus";
+
+// O login e a Produção (o curral) vêm no pacote principal; o resto só é
+// baixado quando aberto. No 3G do curral, abrir o app baixava de uma vez os
+// gráficos do Painel, o gravador da Revisão e as telas de escritório. Sem
+// sinal, tudo abre igual: o service worker guarda todas as partes.
+const HerdDashboard = lazy(() =>
+  import("./features/dashboard/HerdDashboard").then((m) => ({ default: m.HerdDashboard })),
+);
+const ReviewInbox = lazy(() =>
+  import("./features/review/ReviewInbox").then((m) => ({ default: m.ReviewInbox })),
+);
+const AnimalSearchPage = lazy(() =>
+  import("./features/animals/AnimalSearchPage").then((m) => ({ default: m.AnimalSearchPage })),
+);
+const AnimalDetailPanel = lazy(() =>
+  import("./features/animals/AnimalDetailPanel").then((m) => ({ default: m.AnimalDetailPanel })),
+);
+const SuppliesPage = lazy(() =>
+  import("./features/dashboard/SuppliesPage").then((m) => ({ default: m.SuppliesPage })),
+);
+const OfficialMeasurements = lazy(() =>
+  import("./features/dashboard/OfficialMeasurements").then((m) => ({
+    default: m.OfficialMeasurements,
+  })),
+);
+const UsersPage = lazy(() => import("./features/users/UsersPage").then((m) => ({ default: m.UsersPage })));
+const UploadForm = lazy(() =>
+  import("./features/imports/UploadForm").then((m) => ({ default: m.UploadForm })),
+);
+const ReviewWorkspace = lazy(() =>
+  import("./features/imports/ReviewWorkspace").then((m) => ({ default: m.ReviewWorkspace })),
+);
 
 type SessionState =
   | { status: "checking" }
@@ -54,11 +92,23 @@ export function App(): JSX.Element {
       if (storedToken !== null) {
         try {
           const user = await getCurrentUser(storedToken);
+          storeUser(user);
           if (!cancelled) {
             setSession({ status: "signed-in", token: storedToken, user });
           }
           return;
-        } catch {
+        } catch (error) {
+          // Só "não vale mais" apaga a sessão. Sem sinal (ou servidor fora
+          // do ar), recarregar apagava o token ainda válido e jogava quem
+          // estava no curral na tela de login, que também não funciona sem
+          // sinal. Agora abre com quem já estava: o que for lançado fica
+          // guardado no celular.
+          const unauthorized = error instanceof ApiError && error.status === 401;
+          const cached = loadStoredUser();
+          if (!unauthorized && cached !== null) {
+            if (!cancelled) setSession({ status: "signed-in", token: storedToken, user: cached });
+            return;
+          }
           clearStoredToken();
         }
       }
@@ -71,6 +121,7 @@ export function App(): JSX.Element {
       try {
         const user = await getCurrentUser(renewed.access_token);
         storeToken(renewed.access_token);
+        storeUser(user);
         if (!cancelled) {
           setSession({ status: "signed-in", token: renewed.access_token, user });
         }
@@ -120,7 +171,20 @@ export function App(): JSX.Element {
     const token = loginResult.access_token;
     const user = await getCurrentUser(token);
     storeToken(token);
+    storeUser(user);
     setSession({ status: "signed-in", token, user });
+  };
+
+  // Para a fila do celular: depois de horas sem sinal o token venceu, e o
+  // envio atrasado renova antes de desistir.
+  const renewToken = async (): Promise<string | null> => {
+    const renewed = await refreshSession();
+    if (renewed === null) return null;
+    storeToken(renewed.access_token);
+    setSession((current) =>
+      current.status === "signed-in" ? { ...current, token: renewed.access_token } : current,
+    );
+    return renewed.access_token;
   };
 
   const handleLogout = async (): Promise<void> => {
@@ -135,6 +199,8 @@ export function App(): JSX.Element {
       }),
       new Promise((resolve) => window.setTimeout(resolve, LOGOUT_WAIT_MS)),
     ]);
+    // O próximo a entrar neste celular não abre na ficha que ficou na tela.
+    window.history.replaceState(null, "", "/");
     setSession({ status: "signed-out" });
   };
 
@@ -236,6 +302,7 @@ export function App(): JSX.Element {
       token={session.token}
       user={session.user}
       onLogout={() => void handleLogout()}
+      onRenew={renewToken}
     />
   );
 }
@@ -244,6 +311,7 @@ interface AuthenticatedAppProps {
   token: string;
   user: CurrentUser;
   onLogout: () => void;
+  onRenew?: () => Promise<string | null>;
 }
 
 /** Áreas do aplicativo. `painel` abre primeiro: é a visão do dia. */
@@ -287,18 +355,50 @@ function initials(email: string): string {
   return email.slice(0, 2);
 }
 
-function AuthenticatedApp({
+/** A fila do celular envolve tudo o que a pessoa faz depois de entrar. */
+function AuthenticatedApp(props: AuthenticatedAppProps): JSX.Element {
+  const { token, user, onRenew } = props;
+  return (
+    <OutboxProvider
+      outbox={deviceOutbox()}
+      userId={user.id}
+      token={token}
+      renew={onRenew ?? (async () => null)}
+      send={{ enterReading, uploadImport }}
+    >
+      <AppShell {...props} />
+    </OutboxProvider>
+  );
+}
+
+function AppShell({
   token,
   user,
-  onLogout,
+  onLogout: endSessionNow,
 }: AuthenticatedAppProps): JSX.Element {
-  // Quem lança o leite abre direto no lançamento; quem acompanha a fazenda
-  // abre no painel.
-  const [area, setArea] = useState<Area>(atLeast(user, "reviewer") ? "painel" : "producao");
+  // Sair com algo guardado: avisa que fica no celular, esperando esta conta.
+  const queue = useOutbox();
+  const onLogout = (): void => {
+    const waiting = queue?.pending.filter((item) => !item.error).length ?? 0;
+    if (
+      waiting > 0 &&
+      !window.confirm(
+        `Há ${waiting} ${waiting === 1 ? "envio guardado" : "envios guardados"} neste celular esperando sinal. ` +
+          "Eles continuam guardados e vão quando você entrar de novo neste celular. Sair agora?",
+      )
+    ) {
+      return;
+    }
+    endSessionNow();
+  };
+  // A área e a ficha aberta vêm do endereço: recarregar, voltar e mandar o
+  // link funcionam como se espera de qualquer página.
+  const { route, navigate, replace } = useRoute();
   const [farm, setFarm] = useState<Farm | null>(null);
   const [farmError, setFarmError] = useState<string | null>(null);
-  const [openAnimalId, setOpenAnimalId] = useState<string | null>(null);
   const [animal, setAnimal] = useState<AnimalDetail | null>(null);
+  const [animalError, setAnimalError] = useState<string | null>(null);
+  const [animalReload, setAnimalReload] = useState(0);
   const [importId, setImportId] = useState<string | null>(null);
   const [review, setReview] = useState<ImportReview | null>(null);
 
@@ -340,10 +440,34 @@ function AuthenticatedApp({
     };
   }, [token]);
 
-  const loadAnimal = async (animalId: string): Promise<void> => {
-    setOpenAnimalId(animalId);
-    setAnimal(await getAnimal(token, animalId));
-  };
+  const openAnimalId = route.area === "animais" ? route.animalId : null;
+  useEffect(() => {
+    if (openAnimalId === null) {
+      setAnimal(null);
+      setAnimalError(null);
+      return;
+    }
+    let cancelled = false;
+    setAnimalError(null);
+    // A ficha anterior some na hora: por um instante, o nome de uma vaca com
+    // os dados de outra é pior que um instante de espera.
+    setAnimal((current) => (current?.id === openAnimalId ? current : null));
+    getAnimal(token, openAnimalId)
+      .then((loaded) => {
+        if (!cancelled) setAnimal(loaded);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAnimalError("Não foi possível abrir esta ficha. Ela pode não existir nesta fazenda.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, openAnimalId, animalReload]);
+
+  const openAnimal = (animalId: string): void =>
+    navigate({ area: "animais", animalId });
 
   const refreshReview = async (id: string): Promise<void> => {
     setReview(await getImportReview(id, token));
@@ -366,14 +490,9 @@ function AuthenticatedApp({
   // No celular, cabem quatro áreas na barra de baixo e um "Mais" com o
   // resto; no computador, a barra mostra todas.
   const [moreOpen, setMoreOpen] = useState(false);
-  useEffect(() => {
-    if (!moreOpen) return;
-    const close = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") setMoreOpen(false);
-    };
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [moreOpen]);
+  const moreButton = useRef<HTMLButtonElement>(null);
+  const moreSheet = useRef<HTMLDivElement>(null);
+  usePanelFocus(moreOpen, moreSheet, moreButton, () => setMoreOpen(false));
 
   const areas: Area[] = [
     "painel",
@@ -389,22 +508,74 @@ function AuthenticatedApp({
     ...(isAdmin ? (["contas"] as Area[]) : []),
     "minha-conta",
   ];
+  // Quem lança o leite abre direto no lançamento; quem acompanha a fazenda
+  // abre no painel. Endereço sem área, ou de área que a pessoa não alcança
+  // (Contas para quem não é administrador), cai na área inicial.
+  const homeArea: Area = canEdit ? "painel" : "producao";
+  const allowed = route.area !== null && areas.includes(route.area as Area);
+  const area: Area = allowed ? (route.area as Area) : homeArea;
+  useEffect(() => {
+    if (!allowed) replace({ area: homeArea as AreaRoute, animalId: null });
+  }, [allowed, homeArea, replace]);
+  const setArea = (name: Area): void => navigate({ area: name as AreaRoute, animalId: null });
+
+  // Trocar de tela leva o foco ao título da tela nova. Sem isto o foco
+  // ficava no botão da barra, e quem usa leitor de tela não sabia que a
+  // página tinha mudado. A primeira abertura não rouba o foco.
+  const content = useRef<HTMLElement>(null);
+  const place = `${area}/${openAnimalId ?? ""}`;
+  const lastPlace = useRef(place);
+  // A ficha chega depois do endereço: até o título dela existir, o foco
+  // fica na área, e passa ao título quando ele aparece.
+  const wantsHeading = useRef(false);
+  useEffect(() => {
+    if (lastPlace.current !== place) {
+      lastPlace.current = place;
+      wantsHeading.current = true;
+      content.current?.focus({ preventScroll: true });
+    }
+    if (!wantsHeading.current) return;
+    const heading = content.current?.querySelector<HTMLElement>("h2");
+    if (!heading) return;
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+    wantsHeading.current = false;
+  }, [place, animal]);
+
+  useEffect(() => {
+    const titulo = area === "animais" && animal && openAnimalId ? animal.name ?? animal.brinco : AREA_LABEL[area];
+    document.title = titulo ? `${titulo} · Belo Vale II` : "Belo Vale II";
+  }, [area, animal, openAnimalId]);
+
+  // O voltar do celular também fecha o painel Mais. (Os toques na barra já
+  // fecham por conta própria; a correção inicial do endereço não fecha.)
+  useEffect(() => {
+    const close = (): void => setMoreOpen(false);
+    window.addEventListener("popstate", close);
+    return () => window.removeEventListener("popstate", close);
+  }, []);
+
   const moreAreas = areas.filter((name) => !PRIMARY_AREAS.includes(name));
   // No computador, Minha conta é o avatar com o e-mail, ao lado de Sair;
   // na barra seria um terceiro caminho para o mesmo lugar.
   const barAreas = areas.filter((name) => name !== "minha-conta");
 
   return (
-    <main className="shell">
+    <div className="shell">
+      {/* Teclado: pula os botões da barra direto para a tela. */}
+      <a className="skip-link" href="#conteudo">
+        Pular para o conteúdo
+      </a>
       <header className="topbar">
-        <span className="wordmark">
+        <h1 className="wordmark">
           <LogoMark />
           <span>
             <strong>Belo Vale II</strong>
             <small>Gestão do rebanho leiteiro</small>
           </span>
-        </span>
+        </h1>
         <div className="who">
+          <OutboxButton />
           <button
             type="button"
             className="avatar"
@@ -422,6 +593,8 @@ function AuthenticatedApp({
           </button>
         </div>
       </header>
+
+      <OfflineBanner />
 
       <nav className="areanav" aria-label="Áreas">
         {barAreas.map((name) => {
@@ -451,6 +624,7 @@ function AuthenticatedApp({
           <button
             type="button"
             className="nav-more"
+            ref={moreButton}
             aria-expanded={moreOpen}
             aria-controls="mais-areas"
             aria-current={moreAreas.includes(area)}
@@ -464,8 +638,12 @@ function AuthenticatedApp({
 
       {moreOpen && (
         <>
-          <div className="more-backdrop" aria-hidden="true" onClick={() => setMoreOpen(false)} />
-          <div className="more-sheet" id="mais-areas" role="group" aria-label="Mais áreas">
+          <div
+            className="more-backdrop"
+            aria-hidden="true"
+            onClick={() => closeAndReturn(() => setMoreOpen(false), moreButton)}
+          />
+          <div className="more-sheet" id="mais-areas" role="group" aria-label="Mais áreas" ref={moreSheet}>
             {moreAreas.map((name) => {
               const Icon = Icons[name as IconName];
               return (
@@ -489,104 +667,125 @@ function AuthenticatedApp({
 
       {farmError && <p role="alert">{farmError}</p>}
 
-      <div className="area" key={area}>
-        {area === "painel" && <HerdDashboard token={token} />}
+      <main className="area" id="conteudo" tabIndex={-1} key={area} ref={content}>
+        <AreaBoundary>
+          <Suspense fallback={<div className="skeleton skeleton-card" aria-label="Carregando" />}>
+          {area === "painel" && <HerdDashboard token={token} />}
 
-        {area === "producao" && <ProductionPage token={token} canCorrect={canEdit} />}
+          {area === "producao" && <ProductionPage token={token} canCorrect={canEdit} />}
 
-        {area === "revisao" && (
-          <ReviewInbox
-            token={token}
-            farmId={farm?.id}
-            canDecide={canEdit}
-            onChanged={refreshPending}
-          />
-        )}
+          {area === "revisao" && (
+            <ReviewInbox
+              token={token}
+              farmId={farm?.id}
+              canDecide={canEdit}
+              onChanged={refreshPending}
+            />
+          )}
 
-        {area === "insumos" && (
-          <SuppliesPage
-            token={token}
-            canEdit={canEdit}
-            milkPrice={farm?.milk_price_per_liter ?? null}
-            onMilkPriceSaved={(price) =>
-              setFarm((current) => (current ? { ...current, milk_price_per_liter: price } : current))
-            }
-          />
-        )}
-
-        {area === "animais" &&
-          (openAnimalId !== null && animal !== null ? (
-            <>
-              <button
-                type="button"
-                className="link-btn"
-                onClick={() => setOpenAnimalId(null)}
-              >
-                <Icons.back /> Voltar à busca
-              </button>
-              <AnimalDetailPanel
-                token={token}
-                animal={animal}
-                canEdit={canEdit}
-                onChanged={() => void loadAnimal(animal.id)}
-                onOpenAnimal={(animalId) => void loadAnimal(animalId)}
-              />
-            </>
-          ) : (
-            <AnimalSearchPage
+          {area === "insumos" && (
+            <SuppliesPage
               token={token}
               canEdit={canEdit}
-              onOpen={(animalId) => void loadAnimal(animalId)}
-            />
-          ))}
-
-        {area === "fichas" && farm !== null && (
-          <>
-            <h2>Fichas de medição</h2>
-            <p className="muted">
-              Envie a foto da ficha. O sistema lê as linhas e deixa cada uma para
-              conferência antes de virar medição oficial.
-            </p>
-            <UploadForm token={token} farmId={farm.id} onUploaded={handleUploaded} />
-            {review !== null && (
-              <div>
-                <button
-                  type="button"
-                  className="link-btn"
-                  onClick={() => refreshReview(review.import_id)}
-                >
-                  Atualizar revisão
-                </button>
-                <ReviewWorkspace review={review} token={token} onDecided={handleDecided} />
-              </div>
-            )}
-          </>
-        )}
-
-        {area === "medicoes" && farm !== null && (
-          <OfficialMeasurements farmId={farm.id} token={token} />
-        )}
-
-        {area === "contas" && isAdmin && (
-          <UsersPage token={token} currentUserId={user.id} />
-        )}
-
-        {area === "minha-conta" && (
-          <>
-            <PageHeader
-              title="Minha conta"
-              actions={
-                <button type="button" className="secondary logout-account" onClick={onLogout}>
-                  <Icons.logout /> Sair
-                </button>
+              milkPrice={farm?.milk_price_per_liter ?? null}
+              onMilkPriceSaved={(price) =>
+                setFarm((current) => (current ? { ...current, milk_price_per_liter: price } : current))
               }
-            >
-              {user.email}
-            </PageHeader>
-            <ChangePasswordForm token={token} />
-          </>
-        )}
-      </div>
-    </main>
+            />
+          )}
+
+          {area === "animais" && (
+            <>
+              {/* A busca fica montada por trás da ficha: voltar devolve a lista
+                  como estava, com o recorte e o que já tinha carregado. */}
+              <div hidden={openAnimalId !== null}>
+                <AnimalSearchPage token={token} canEdit={canEdit} onOpen={openAnimal} />
+              </div>
+              {openAnimalId !== null && (
+                <>
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() => {
+                      // Veio da lista: volta nela (o voltar do celular faz o
+                      // mesmo). Chegou por link: não há o que voltar, abre a lista.
+                      if ((window.history.state as { inApp?: boolean } | null)?.inApp) {
+                        window.history.back();
+                      } else {
+                        replace({ area: "animais", animalId: null });
+                      }
+                    }}
+                  >
+                    <Icons.back /> Voltar à busca
+                  </button>
+                  {animalError && <p role="alert">{animalError}</p>}
+                  {animal === null && !animalError && (
+                    <div className="skeleton skeleton-card" aria-label="Carregando a ficha" />
+                  )}
+                  {animal !== null && (
+                    <AnimalDetailPanel
+                      key={animal.id}
+                      token={token}
+                      animal={animal}
+                      canEdit={canEdit}
+                      onChanged={() => setAnimalReload((count) => count + 1)}
+                      onOpenAnimal={openAnimal}
+                    />
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {area === "fichas" && farm !== null && (
+            <>
+              <h2>Fichas de medição</h2>
+              <p className="muted">
+                Envie a foto da ficha. O sistema lê as linhas e deixa cada uma para
+                conferência antes de virar medição oficial.
+              </p>
+              <UploadForm token={token} farmId={farm.id} onUploaded={handleUploaded} />
+              {review !== null && (
+                <div>
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() => refreshReview(review.import_id)}
+                  >
+                    Atualizar revisão
+                  </button>
+                  <ReviewWorkspace review={review} token={token} onDecided={handleDecided} />
+                </div>
+              )}
+            </>
+          )}
+
+          {area === "medicoes" && farm !== null && (
+            <OfficialMeasurements farmId={farm.id} token={token} />
+          )}
+
+          {area === "contas" && isAdmin && (
+            <UsersPage token={token} currentUserId={user.id} />
+          )}
+
+          {area === "minha-conta" && (
+            <>
+              <PageHeader
+                title="Minha conta"
+                actions={
+                  <button type="button" className="secondary logout-account" onClick={onLogout}>
+                    <Icons.logout /> Sair
+                  </button>
+                }
+              >
+                {user.email}
+              </PageHeader>
+              <ChangePasswordForm token={token} />
+            </>
+          )}
+          </Suspense>
+        </AreaBoundary>
+      </main>
+    </div>
   );
 }

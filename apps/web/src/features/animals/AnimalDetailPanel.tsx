@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import {
   assignLot,
@@ -19,6 +19,7 @@ import {
   type MergePreview,
 } from "../../api/types";
 import { Icons } from "../../ui/Brand";
+import { usePanelFocus } from "../../ui/usePanelFocus";
 import { brDate, farmToday } from "../../ui/dates";
 import { MergeFichas } from "./MergeFichas";
 import { ProductionHistory } from "./ProductionHistory";
@@ -128,10 +129,28 @@ export function AnimalDetailPanel({
   >("none");
   // As ações raras (tirar brinco, juntar, baixa) ficam atrás de "Mais ações".
   const [moreActions, setMoreActions] = useState(false);
+  const moreToggle = useRef<HTMLButtonElement>(null);
+  const moreGroup = useRef<HTMLDivElement>(null);
+  usePanelFocus(moreActions, moreGroup, moreToggle, () => setMoreActions(false));
   const open = (next: typeof panel): void => {
     setPanel(next);
     setMoreActions(false);
   };
+
+  // O formulário abre abaixo dos botões: no celular, fora da tela. Leva a
+  // tela até ele e põe o cursor no primeiro campo, para ninguém tocar num
+  // botão e achar que nada aconteceu.
+  const section = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (panel === "none") return;
+    const form = Array.from(section.current?.querySelectorAll("form") ?? []).find(
+      (candidate) => !candidate.closest(".production-history"),
+    );
+    if (!form) return;
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    form.scrollIntoView?.({ behavior: still ? "auto" : "smooth", block: "nearest" });
+    form.querySelector<HTMLElement>("input:not([type=hidden]), select, textarea")?.focus({ preventScroll: true });
+  }, [panel]);
   const merged = Boolean(animal.merged_into_id);
   const del = daysInMilk(animal.ultimo_parto, today);
   const [busy, setBusy] = useState(false);
@@ -218,7 +237,7 @@ export function AnimalDetailPanel({
   }
 
   return (
-    <section className="animal-detail">
+    <section className="animal-detail" ref={section}>
       {/* O brinco uma vez só, no selo ao lado do nome — é como a vaca aparece
           em todas as listas. Embaixo, só o que o selo não diz. */}
       <header className="detail-head">
@@ -339,6 +358,7 @@ export function AnimalDetailPanel({
             <button
               type="button"
               className="secondary actions-toggle"
+              ref={moreToggle}
               aria-expanded={moreActions}
               aria-controls="ficha-mais-acoes"
               onClick={() => setMoreActions((current) => !current)}
@@ -347,7 +367,13 @@ export function AnimalDetailPanel({
             </button>
           </div>
           {moreActions && (
-            <div className="actions actions-more" id="ficha-mais-acoes" role="group" aria-label="Mais ações">
+            <div
+              className="actions actions-more"
+              id="ficha-mais-acoes"
+              role="group"
+              aria-label="Mais ações"
+              ref={moreGroup}
+            >
               {animal.brinco && (
                 <button type="button" className="secondary" onClick={() => open("tirar-brinco")}>
                   Tirar o brinco

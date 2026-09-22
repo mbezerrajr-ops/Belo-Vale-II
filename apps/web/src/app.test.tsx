@@ -2,7 +2,7 @@
  * Casca do aplicativo: para onde cada pessoa vai ao entrar.
  */
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
@@ -27,6 +27,9 @@ function signedIn(user: Partial<CurrentUser>): void {
 
 beforeEach(() => {
   clearStoredToken();
+  // O endereço é estado da página: sem zerar, um teste abria onde o
+  // anterior tinha parado.
+  window.history.replaceState(null, "", "/");
   api.getCurrentFarm.mockResolvedValue({ id: "f-1", name: "Belo Vale II", code: null });
   api.getProductionSheet.mockResolvedValue({
     measured_on: "2026-09-18",
@@ -169,6 +172,168 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: /sair/i }));
 
     expect(await screen.findByRole("button", { name: /entrar/i })).toBeInTheDocument();
+  });
+
+  describe("teclado e leitor de tela", () => {
+    it("trocar de tela leva o foco ao título da tela nova", async () => {
+      signedIn({ role: "admin", email: "dono@belovale" });
+      api.listSupplies.mockResolvedValue([]);
+      render(<App />);
+      const nav = await screen.findByRole("navigation", { name: "Áreas" });
+
+      fireEvent.click(within(nav).getByRole("button", { name: /^produção/i }));
+
+      const titulo = await screen.findByRole("heading", { name: /produção do dia/i });
+      await waitFor(() => expect(document.activeElement).toBe(titulo));
+    });
+
+    it("abrir o Mais põe o foco dentro dele; Esc devolve ao botão", async () => {
+      signedIn({ role: "admin", email: "dono@belovale" });
+      render(<App />);
+      const mais = await screen.findByRole("button", { name: /^mais$/i });
+
+      fireEvent.click(mais);
+      const painel = screen.getByRole("group", { name: /mais áreas/i });
+      expect(painel.contains(document.activeElement)).toBe(true);
+
+      fireEvent.keyDown(window, { key: "Escape" });
+      expect(document.activeElement).toBe(mais);
+    });
+
+    it("tem link para pular direto ao conteúdo e o nome do app como título", async () => {
+      signedIn({ role: "operator" });
+      render(<App />);
+      await screen.findByRole("heading", { name: /produção do dia/i });
+
+      expect(screen.getByRole("link", { name: /pular para o conteúdo/i })).toHaveAttribute("href", "#conteudo");
+      expect(screen.getByRole("heading", { level: 1, name: /belo vale ii/i })).toBeInTheDocument();
+      expect(screen.getByRole("main")).toHaveAttribute("id", "conteudo");
+    });
+  });
+
+  describe("recarregar sem sinal", () => {
+    it("abre com quem já estava, em vez de mandar para o login", async () => {
+      // Antes, sem sinal, recarregar apagava o token ainda válido: quem
+      // estava no curral caía no login, que também não funciona sem sinal.
+      signedIn({ role: "operator" });
+      render(<App />);
+      await screen.findByRole("heading", { name: /produção do dia/i });
+      cleanup();
+
+      api.getCurrentUser.mockRejectedValue(new TypeError("Failed to fetch"));
+      api.refreshSession.mockRejectedValue(new TypeError("Failed to fetch"));
+      render(<App />);
+
+      expect(await screen.findByRole("heading", { name: /produção do dia/i })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /entrar/i })).not.toBeInTheDocument();
+    });
+
+    it("token que não vale mais continua levando ao login", async () => {
+      signedIn({ role: "operator" });
+      render(<App />);
+      await screen.findByRole("heading", { name: /produção do dia/i });
+      cleanup();
+
+      const { ApiError } = await import("./api/types");
+      api.getCurrentUser.mockRejectedValue(new ApiError(401, { code: "unauthorized" }));
+      render(<App />);
+
+      expect(await screen.findByRole("button", { name: /entrar/i })).toBeInTheDocument();
+    });
+  });
+
+  describe("endereço de cada tela", () => {
+    const ID = "3f2b8c1e-9a4d-4e21-8b7a-0c5d6e7f8a9b";
+
+    it("recarregar mantém a área em que a pessoa estava", async () => {
+      window.history.replaceState(null, "", "/insumos");
+      signedIn({ role: "admin", email: "dono@belovale" });
+      api.listSupplies.mockResolvedValue([]);
+
+      render(<App />);
+
+      expect(await screen.findByRole("heading", { name: /insumos e dieta/i })).toBeInTheDocument();
+      expect(document.title).toBe("Insumos · Belo Vale II");
+    });
+
+    it("trocar de área muda o endereço, e o voltar do celular volta", async () => {
+      signedIn({ role: "admin", email: "dono@belovale" });
+      api.listSupplies.mockResolvedValue([]);
+      render(<App />);
+      const nav = await screen.findByRole("navigation", { name: "Áreas" });
+
+      fireEvent.click(within(nav).getByRole("button", { name: /^produção/i }));
+      expect(window.location.pathname).toBe("/producao");
+      expect(await screen.findByRole("heading", { name: /produção do dia/i })).toBeInTheDocument();
+
+      // O que o navegador faz no gesto de voltar.
+      window.history.replaceState(null, "", "/painel");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+
+      await waitFor(() =>
+        expect(within(nav).getByRole("button", { name: /^painel/i })).toHaveAttribute(
+          "aria-current",
+          "true",
+        ),
+      );
+    });
+
+    it("área que a pessoa não alcança cai na inicial e o endereço é corrigido", async () => {
+      window.history.replaceState(null, "", "/contas");
+      signedIn({ role: "operator" });
+
+      render(<App />);
+
+      expect(await screen.findByRole("heading", { name: /produção do dia/i })).toBeInTheDocument();
+      await waitFor(() => expect(window.location.pathname).toBe("/producao"));
+    });
+
+    it("o link de uma ficha abre a ficha", async () => {
+      window.history.replaceState(null, "", `/animais/${ID}`);
+      signedIn({ role: "reviewer", email: "revisor@belovale" });
+      api.searchAnimals.mockResolvedValue({ items: [], total: 0 } as never);
+      api.getAnimal.mockResolvedValue({
+        id: ID,
+        brinco: "497",
+        name: "PONTA CURTA",
+        historico_lotes: [],
+        lote_atual: null,
+        grupo_manejo: null,
+        situacao: null,
+        ultimo_parto: null,
+      } as never);
+      api.getAnimalProduction.mockResolvedValue([] as never);
+
+      render(<App />);
+
+      expect(await screen.findByRole("heading", { name: "PONTA CURTA" })).toBeInTheDocument();
+      expect(api.getAnimal).toHaveBeenCalledWith("token-de-teste", ID);
+      expect(document.title).toBe("PONTA CURTA · Belo Vale II");
+    });
+
+    it("ficha que não existe diz isso, em vez de ficar carregando", async () => {
+      window.history.replaceState(null, "", `/animais/${ID}`);
+      signedIn({ role: "reviewer", email: "revisor@belovale" });
+      api.searchAnimals.mockResolvedValue({ items: [], total: 0 } as never);
+      api.getAnimal.mockRejectedValue(new Error("404"));
+
+      render(<App />);
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(/não foi possível abrir esta ficha/i);
+    });
+
+    it("sair limpa o endereço, para o próximo não abrir na tela de quem saiu", async () => {
+      window.history.replaceState(null, "", "/insumos");
+      signedIn({ role: "admin", email: "dono@belovale" });
+      api.listSupplies.mockResolvedValue([]);
+      api.logout.mockResolvedValue(undefined);
+      render(<App />);
+
+      fireEvent.click((await screen.findAllByRole("button", { name: /sair/i }))[0]);
+
+      expect(await screen.findByRole("button", { name: /entrar/i })).toBeInTheDocument();
+      expect(window.location.pathname).toBe("/");
+    });
   });
 
   it("senha provisória leva direto à troca, sem acesso ao resto", async () => {

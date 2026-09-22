@@ -160,12 +160,17 @@ export function MergeFichas({
             <button
               key={other.id}
               type="button"
-              className="btn-ghost"
+              className="btn-ghost merge-choice"
+              aria-label={`É esta: ${who(other)}${other.lote_atual ? ` · ${other.lote_atual}` : ""}`}
               disabled={busy}
               onClick={() => void choose(other)}
             >
-              É esta: {who(other)}
-              {other.lote_atual ? ` · ${other.lote_atual}` : ""}
+              <span className={other.brinco ? "tag" : "tag none"}>{other.brinco ?? "sem brinco"}</span>
+              <span className="merge-choice-name">
+                {other.name ?? "sem nome"}
+                {other.lote_atual && <small>{other.lote_atual}</small>}
+              </span>
+              <span className="merge-choice-go">É esta</span>
             </button>
           ))}
         </div>
