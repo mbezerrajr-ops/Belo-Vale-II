@@ -105,11 +105,36 @@ class _Servidor:
 
 
 def _detalhada(*trechos: tuple[float, float, str], duracao: float) -> bytes:
+    """A resposta do whisper-server com marcas de tempo. Como no de verdade,
+    cada trecho começa com espaço — a não ser o que continua a palavra do
+    anterior, marcado aqui com "+"."""
+    textos = [t[1:] if t.startswith("+") else (t if t.startswith(" ") else " " + t) for _, _, t in trechos]
     return json.dumps({
-        "text": " ".join(t for _, _, t in trechos),
+        "text": "".join(textos),
         "duration": duracao,
-        "segments": [{"start": a, "end": b, "text": t} for a, b, t in trechos],
+        "segments": [{"start": a, "end": b, "text": t} for (a, b, _), t in zip(trechos, textos)],
     }).encode()
+
+
+def _fala(segundos: float, silencio: tuple[float, float] | None = None, taxa: int = 16_000) -> bytes:
+    """WAV 16 kHz mono com "voz" (um tom), e silêncio onde pedido."""
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as arquivo:
+        arquivo.setnchannels(1)
+        arquivo.setsampwidth(2)
+        arquivo.setframerate(taxa)
+        amostras = []
+        for n in range(int(segundos * taxa)):
+            t = n / taxa
+            calado = silencio is not None and silencio[0] <= t < silencio[1]
+            amostras.append(0 if calado else int(6_000 * math.sin(2 * math.pi * 220 * t)))
+        arquivo.writeframes(struct.pack(f"<{len(amostras)}h", *amostras))
+    return buffer.getvalue()
+
+
+def _segundos(wav: bytes) -> float:
+    with wave.open(io.BytesIO(wav)) as arquivo:
+        return arquivo.getnframes() / arquivo.getframerate()
 
 
 class TestTalkingToWhisper:
@@ -128,32 +153,78 @@ class TestTalkingToWhisper:
         assert campos["temperature"] == "0"
         assert wav == b"RIFF..."
 
-    def test_a_skipped_stretch_of_speech_is_asked_again_without_timestamps(self) -> None:
-        """Medido numa gravação do titular: o whisper transcreveu "Mensagem de
-        teste" (0 a 1,7 s) e SALTOU para 29,98 s — sumiram três vacas, em
-        silêncio. É o salto de marca de tempo: sem marcas, ele não tem para
-        onde saltar. O buraco entre trechos é o sinal (numa gravação boa, o
-        maior foi de 0,44 s)."""
+    def test_a_skipped_stretch_of_speech_is_heard_again_on_its_own(self) -> None:
+        """Medido numa gravação do titular, feita pelo gravador do navegador:
+        o whisper transcreveu "Mensagem de teste" (0 a 1,6 s) e SALTOU para
+        29,98 s — sumiram duas vacas, sem erro nenhum. É o salto de marca de
+        tempo. Perguntar de novo sem marcas não resolveu nessa gravação; o
+        trecho pulado, ouvido sozinho, saiu perfeito. O buraco entre trechos
+        é o sinal (numa gravação boa, o maior foi de 0,44 s)."""
         servidor = _Servidor(
-            _detalhada((0.0, 1.66, "Mensagem de teste."), (29.98, 32.2, "Produziu 7 litros."), duracao=40.0),
-            json.dumps({"text": "Mensagem de teste. Vaca 417 Pandora. Produziu 7 litros."}).encode(),
+            _detalhada((0.0, 1.6, "Mensagem de teste."), (29.98, 32.2, "Produziu 7 litros."), duracao=34.0),
+            _detalhada((0.0, 4.2, "Vaca 417 Pandora"), (4.2, 26.0, "Produziu 5 litros"), duracao=28.38),
         )
         transcritor = WhisperCppTranscriber(url="http://127.0.0.1:8081", model="m", post=servidor)
 
-        texto = transcritor.transcribe(b"RIFF...")
+        texto = transcritor.transcribe(_fala(34.0))
 
-        assert "Pandora" in texto
-        assert len(servidor.chamadas) == 2
-        assert servidor.chamadas[1][1]["no_timestamps"] == "true"
+        assert texto.split("\n") == [
+            "Mensagem de teste.",
+            "Vaca 417 Pandora",
+            "Produziu 5 litros",
+            "Produziu 7 litros.",
+        ]
+        [_, (_, campos, fatia)] = servidor.chamadas
+        assert campos["response_format"] == "verbose_json"  # com marcas: erra menos dígito
+        assert _segundos(fatia) == pytest.approx(29.98 - 1.6, abs=0.01)
 
-    def test_speech_lost_at_the_end_is_asked_again_too(self) -> None:
+    def test_speech_lost_at_the_end_is_heard_again_too(self) -> None:
         servidor = _Servidor(
             _detalhada((0.0, 9.0, "Vaca 417."), duracao=40.0),
-            json.dumps({"text": "Vaca 417. Vaca 633. Vaca 419."}).encode(),
+            _detalhada((1.0, 12.0, "Vaca 633."), (12.0, 28.0, "Vaca 419."), duracao=31.0),
         )
         transcritor = WhisperCppTranscriber(url="http://127.0.0.1:8081", model="m", post=servidor)
 
-        assert transcritor.transcribe(b"RIFF...") == "Vaca 417. Vaca 633. Vaca 419."
+        assert transcritor.transcribe(_fala(40.0)).split("\n") == ["Vaca 417.", "Vaca 633.", "Vaca 419."]
+
+    def test_a_recovered_stretch_with_its_own_hole_is_heard_again_up_to_a_limit(self) -> None:
+        servidor = _Servidor(
+            _detalhada((0.0, 1.0, "Vaca 417."), (30.0, 31.0, "Vaca 419."), duracao=31.0),
+            _detalhada((0.0, 2.0, "Produziu 8 litros."), duracao=29.0),
+            _detalhada((0.0, 2.0, "Vaca 633."), duracao=27.0),
+        )
+        transcritor = WhisperCppTranscriber(url="http://127.0.0.1:8081", model="m", post=servidor)
+
+        texto = transcritor.transcribe(_fala(31.0))
+
+        assert texto.split("\n") == ["Vaca 417.", "Produziu 8 litros.", "Vaca 633.", "Vaca 419."]
+        # A gravação, o buraco, e o buraco que sobrou dele — e para aí.
+        assert len(servidor.chamadas) == 3
+
+    def test_a_real_pause_is_not_asked_again(self) -> None:
+        """Pausa longa de verdade é silêncio, e whisper sobre silêncio inventa
+        frase de legenda de vídeo. Sem som no buraco, não se pergunta nada."""
+        servidor = _Servidor(
+            _detalhada((0.0, 3.0, "Vaca 417, 8 litros."), (20.0, 23.0, "Vaca 633, 4 litros."), duracao=24.0)
+        )
+        transcritor = WhisperCppTranscriber(url="http://127.0.0.1:8081", model="m", post=servidor)
+
+        texto = transcritor.transcribe(_fala(24.0, silencio=(3.0, 20.0)))
+
+        assert texto.split("\n") == ["Vaca 417, 8 litros.", "Vaca 633, 4 litros."]
+        assert len(servidor.chamadas) == 1
+
+    def test_a_phrase_invented_in_the_stretch_is_dropped(self) -> None:
+        servidor = _Servidor(
+            _detalhada((0.0, 3.0, "Vaca 417, 8 litros."), (20.0, 23.0, "Vaca 633, 4 litros."), duracao=24.0),
+            _detalhada((0.0, 5.0, " Legendas pela comunidade Amara.org"), duracao=17.0),
+        )
+        transcritor = WhisperCppTranscriber(url="http://127.0.0.1:8081", model="m", post=servidor)
+
+        assert transcritor.transcribe(_fala(24.0)).split("\n") == [
+            "Vaca 417, 8 litros.",
+            "Vaca 633, 4 litros.",
+        ]
 
     def test_each_segment_is_a_line(self) -> None:
         """A pausa entre trechos é fronteira para o tradutor."""
@@ -165,6 +236,26 @@ class TestTalkingToWhisper:
         assert transcritor.transcribe(b"RIFF...") == (
             "7 pela manhã, mais 5 da tarde\nPequina produziu 6,5 litros"
         )
+
+    def test_a_word_split_between_segments_is_glued_back(self) -> None:
+        """Medido: o whisper partiu "litros" entre dois trechos ("...8 lit" e
+        "ros no total"), e a quebra de linha entre trechos separava a
+        palavra — sobrava "lit; ros" como observação. O trecho que continua a
+        palavra começa sem espaço; o que começa palavra nova, com espaço."""
+        servidor = _Servidor(
+            _detalhada(
+                (0.0, 5.0, " Produziu 5 litros pela manhã, totalizando 8 lit"),
+                (5.0, 5.6, "+ros no total"),
+                (5.6, 9.0, " A vaca 633, gigante"),
+                duracao=9.5,
+            )
+        )
+        transcritor = WhisperCppTranscriber(url="http://127.0.0.1:8081", model="m", post=servidor)
+
+        assert transcritor.transcribe(b"RIFF...").split("\n") == [
+            "Produziu 5 litros pela manhã, totalizando 8 litros no total",
+            "A vaca 633, gigante",
+        ]
 
     def test_a_continuous_transcript_is_asked_only_once(self) -> None:
         servidor = _Servidor(
