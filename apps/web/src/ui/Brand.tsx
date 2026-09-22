@@ -220,7 +220,9 @@ export function Hills(): JSX.Element {
         <path d={wave} />
         <path d={wave} transform="translate(600 0)" />
       </g>
-      <g fill="#f4efe4" transform="translate(0 28)">
+      {/* A colina da frente é o chão da página: segue o tema, senão sobrava
+          uma faixa creme sobre o fundo escuro. */}
+      <g className="hill-front" transform="translate(0 28)">
         <path d={wave} />
         <path d={wave} transform="translate(600 0)" />
       </g>
@@ -233,16 +235,21 @@ export function Cows(): JSX.Element {
   const cow =
     "M6 12c0-4 3-7 8-7h14c4 0 7 2 8 5l1 3c3 0 5 1 5 3l-1 3h-4l-2-2h-2v9h-3l-1-7h-2l-1 7h-3l-1-7H14l-1 7h-3l-1-7H8l-1 7H4l-1-9c-2-1-3-3-3-5z";
   const positions = [60, 210, 330, 520, 700, 860, 1010, 1150];
+  // Em tamanho real e repetido duas vezes (2.400 px): a faixa anda metade e
+  // recomeça sem emenda. Esticada para a largura da tela, como antes, a vaca
+  // virava uma salsicha no computador e um palito no celular.
   return (
-    <svg viewBox="0 0 1200 40" preserveAspectRatio="none" aria-hidden="true">
+    <svg viewBox="0 0 2400 40" width="2400" height="40" aria-hidden="true">
       <g fill="#14382b" opacity="0.7">
-        {positions.map((x, index) => (
-          <path
-            key={x}
-            d={cow}
-            transform={`translate(${x} 4) scale(${index % 3 === 0 ? 0.9 : 0.75})`}
-          />
-        ))}
+        {[0, 1200].flatMap((offset) =>
+          positions.map((x, index) => (
+            <path
+              key={offset + x}
+              d={cow}
+              transform={`translate(${offset + x} 4) scale(${index % 3 === 0 ? 0.9 : 0.75})`}
+            />
+          )),
+        )}
       </g>
     </svg>
   );

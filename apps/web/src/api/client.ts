@@ -60,6 +60,7 @@ function authHeaders(token: string): HeadersInit {
 export async function login(
   email: string,
   password: string,
+  signal?: AbortSignal,
 ): Promise<LoginResult> {
   const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: "POST",
@@ -67,6 +68,8 @@ export async function login(
     body: JSON.stringify({ email, password }),
     // O refresh volta num cookie HttpOnly; sem isto o navegador o descarta.
     credentials: "include",
+    // Sinal fraco pode deixar o pedido pendurado: quem chama põe um prazo.
+    signal,
   });
   return parseJsonOrThrow<LoginResult>(response);
 }
