@@ -214,6 +214,7 @@ export class Outbox {
       }
     }
     const queued: QueuedReading = { ...item, kind: "reading", id: newId(), createdAt: new Date().toISOString() };
+    keepStorage();
     await this.store.put(queued);
     this.emit({ type: "changed" });
     return queued;
@@ -221,6 +222,7 @@ export class Outbox {
 
   async addUpload(item: Omit<QueuedUpload, "id" | "kind" | "createdAt">): Promise<QueuedUpload> {
     const queued: QueuedUpload = { ...item, kind: "upload", id: newId(), createdAt: new Date().toISOString() };
+    keepStorage();
     await this.store.put(queued);
     this.emit({ type: "changed" });
     return queued;
@@ -299,6 +301,15 @@ function newId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+/**
+ * Pede ao navegador para não apagar a fila. O Safari do iPhone pode descartar
+ * o que um site guardou quando ele fica dias sem uso; um lançamento guardado
+ * sem sinal não pode sumir assim. Se o navegador negar, a fila funciona igual.
+ */
+function keepStorage(): void {
+  void (navigator.storage?.persist?.() ?? Promise.resolve(false)).catch(() => false);
 }
 
 let shared: Outbox | null = null;

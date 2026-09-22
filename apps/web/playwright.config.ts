@@ -32,5 +32,11 @@ export default defineConfig({
     // de Brasília. O dia da fazenda é UTC−3 fixo, venha o aparelho de onde vier.
     timezoneId: "UTC",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    // O motor do Safari, num iPhone. Só com E2E_IPHONE=1: roda antes do teste
+    // de campo, para pegar aqui o que só quebra no Safari, sem dobrar o tempo
+    // da bateria de todo dia.
+    ...(process.env.E2E_IPHONE ? [{ name: "iphone", use: { ...devices["iPhone 13"] } }] : []),
+  ],
 });
