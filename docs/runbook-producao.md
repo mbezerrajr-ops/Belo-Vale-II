@@ -36,8 +36,8 @@ Decisões (22/09/2026):
 | Fazenda + baseline (401 animais, 152 medições, insumos, preço do leite) | feito |
 | Backup diário (3h30) e verificação semanal (domingo 4h30) agendados | feito |
 | PC sem suspender na tomada; Docker Desktop abrindo com o Windows | já estava |
-| Criar a conta do administrador | **pendente: você** |
-| Instalar a Tailscale e ligar o Funnel | **pendente: você** |
+| Criar a conta do administrador | feito |
+| Instalar a Tailscale e ligar o Funnel (`https://desktop-caio.tailf88007.ts.net`) | feito |
 | Anotar no papel a senha do backup | **pendente: você** |
 | Conectar o HD externo e indicar a pasta | **pendente: você** |
 
@@ -72,9 +72,9 @@ pelo app, em **Contas**.
 
    O `--bg` deixa o Funnel ligado inclusive depois de reiniciar o PC. O
    endereço aparece no `status`, no formato `https://nome-do-pc.xxxx.ts.net`.
-4. Avise quando estiver ligado: ainda falta conferir, com o endereço real, que
-   o bloqueio de tentativas de login enxerga o IP de quem acessa, e ligar o
-   HSTS.
+4. Conferido em 22/09/2026: certificado válido, cabeçalhos de segurança
+   presentes, e a API enxerga o IP de quem acessa (não o do proxy) — o
+   bloqueio de tentativas de login vale por pessoa.
 
 Para desligar o acesso pela internet (sem parar o sistema):
 `tailscale funnel --https=443 http://127.0.0.1:8090 off`.
@@ -226,5 +226,7 @@ Para devolver espaço ao C:, sem risco para os dados:
   só para o app.
 - Compressão só nos arquivos do app, nunca nas respostas da API (BREACH).
 - Nenhuma porta aberta na rede local; o único caminho de fora é o Funnel.
-- **Pendente, depois do Funnel ligado:** HSTS e a conferência do IP de origem
-  no limite de login.
+- HSTS (`max-age` de um ano, só para o endereço do sistema) e o nginx sem
+  anunciar a versão.
+- O IP de origem chega à API pelo Funnel: o limite de login distingue quem
+  tenta.

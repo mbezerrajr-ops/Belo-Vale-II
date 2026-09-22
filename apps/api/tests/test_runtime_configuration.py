@@ -110,13 +110,24 @@ def test_the_microphone_is_only_for_the_app_itself() -> None:
     assert "geolocation=()" in policy
 
 
-def test_hsts_stays_disabled_until_there_is_tls() -> None:
-    """Habilitar HSTS sem certificado torna o site inacessível pelo max-age."""
-    config = _nginx_config()
+def test_hsts_is_on_and_limited_to_the_system_address() -> None:
+    """Com o HTTPS terminando no Tailscale Funnel (22/09/2026), o navegador
+    deve recusar o endereço sem HTTPS. Sem includeSubDomains nem preload:
+    uma lista de pré-carga não se desfaz rápido se o endereço mudar."""
+    [line] = [
+        line.strip() for line in _nginx_config().splitlines()
+        if "Strict-Transport-Security" in line and not line.strip().startswith("#")
+    ]
 
-    for line in config.splitlines():
-        if "Strict-Transport-Security" in line:
-            assert line.strip().startswith("#"), line
+    assert line.startswith("add_header Strict-Transport-Security")
+    assert "max-age=31536000" in line
+    assert "always" in line
+    assert "includeSubDomains" not in line
+    assert "preload" not in line
+
+
+def test_nginx_does_not_announce_its_version() -> None:
+    assert "server_tokens off;" in _nginx_config()
 
 
 def test_api_reads_forwarded_headers_from_trusted_sources_only() -> None:
