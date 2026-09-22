@@ -31,6 +31,7 @@ import { ChangePasswordForm } from "./features/users/ChangePasswordForm";
 import { UsersPage } from "./features/users/UsersPage";
 import { Cows, Hills, Icons, LogoMark, type IconName } from "./ui/Brand";
 import { PageHeader } from "./ui/PageHeader";
+import { useRoute, type AreaRoute } from "./router";
 
 type SessionState =
   | { status: "checking" }
@@ -135,6 +136,8 @@ export function App(): JSX.Element {
       }),
       new Promise((resolve) => window.setTimeout(resolve, LOGOUT_WAIT_MS)),
     ]);
+    // O próximo a entrar neste celular não abre na ficha que ficou na tela.
+    window.history.replaceState(null, "", "/");
     setSession({ status: "signed-out" });
   };
 
@@ -292,13 +295,14 @@ function AuthenticatedApp({
   user,
   onLogout,
 }: AuthenticatedAppProps): JSX.Element {
-  // Quem lança o leite abre direto no lançamento; quem acompanha a fazenda
-  // abre no painel.
-  const [area, setArea] = useState<Area>(atLeast(user, "reviewer") ? "painel" : "producao");
+  // A área e a ficha aberta vêm do endereço: recarregar, voltar e mandar o
+  // link funcionam como se espera de qualquer página.
+  const { route, navigate, replace } = useRoute();
   const [farm, setFarm] = useState<Farm | null>(null);
   const [farmError, setFarmError] = useState<string | null>(null);
-  const [openAnimalId, setOpenAnimalId] = useState<string | null>(null);
   const [animal, setAnimal] = useState<AnimalDetail | null>(null);
+  const [animalError, setAnimalError] = useState<string | null>(null);
+  const [animalReload, setAnimalReload] = useState(0);
   const [importId, setImportId] = useState<string | null>(null);
   const [review, setReview] = useState<ImportReview | null>(null);
 
@@ -340,10 +344,34 @@ function AuthenticatedApp({
     };
   }, [token]);
 
-  const loadAnimal = async (animalId: string): Promise<void> => {
-    setOpenAnimalId(animalId);
-    setAnimal(await getAnimal(token, animalId));
-  };
+  const openAnimalId = route.area === "animais" ? route.animalId : null;
+  useEffect(() => {
+    if (openAnimalId === null) {
+      setAnimal(null);
+      setAnimalError(null);
+      return;
+    }
+    let cancelled = false;
+    setAnimalError(null);
+    // A ficha anterior some na hora: por um instante, o nome de uma vaca com
+    // os dados de outra é pior que um instante de espera.
+    setAnimal((current) => (current?.id === openAnimalId ? current : null));
+    getAnimal(token, openAnimalId)
+      .then((loaded) => {
+        if (!cancelled) setAnimal(loaded);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAnimalError("Não foi possível abrir esta ficha. Ela pode não existir nesta fazenda.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, openAnimalId, animalReload]);
+
+  const openAnimal = (animalId: string): void =>
+    navigate({ area: "animais", animalId });
 
   const refreshReview = async (id: string): Promise<void> => {
     setReview(await getImportReview(id, token));
@@ -389,6 +417,30 @@ function AuthenticatedApp({
     ...(isAdmin ? (["contas"] as Area[]) : []),
     "minha-conta",
   ];
+  // Quem lança o leite abre direto no lançamento; quem acompanha a fazenda
+  // abre no painel. Endereço sem área, ou de área que a pessoa não alcança
+  // (Contas para quem não é administrador), cai na área inicial.
+  const homeArea: Area = canEdit ? "painel" : "producao";
+  const allowed = route.area !== null && areas.includes(route.area as Area);
+  const area: Area = allowed ? (route.area as Area) : homeArea;
+  useEffect(() => {
+    if (!allowed) replace({ area: homeArea as AreaRoute, animalId: null });
+  }, [allowed, homeArea, replace]);
+  const setArea = (name: Area): void => navigate({ area: name as AreaRoute, animalId: null });
+
+  useEffect(() => {
+    const titulo = area === "animais" && animal && openAnimalId ? animal.name ?? animal.brinco : AREA_LABEL[area];
+    document.title = titulo ? `${titulo} · Belo Vale II` : "Belo Vale II";
+  }, [area, animal, openAnimalId]);
+
+  // O voltar do celular também fecha o painel Mais. (Os toques na barra já
+  // fecham por conta própria; a correção inicial do endereço não fecha.)
+  useEffect(() => {
+    const close = (): void => setMoreOpen(false);
+    window.addEventListener("popstate", close);
+    return () => window.removeEventListener("popstate", close);
+  }, []);
+
   const moreAreas = areas.filter((name) => !PRIMARY_AREAS.includes(name));
   // No computador, Minha conta é o avatar com o e-mail, ao lado de Sair;
   // na barra seria um terceiro caminho para o mesmo lugar.
@@ -514,31 +566,48 @@ function AuthenticatedApp({
           />
         )}
 
-        {area === "animais" &&
-          (openAnimalId !== null && animal !== null ? (
-            <>
-              <button
-                type="button"
-                className="link-btn"
-                onClick={() => setOpenAnimalId(null)}
-              >
-                <Icons.back /> Voltar à busca
-              </button>
-              <AnimalDetailPanel
-                token={token}
-                animal={animal}
-                canEdit={canEdit}
-                onChanged={() => void loadAnimal(animal.id)}
-                onOpenAnimal={(animalId) => void loadAnimal(animalId)}
-              />
-            </>
-          ) : (
-            <AnimalSearchPage
-              token={token}
-              canEdit={canEdit}
-              onOpen={(animalId) => void loadAnimal(animalId)}
-            />
-          ))}
+        {area === "animais" && (
+          <>
+            {/* A busca fica montada por trás da ficha: voltar devolve a lista
+                como estava, com o recorte e o que já tinha carregado. */}
+            <div hidden={openAnimalId !== null}>
+              <AnimalSearchPage token={token} canEdit={canEdit} onOpen={openAnimal} />
+            </div>
+            {openAnimalId !== null && (
+              <>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => {
+                    // Veio da lista: volta nela (o voltar do celular faz o
+                    // mesmo). Chegou por link: não há o que voltar, abre a lista.
+                    if ((window.history.state as { inApp?: boolean } | null)?.inApp) {
+                      window.history.back();
+                    } else {
+                      replace({ area: "animais", animalId: null });
+                    }
+                  }}
+                >
+                  <Icons.back /> Voltar à busca
+                </button>
+                {animalError && <p role="alert">{animalError}</p>}
+                {animal === null && !animalError && (
+                  <div className="skeleton skeleton-card" aria-label="Carregando a ficha" />
+                )}
+                {animal !== null && (
+                  <AnimalDetailPanel
+                    key={animal.id}
+                    token={token}
+                    animal={animal}
+                    canEdit={canEdit}
+                    onChanged={() => setAnimalReload((count) => count + 1)}
+                    onOpenAnimal={openAnimal}
+                  />
+                )}
+              </>
+            )}
+          </>
+        )}
 
         {area === "fichas" && farm !== null && (
           <>
