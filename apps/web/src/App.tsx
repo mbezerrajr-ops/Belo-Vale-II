@@ -433,6 +433,9 @@ function AuthenticatedApp({
             token={token}
             canEdit={canEdit}
             milkPrice={farm?.milk_price_per_liter ?? null}
+            onMilkPriceSaved={(price) =>
+              setFarm((current) => (current ? { ...current, milk_price_per_liter: price } : current))
+            }
           />
         )}
 

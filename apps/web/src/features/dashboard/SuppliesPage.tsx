@@ -23,6 +23,8 @@ interface Props {
   token: string;
   canEdit: boolean;
   milkPrice?: number | null;
+  /** O preço do leite foi salvo: quem guarda a fazenda atualiza o seu. */
+  onMilkPriceSaved?: (pricePerLiter: number) => void;
   onList?: (token: string) => Promise<Supply[]>;
   onUpdatePrice?: (
     token: string,
@@ -55,6 +57,7 @@ export function SuppliesPage({
   onCreate = createSupply,
   onSetMilkPrice = setMilkPrice,
   onLoadPrices = getSupplyPrices,
+  onMilkPriceSaved,
 }: Props): JSX.Element {
   const [supplies, setSupplies] = useState<Supply[] | null>(null);
   const [prices, setPrices] = useState<Record<string, string>>({});
@@ -63,6 +66,12 @@ export function SuppliesPage({
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [milk, setMilk] = useState(milkPrice === null ? "" : String(milkPrice));
+  const [milkSaved, setMilkSaved] = useState<number | null>(null);
+  // A fazenda chega junto com a tela: o preço em vigor entra no campo quando
+  // chegar, em vez de o campo ficar vazio com o preço definido.
+  useEffect(() => {
+    setMilk(milkPrice === null ? "" : String(milkPrice));
+  }, [milkPrice]);
   // Histórico aberto por insumo. Carregado só quando pedido.
   const [history, setHistory] = useState<Record<string, SupplyPrice[]>>({});
 
@@ -120,7 +129,13 @@ export function SuppliesPage({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            void guard(() => onSetMilkPrice(token, Number(milk)));
+            const price = Number(milk);
+            setMilkSaved(null);
+            void guard(async () => {
+              await onSetMilkPrice(token, price);
+              setMilkSaved(price);
+              onMilkPriceSaved?.(price);
+            });
           }}
         >
           <h3>Preço do leite</h3>
@@ -138,6 +153,12 @@ export function SuppliesPage({
           <button type="submit" disabled={busy || milk === ""}>
             Salvar preço do leite
           </button>
+          {milkSaved !== null && (
+            <p role="status">
+              Preço do leite salvo: R$ {milkSaved.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}{" "}
+              por litro.
+            </p>
+          )}
         </form>
       )}
 

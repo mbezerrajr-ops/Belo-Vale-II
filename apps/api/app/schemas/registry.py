@@ -25,6 +25,9 @@ class FarmRead(BaseModel):
     id: UUID
     name: str
     code: str | None = None
+    #: Preço do leite em vigor, base da receita e do lucro. A tela de Insumos
+    #: mostra este valor no campo de edição.
+    milk_price_per_liter: float | None = None
 
 
 class AnimalCreate(BaseModel):

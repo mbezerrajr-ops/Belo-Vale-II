@@ -161,6 +161,21 @@ class TestCurrentFarm:
         _farm(db)
         assert api.get("/api/farms/current").status_code in (401, 403)
 
+    def test_brings_the_milk_price(self, api, db) -> None:
+        """A tela de Insumos mostra o preço do leite em vigor a partir daqui.
+        Sem ele, o campo aparecia vazio mesmo com o preço definido."""
+        _farm(db)
+        reviewer = _user(db, "revisor@belovale", "reviewer")
+        assert api.get("/api/farms/current", headers=_auth(reviewer)).json()["milk_price_per_liter"] is None
+
+        api.patch(
+            "/api/farms/current/milk-price",
+            headers=_auth(reviewer),
+            json={"milk_price_per_liter": 2.45},
+        )
+
+        assert api.get("/api/farms/current", headers=_auth(reviewer)).json()["milk_price_per_liter"] == 2.45
+
 
 class TestCreateFarm:
     def test_admin_creates_the_first_farm(self, api, db) -> None:
