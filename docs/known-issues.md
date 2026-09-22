@@ -171,28 +171,23 @@ antigo ambiente Linux. Eles foram preservados como histórico; não são o gate 
 baseline. Use os dois comandos de módulos explícitos documentados no runbook e o teste
 Playwright TypeScript `apps/web/e2e/legacy-platform.spec.ts`.
 
-## npm audit — esbuild (dependência de desenvolvimento)
+## npm audit — esbuild e Vitest (ferramentas de desenvolvimento) — resolvido
 
-- **Dependência:** `esbuild` (via `vite`/`vitest`/`vite-node`/`@vitest/mocker`,
-  todas dependências de desenvolvimento do frontend).
-- **Advisory:** [GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99)
-  — o servidor de desenvolvimento do esbuild aceita requisições de qualquer
-  origem e devolve a resposta.
-- **Escopo:** exclusivamente o servidor de desenvolvimento local (`vite dev`
-  / `npm run dev`). Não afeta o bundle de produção gerado por `npm run
-  build` nem a imagem Docker do serviço `web` (que só serve arquivos
-  estáticos via nginx, sem o servidor de dev do Vite).
-- **Impacto:** um site malicioso aberto no mesmo navegador enquanto alguém
-  roda `npm run dev` localmente poderia, em teoria, ler respostas do
-  servidor de dev. Não há exposição em produção nem em CI (que roda `npm
-  run build`, não `npm run dev`).
-- **Mitigação atual:** nenhuma ação além de não expor o servidor de dev em
-  rede não confiável (comportamento padrão — ele só escuta em localhost).
-- **Upgrade necessário para resolver:** `vite@8` (major, breaking change),
-  que arrasta `vitest`/`@vitest/mocker`/`vite-node` juntos.
-- **Prioridade:** baixa. Deliberadamente não aplicado nesta task para não
-  trocar a stack de build/teste no meio de uma integração — ver instrução
-  explícita da Task 8 de não fazer upgrade major só para zerar o audit.
+Resolvido em 22/09/2026. Os avisos eram todos das ferramentas de
+desenvolvimento e teste, nunca do que vai para produção (o `web` só serve os
+arquivos gerados pelo `npm run build`, pelo nginx):
+
+- `esbuild` <= 0.24.2 ([GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99)):
+  o servidor de desenvolvimento aceitava requisição de qualquer origem;
+- `@vitest/mocker` <= 4.1.10 ([GHSA-82fw-gwwq-j7x9](https://github.com/advisories/GHSA-82fw-gwwq-j7x9)):
+  leitura de arquivo fora do projeto por um mock malicioso.
+
+A correção pedia versão principal nova: Vite 8, Vitest 5 e
+`@vitejs/plugin-react` 6. O Vitest 5 exige Node 22.12 ou mais novo, então o
+Node do CI e do `Dockerfile.web` subiu de 20 para 22 — o Node 20 já tinha
+saído de suporte em abril de 2026. O jsdom ficou na 25: a 30 exige Node
+22.22, mais novo que o da máquina do titular. `npm audit`: 0
+vulnerabilidades.
 
 ## Duas seções "Fazenda" na tela principal — resolvido
 

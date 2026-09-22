@@ -106,7 +106,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - name: Dependências (lock congelado)
@@ -165,7 +165,7 @@ jobs:
           curl -s -o /dev/null -X POST http://localhost:8080/api/auth/refresh             --cookie "bv_refresh=warmup-nao-e-uma-sessao-real"
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - name: Dependências e navegador
