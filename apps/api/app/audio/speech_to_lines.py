@@ -269,17 +269,25 @@ def _cows(tokens: list[_Token], numeros: list[_Number]) -> list[_Cow]:
                 continue
 
         # Âncora 2: número com cara de brinco, quando a vaca atual já tem
-        # brinco ou já tem litros.
+        # brinco ou já tem litros — ou quando vem com outro nome ("649,
+        # redonda"). Senão, é o brinco da vaca atual, dito depois do nome e
+        # do outro lado de uma pausa ("a vaca aceitona" / "117").
         if i in por_inicio:
             numero = por_inicio[i]
             ocupada = atual is not None and (
                 atual.brinco is not None or _has_liters(numeros, atual.start, i, tokens)
             )
-            if numero.brinco_like() and (atual is None or ocupada):
+            if numero.brinco_like() and (
+                atual is None or ocupada or _names_another_cow(tokens, numero.last + 1, atual)
+            ):
                 atual = _open(vacas, tokens, i)
                 atual.brinco = numero
                 atual.used.update(range(numero.first, numero.last + 1))
                 i = _read_name(tokens, numero.last + 1, atual)
+            elif numero.brinco_like():
+                atual.brinco = numero
+                atual.used.update(range(numero.first, numero.last + 1))
+                i = numero.last + 1
             else:
                 i = numero.last + 1
             inicio_de_frase = False
@@ -348,6 +356,14 @@ def _read_name(tokens: list[_Token], j: int, vaca: _Cow) -> int:
         vaca.used.update(partes)
         return partes[-1] + 1
     return j
+
+
+def _names_another_cow(tokens: list[_Token], j: int, vaca: _Cow) -> bool:
+    """Logo depois do número vem um nome, e não é o da vaca atual?"""
+    j = _skip(tokens, j, {"da", "do", "de", "a", "o"})
+    if j >= len(tokens) or not _is_name_word(tokens[j]):
+        return False
+    return vaca.nome is None or tokens[j].folded != fold(vaca.nome.split()[0])
 
 
 def _is_name_word(token: _Token) -> bool:

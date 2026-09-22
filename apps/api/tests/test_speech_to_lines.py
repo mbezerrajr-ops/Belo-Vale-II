@@ -130,6 +130,41 @@ class TestTheBrinco:
         assert linha["manha"] == "18"
 
 
+class TestTheBrincoAfterAPause:
+    """Achado pelo avaliador, com ruído somado a uma gravação do titular: o
+    whisper cortou o trecho entre o nome e o brinco,
+
+        E por fim, a vaca aceitona
+        117
+        14 litros no total
+
+    e o 117 sumia sem aviso — a vaca chegava sem brinco. Um número com cara
+    de brinco logo depois de uma vaca que ainda não tem brinco nem litros é o
+    brinco dela."""
+
+    def test_the_brinco_on_the_next_line_is_the_cow_s(self) -> None:
+        [linha] = _linhas("E por fim, a vaca aceitona\n117\n14 litros no total")
+
+        assert (linha["brinco"], linha["nome"], linha["total"]) == ("117", "ACEITONA", "14")
+
+    def test_after_a_full_stop_too(self) -> None:
+        [linha] = _linhas("Vaca Pandora. 417. Produziu 8 litros.")
+
+        assert (linha["brinco"], linha["nome"], linha["total"]) == ("417", "PANDORA", "8")
+
+    def test_a_brinco_with_another_name_is_another_cow(self) -> None:
+        """ "649, redonda" depois de uma vaca sem litros é outra vaca, com
+        nome próprio — não o brinco da anterior."""
+        linhas = _linhas("Vaca Pandora\n649, redonda, produziu 5 litros")
+
+        assert ("649", "REDONDA", "5") in [(l["brinco"], l["nome"], l["total"]) for l in linhas]
+
+    def test_a_cow_that_already_has_liters_does_not_take_it(self) -> None:
+        linhas = _linhas("Vaca Pandora produziu 8 litros\n633\nproduziu 4 litros")
+
+        assert [(l["brinco"], l["total"]) for l in linhas] == [(None, "8"), ("633", "4")]
+
+
 class TestWhatIsNotUnderstoodIsKept:
     def test_a_command_goes_to_the_annotation(self) -> None:
         [linha] = _linhas("a 406 vai para o terceiro lote")
