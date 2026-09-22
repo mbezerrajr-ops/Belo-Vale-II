@@ -12,10 +12,14 @@ import {
   EXIT_REASON_LABEL,
   type Animal,
   type AnimalDetail,
+  type AnimalPage,
+  type AnimalSearch,
   type AnimalUpdateInput,
   type ExitReason,
+  type MergePreview,
 } from "../../api/types";
 import { brDate, farmToday } from "../../ui/dates";
+import { MergeFichas } from "./MergeFichas";
 import { ProductionHistory } from "./ProductionHistory";
 import type { ProductionHistoryEntry, Reading } from "../../api/types";
 
@@ -76,6 +80,12 @@ interface Props {
     reason: string,
   ) => Promise<Reading>;
   onVoid?: (token: string, measurementId: string, reason: string) => Promise<void>;
+  /** Abre outra ficha: a que ficou, depois de juntar, ou uma juntada a esta. */
+  onOpenAnimal?: (animalId: string) => void;
+  /** Injetáveis para teste da junção de fichas. */
+  onSearch?: (token: string, search: AnimalSearch) => Promise<AnimalPage>;
+  onPreviewMerge?: (token: string, animalId: string, otherId: string) => Promise<MergePreview>;
+  onMerge?: (token: string, animalId: string, otherId: string, reason: string) => Promise<Animal>;
 }
 
 function errorMessage(error: unknown): string {
@@ -100,10 +110,15 @@ export function AnimalDetailPanel({
   onLoadProduction,
   onCorrect,
   onVoid,
+  onOpenAnimal,
+  onSearch,
+  onPreviewMerge,
+  onMerge,
 }: Props): JSX.Element {
   const [panel, setPanel] = useState<
-    "none" | "brinco" | "tirar-brinco" | "lote" | "cadastro" | "baixa" | "desfazer"
+    "none" | "brinco" | "tirar-brinco" | "lote" | "cadastro" | "baixa" | "desfazer" | "juntar"
   >("none");
+  const merged = Boolean(animal.merged_into_id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -233,7 +248,26 @@ export function AnimalDetailPanel({
         </div>
       </dl>
 
-      {exited && (
+      {merged && (
+        <div className="exit-banner merged-banner">
+          <strong>Ficha juntada a outra em {br(animal.merged_at?.slice(0, 10) ?? null)}</strong>
+          <span>
+            As produções dela foram relançadas na ficha que ficou. Esta fica arquivada, só para
+            consulta.
+          </span>
+          {onOpenAnimal && animal.merged_into_id && (
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => onOpenAnimal(animal.merged_into_id as string)}
+            >
+              Abrir a ficha que ficou
+            </button>
+          )}
+        </div>
+      )}
+
+      {exited && !merged && (
         <div className="exit-banner">
           <strong>
             Baixa em {br(animal.exited_on ?? null)} —{" "}
@@ -244,21 +278,24 @@ export function AnimalDetailPanel({
         </div>
       )}
 
-      {!animal.brinco && !exited && (
+      {!animal.brinco && !exited && !merged && (
         <p className="warning">
           Este animal não recebe medição automática enquanto não tiver brinco.
         </p>
       )}
 
-      {canEdit && exited && (
+      {canEdit && exited && !merged && (
         <div className="actions">
           <button type="button" className="secondary" onClick={() => setPanel("desfazer")}>
             Desfazer baixa
           </button>
+          <button type="button" className="secondary" onClick={() => setPanel("juntar")}>
+            Juntar com outra ficha
+          </button>
         </div>
       )}
 
-      {canEdit && !exited && (
+      {canEdit && !exited && !merged && (
         <div className="actions">
           <button type="button" onClick={() => setPanel("brinco")}>
             {animal.brinco ? "Trocar brinco" : "Vincular brinco"}
@@ -273,6 +310,9 @@ export function AnimalDetailPanel({
           </button>
           <button type="button" className="secondary" onClick={() => setPanel("cadastro")}>
             Editar cadastro
+          </button>
+          <button type="button" className="secondary" onClick={() => setPanel("juntar")}>
+            Juntar com outra ficha
           </button>
           <button type="button" className="secondary danger" onClick={() => setPanel("baixa")}>
             Dar baixa
@@ -445,6 +485,22 @@ export function AnimalDetailPanel({
         </form>
       )}
 
+      {panel === "juntar" && canEdit && !merged && (
+        <MergeFichas
+          token={token}
+          animal={animal}
+          onSearch={onSearch}
+          onPreview={onPreviewMerge}
+          onMerge={onMerge}
+          onCancel={() => setPanel("none")}
+          onMerged={(keepId) => {
+            setPanel("none");
+            if (onOpenAnimal) onOpenAnimal(keepId);
+            else onChanged();
+          }}
+        />
+      )}
+
       {panel === "cadastro" && canEdit && (
         <form
           onSubmit={(event) => {
@@ -494,6 +550,28 @@ export function AnimalDetailPanel({
         onCorrect={onCorrect}
         onVoid={onVoid}
       />
+
+      {(animal.fichas_juntadas ?? []).length > 0 && (
+        <>
+          <h3>Fichas juntadas a esta</h3>
+          <ul className="merged-list">
+            {(animal.fichas_juntadas ?? []).map((ficha) => (
+              <li key={ficha.id}>
+                <span>
+                  {ficha.name ?? "sem nome"}
+                  {ficha.numero_legado ? ` · nº antigo ${ficha.numero_legado}` : ""}
+                </span>
+                <small>juntada em {br(ficha.merged_at?.slice(0, 10) ?? null)}</small>
+                {onOpenAnimal && (
+                  <button type="button" className="link-btn" onClick={() => onOpenAnimal(ficha.id)}>
+                    Ver a ficha arquivada
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <h3>Histórico de lotes e grupos</h3>
       {animal.historico_lotes.length === 0 ? (

@@ -451,6 +451,7 @@ function AuthenticatedApp({
                 animal={animal}
                 canEdit={canEdit}
                 onChanged={() => void loadAnimal(animal.id)}
+                onOpenAnimal={(animalId) => void loadAnimal(animalId)}
               />
             </>
           ) : (

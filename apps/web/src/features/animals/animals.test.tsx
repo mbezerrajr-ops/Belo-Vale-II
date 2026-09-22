@@ -471,3 +471,157 @@ describe("AnimalDetailPanel — lote de ordenha × grupo de manejo", () => {
     expect(screen.getByText("manejo")).toBeInTheDocument();
   });
 });
+
+describe("AnimalDetailPanel — juntar fichas", () => {
+  // A vaca com duas fichas: uma com o brinco, outra sem, cada uma com parte
+  // da produção. Antes, a correção era anular e relançar, uma por vez.
+  const certa = animal({ id: "a-861", brinco: "861", name: "SAIA BRANCA", lote_atual: null });
+  const duplicada = animal({
+    id: "a-dup",
+    brinco: null,
+    brinco_origem: null,
+    name: "SAIA BRANCA",
+    lote_atual: "LOTE 1",
+  });
+
+  function previa(extra = {}) {
+    return {
+      keep: certa,
+      drop: duplicada,
+      moves: [{ measured_on: "2026-07-22", producao: 21.5 }],
+      conflicts: [],
+      fills: { nascimento: "2019-03-10" },
+      lots: ["LOTE 1"],
+      pending_proposals: 1,
+      blockers: [],
+      ...extra,
+    };
+  }
+
+  function montar(props = {}) {
+    const onSearch = vi.fn().mockResolvedValue(page([duplicada, certa]));
+    const onPreviewMerge = vi.fn().mockResolvedValue(previa());
+    const onMerge = vi.fn().mockResolvedValue(certa);
+    const onOpenAnimal = vi.fn();
+    render(
+      <AnimalDetailPanel
+        token={TOKEN}
+        animal={duplicada}
+        canEdit
+        onChanged={vi.fn()}
+        onSearch={onSearch}
+        onPreviewMerge={onPreviewMerge}
+        onMerge={onMerge}
+        onOpenAnimal={onOpenAnimal}
+        {...props}
+      />,
+    );
+    return { onSearch, onPreviewMerge, onMerge, onOpenAnimal };
+  }
+
+  async function escolherACerta(): Promise<void> {
+    fireEvent.click(screen.getByRole("button", { name: /juntar com outra ficha/i }));
+    fireEvent.change(screen.getByLabelText(/brinco ou nome da outra ficha/i), {
+      target: { value: "861" },
+    });
+    const buscar = screen.getAllByRole("button", { name: /^buscar$/i });
+    await act(async () => {
+      fireEvent.click(buscar[buscar.length - 1]);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /é esta: 861/i }));
+    });
+  }
+
+  it("mostra o que vai acontecer antes de juntar", async () => {
+    const { onSearch, onPreviewMerge } = montar();
+
+    await escolherACerta();
+
+    expect(onSearch.mock.calls[0][1]).toMatchObject({ brinco: "861", rebanho: "todos" });
+    expect(onPreviewMerge).toHaveBeenCalledWith(TOKEN, "a-dup", "a-861");
+    // A própria ficha não aparece como opção.
+    expect(screen.queryByRole("button", { name: /é esta: sem brinco/i })).not.toBeInTheDocument();
+    const efeitos = screen.getByRole("list", { name: /o que a junção faz/i });
+    expect(efeitos).toHaveTextContent(/1 produção passa para a ficha que fica: 22\/07\/2026 — 21,5 L/);
+    expect(efeitos).toHaveTextContent(/nascimento 10\/03\/2019/);
+    expect(efeitos).toHaveTextContent(/entra em lote 1/i);
+    expect(efeitos).toHaveTextContent(/1 proposta pendente/);
+  });
+
+  it("junta com o motivo e abre a ficha que ficou", async () => {
+    const { onMerge, onOpenAnimal } = montar();
+    await escolherACerta();
+
+    const juntar = screen.getByRole("button", { name: /^juntar fichas$/i });
+    expect(juntar).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/por que são o mesmo animal/i), {
+      target: { value: "conferido no curral" },
+    });
+    await act(async () => {
+      fireEvent.click(juntar);
+    });
+
+    expect(onMerge).toHaveBeenCalledWith(TOKEN, "a-dup", "a-861", "conferido no curral");
+    expect(onOpenAnimal).toHaveBeenCalledWith("a-861");
+  });
+
+  it("o que impede juntar aparece, e não há botão para forçar", async () => {
+    montar({
+      onPreviewMerge: vi.fn().mockResolvedValue(
+        previa({ blockers: ["As duas fichas têm produção no mesmo dia: 22/07/2026."] }),
+      ),
+    });
+
+    await escolherACerta();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/mesmo dia: 22\/07\/2026/);
+    expect(screen.queryByRole("button", { name: /^juntar fichas$/i })).not.toBeInTheDocument();
+  });
+
+  it("a ficha arquivada avisa, leva à que ficou e não oferece mais nada", () => {
+    const onOpenAnimal = vi.fn();
+    render(
+      <AnimalDetailPanel
+        token={TOKEN}
+        animal={{ ...duplicada, merged_into_id: "a-861", merged_at: "2026-09-22T12:00:00Z" }}
+        canEdit
+        onChanged={vi.fn()}
+        onOpenAnimal={onOpenAnimal}
+      />,
+    );
+
+    expect(screen.getByText(/ficha juntada a outra em 22\/09\/2026/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /abrir a ficha que ficou/i }));
+    expect(onOpenAnimal).toHaveBeenCalledWith("a-861");
+    expect(screen.queryByRole("button", { name: /vincular brinco|mudar de lote|dar baixa|juntar/i })).not.toBeInTheDocument();
+  });
+
+  it("a ficha que ficou lista as fichas juntadas a ela", () => {
+    const onOpenAnimal = vi.fn();
+    render(
+      <AnimalDetailPanel
+        token={TOKEN}
+        animal={{
+          ...certa,
+          fichas_juntadas: [
+            { id: "a-dup", name: "SAIA BRANCA", numero_legado: "862", merged_at: "2026-09-22T12:00:00Z" },
+          ],
+        }}
+        canEdit
+        onChanged={vi.fn()}
+        onOpenAnimal={onOpenAnimal}
+      />,
+    );
+
+    expect(screen.getByText(/nº antigo 862/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /ver a ficha arquivada/i }));
+    expect(onOpenAnimal).toHaveBeenCalledWith("a-dup");
+  });
+
+  it("quem não pode editar não junta", () => {
+    render(<AnimalDetailPanel token={TOKEN} animal={duplicada} canEdit={false} onChanged={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: /juntar com outra ficha/i })).not.toBeInTheDocument();
+  });
+});
