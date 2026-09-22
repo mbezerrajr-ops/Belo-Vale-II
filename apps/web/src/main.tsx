@@ -15,3 +15,14 @@ createRoot(container).render(
     <App />
   </StrictMode>,
 );
+
+// Guarda o app para abrir sem sinal no curral. Só no build de produção: em
+// desenvolvimento, uma página guardada esconderia a mudança que se acabou de
+// fazer.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).catch(() => {
+      // Sem service worker o app funciona igual; só não abre sem sinal.
+    });
+  });
+}

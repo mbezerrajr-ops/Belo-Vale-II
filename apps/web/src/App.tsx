@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import {
+  enterReading,
+  uploadImport,
   getAnimal,
   getCurrentFarm,
   getCurrentUser,
@@ -16,8 +18,15 @@ import type {
   ImportReview,
   UploadResult,
 } from "./api/types";
+import { ApiError } from "./api/types";
 import { LoginForm } from "./auth/LoginForm";
-import { clearStoredToken, loadStoredToken, storeToken } from "./auth/session";
+import {
+  clearStoredToken,
+  loadStoredToken,
+  loadStoredUser,
+  storeToken,
+  storeUser,
+} from "./auth/session";
 import { AnimalDetailPanel } from "./features/animals/AnimalDetailPanel";
 import { AnimalSearchPage } from "./features/animals/AnimalSearchPage";
 import { HerdDashboard } from "./features/dashboard/HerdDashboard";
@@ -32,6 +41,9 @@ import { UsersPage } from "./features/users/UsersPage";
 import { Cows, Hills, Icons, LogoMark, type IconName } from "./ui/Brand";
 import { PageHeader } from "./ui/PageHeader";
 import { useRoute, type AreaRoute } from "./router";
+import { deviceOutbox } from "./offline/outbox";
+import { OutboxProvider, useOutbox } from "./offline/OutboxContext";
+import { OfflineBanner, OutboxButton } from "./offline/OutboxStatus";
 
 type SessionState =
   | { status: "checking" }
@@ -55,11 +67,23 @@ export function App(): JSX.Element {
       if (storedToken !== null) {
         try {
           const user = await getCurrentUser(storedToken);
+          storeUser(user);
           if (!cancelled) {
             setSession({ status: "signed-in", token: storedToken, user });
           }
           return;
-        } catch {
+        } catch (error) {
+          // Só "não vale mais" apaga a sessão. Sem sinal (ou servidor fora
+          // do ar), recarregar apagava o token ainda válido e jogava quem
+          // estava no curral na tela de login, que também não funciona sem
+          // sinal. Agora abre com quem já estava: o que for lançado fica
+          // guardado no celular.
+          const unauthorized = error instanceof ApiError && error.status === 401;
+          const cached = loadStoredUser();
+          if (!unauthorized && cached !== null) {
+            if (!cancelled) setSession({ status: "signed-in", token: storedToken, user: cached });
+            return;
+          }
           clearStoredToken();
         }
       }
@@ -72,6 +96,7 @@ export function App(): JSX.Element {
       try {
         const user = await getCurrentUser(renewed.access_token);
         storeToken(renewed.access_token);
+        storeUser(user);
         if (!cancelled) {
           setSession({ status: "signed-in", token: renewed.access_token, user });
         }
@@ -121,7 +146,20 @@ export function App(): JSX.Element {
     const token = loginResult.access_token;
     const user = await getCurrentUser(token);
     storeToken(token);
+    storeUser(user);
     setSession({ status: "signed-in", token, user });
+  };
+
+  // Para a fila do celular: depois de horas sem sinal o token venceu, e o
+  // envio atrasado renova antes de desistir.
+  const renewToken = async (): Promise<string | null> => {
+    const renewed = await refreshSession();
+    if (renewed === null) return null;
+    storeToken(renewed.access_token);
+    setSession((current) =>
+      current.status === "signed-in" ? { ...current, token: renewed.access_token } : current,
+    );
+    return renewed.access_token;
   };
 
   const handleLogout = async (): Promise<void> => {
@@ -239,6 +277,7 @@ export function App(): JSX.Element {
       token={session.token}
       user={session.user}
       onLogout={() => void handleLogout()}
+      onRenew={renewToken}
     />
   );
 }
@@ -247,6 +286,7 @@ interface AuthenticatedAppProps {
   token: string;
   user: CurrentUser;
   onLogout: () => void;
+  onRenew?: () => Promise<string | null>;
 }
 
 /** Áreas do aplicativo. `painel` abre primeiro: é a visão do dia. */
@@ -290,11 +330,42 @@ function initials(email: string): string {
   return email.slice(0, 2);
 }
 
-function AuthenticatedApp({
+/** A fila do celular envolve tudo o que a pessoa faz depois de entrar. */
+function AuthenticatedApp(props: AuthenticatedAppProps): JSX.Element {
+  const { token, user, onRenew } = props;
+  return (
+    <OutboxProvider
+      outbox={deviceOutbox()}
+      userId={user.id}
+      token={token}
+      renew={onRenew ?? (async () => null)}
+      send={{ enterReading, uploadImport }}
+    >
+      <AppShell {...props} />
+    </OutboxProvider>
+  );
+}
+
+function AppShell({
   token,
   user,
-  onLogout,
+  onLogout: endSessionNow,
 }: AuthenticatedAppProps): JSX.Element {
+  // Sair com algo guardado: avisa que fica no celular, esperando esta conta.
+  const queue = useOutbox();
+  const onLogout = (): void => {
+    const waiting = queue?.pending.filter((item) => !item.error).length ?? 0;
+    if (
+      waiting > 0 &&
+      !window.confirm(
+        `Há ${waiting} ${waiting === 1 ? "envio guardado" : "envios guardados"} neste celular esperando sinal. ` +
+          "Eles continuam guardados e vão quando você entrar de novo neste celular. Sair agora?",
+      )
+    ) {
+      return;
+    }
+    endSessionNow();
+  };
   // A área e a ficha aberta vêm do endereço: recarregar, voltar e mandar o
   // link funcionam como se espera de qualquer página.
   const { route, navigate, replace } = useRoute();
@@ -457,6 +528,7 @@ function AuthenticatedApp({
           </span>
         </span>
         <div className="who">
+          <OutboxButton />
           <button
             type="button"
             className="avatar"
@@ -474,6 +546,8 @@ function AuthenticatedApp({
           </button>
         </div>
       </header>
+
+      <OfflineBanner />
 
       <nav className="areanav" aria-label="Áreas">
         {barAreas.map((name) => {

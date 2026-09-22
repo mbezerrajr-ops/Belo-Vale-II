@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { login } from "../api/client";
 import { ApiError, type LoginResult } from "../api/types";
@@ -64,6 +64,18 @@ export function LoginForm({
   const [badCredentials, setBadCredentials] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
+  // Entrar precisa de sinal: dizer isso antes de a pessoa digitar a senha.
+  const [online, setOnline] = useState(() => navigator.onLine !== false);
+  useEffect(() => {
+    const up = (): void => setOnline(true);
+    const down = (): void => setOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    return () => {
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
+    };
+  }, []);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
@@ -94,6 +106,12 @@ export function LoginForm({
     <form onSubmit={handleSubmit} aria-label="Entrar">
       <h2>Entrar</h2>
       <p className="sub">Use a conta criada pelo administrador da fazenda.</p>
+      {!online && (
+        <p className="warning login-offline" role="status">
+          Sem sinal. Para entrar o celular precisa de conexão; depois de entrar, o que você lançar
+          sem sinal fica guardado.
+        </p>
+      )}
       <label htmlFor="login-email">E-mail</label>
       <input
         id="login-email"

@@ -2,7 +2,7 @@
  * Casca do aplicativo: para onde cada pessoa vai ao entrar.
  */
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
@@ -172,6 +172,37 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: /sair/i }));
 
     expect(await screen.findByRole("button", { name: /entrar/i })).toBeInTheDocument();
+  });
+
+  describe("recarregar sem sinal", () => {
+    it("abre com quem já estava, em vez de mandar para o login", async () => {
+      // Antes, sem sinal, recarregar apagava o token ainda válido: quem
+      // estava no curral caía no login, que também não funciona sem sinal.
+      signedIn({ role: "operator" });
+      render(<App />);
+      await screen.findByRole("heading", { name: /produção do dia/i });
+      cleanup();
+
+      api.getCurrentUser.mockRejectedValue(new TypeError("Failed to fetch"));
+      api.refreshSession.mockRejectedValue(new TypeError("Failed to fetch"));
+      render(<App />);
+
+      expect(await screen.findByRole("heading", { name: /produção do dia/i })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /entrar/i })).not.toBeInTheDocument();
+    });
+
+    it("token que não vale mais continua levando ao login", async () => {
+      signedIn({ role: "operator" });
+      render(<App />);
+      await screen.findByRole("heading", { name: /produção do dia/i });
+      cleanup();
+
+      const { ApiError } = await import("./api/types");
+      api.getCurrentUser.mockRejectedValue(new ApiError(401, { code: "unauthorized" }));
+      render(<App />);
+
+      expect(await screen.findByRole("button", { name: /entrar/i })).toBeInTheDocument();
+    });
   });
 
   describe("endereço de cada tela", () => {

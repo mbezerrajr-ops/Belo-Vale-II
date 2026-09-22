@@ -17,6 +17,8 @@ import { brDate, liters, farmToday } from "../../ui/dates";
 import { ImportPanel } from "./ImportPanel";
 import { Icons } from "../../ui/Brand";
 import { PageHeader } from "../../ui/PageHeader";
+import { isTransient, withTimeout } from "../../offline/outbox";
+import { useOutbox } from "../../offline/OutboxContext";
 
 /**
  * Lançamento de produção, vaca a vaca.
@@ -31,6 +33,37 @@ import { PageHeader } from "../../ui/PageHeader";
 
 /** Teto de plausibilidade, igual ao do servidor. */
 const MAX_LITERS = 80;
+
+/** Sinal fraco pode deixar o pedido pendurado: depois disto, vai para a fila. */
+export const SAVE_TIMEOUT_MS = 15_000;
+
+const QUEUED =
+  "Sem sinal — guardado neste celular. Vai sozinho quando o sinal voltar.";
+
+/**
+ * A última folha vista de cada lote e dia, na aba: sem sinal, dá para lançar
+ * no curral com a lista de vacas que se tinha. Vai junto com a sessão.
+ */
+function sheetKey(day: string, lote: string | null): string {
+  return `belo-vale.folha:${day}|${lote ?? ""}`;
+}
+
+function rememberSheet(day: string, lote: string | null, sheet: ProductionSheet): void {
+  try {
+    sessionStorage.setItem(sheetKey(day, lote), JSON.stringify({ at: Date.now(), sheet }));
+  } catch {
+    // Sem espaço: só não haverá a folha guardada.
+  }
+}
+
+function rememberedSheet(day: string, lote: string | null): { at: number; sheet: ProductionSheet } | null {
+  try {
+    const raw = sessionStorage.getItem(sheetKey(day, lote));
+    return raw ? (JSON.parse(raw) as { at: number; sheet: ProductionSheet }) : null;
+  } catch {
+    return null;
+  }
+}
 
 type SheetFn = (
   token: string,
@@ -68,6 +101,7 @@ type RowStatus =
   | "saved"
   | "invalid"
   | "offline"
+  | "queued"
   | "error"
   | "locked"
   | "correcting"
@@ -142,6 +176,9 @@ export function ProductionPage({
   const [sheet, setSheet] = useState<ProductionSheet | null>(null);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Folha guardada em uso, sem sinal: quando foi vista pela última vez.
+  const [staleAt, setStaleAt] = useState<number | null>(null);
+  const queue = useOutbox();
   const [how, setHow] = useState<"digitar" | "importar">("digitar");
   // Muda depois de uma importação, para a folha reler o que foi gravado.
   const [reloadKey, setReloadKey] = useState(0);
@@ -161,26 +198,88 @@ export function ProductionPage({
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
+    const display = (loaded: ProductionSheet): void => {
+      // A primeira chamada não sabe quais lotes existem: pega o primeiro.
+      if (lote === null && loaded.lotes.length > 0) {
+        setLote(loaded.lotes[0]);
+        return;
+      }
+      setSheet(loaded);
+      setRows(initialRows(loaded.items));
+    };
     onLoadSheet(token, day, lote)
       .then((loaded) => {
         if (cancelled) return;
-        // A primeira chamada não sabe quais lotes existem: pega o primeiro.
-        if (lote === null && loaded.lotes.length > 0) {
-          setLote(loaded.lotes[0]);
+        if (queue) rememberSheet(day, lote, loaded);
+        setStaleAt(null);
+        display(loaded);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        const saved = queue && isTransient(error) ? rememberedSheet(day, lote) : null;
+        if (saved) {
+          setStaleAt(saved.at);
+          display(saved.sheet);
           return;
         }
-        setSheet(loaded);
-        setRows(initialRows(loaded.items));
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setLoadError("Não foi possível carregar a folha. Verifique a conexão.");
-        }
+        setLoadError("Não foi possível carregar a folha. Verifique a conexão.");
       });
     return () => {
       cancelled = true;
     };
+    // `queue` só liga a folha guardada; mudar de fila não relê a folha.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, day, lote, onLoadSheet, reloadKey]);
+
+  // O que está guardado no celular para este dia aparece na linha da vaca,
+  // e sai dela quando for enviado (ou recusado).
+  useEffect(() => {
+    if (!queue || sheet === null) return;
+    let cancelled = false;
+    const mark = async (): Promise<void> => {
+      const items = await queue.outbox.list(queue.userId);
+      if (cancelled) return;
+      setRows((current) => {
+        const next = { ...current };
+        for (const item of items) {
+          if (item.kind !== "reading" || item.measuredOn !== day) continue;
+          const row = next[item.animalId];
+          if (!row || row.status === "saving") continue;
+          next[item.animalId] = item.error
+            ? { ...row, status: "error", message: `Não enviado: ${item.error}` }
+            : { ...row, status: "queued", value: show(item.producao), message: QUEUED };
+        }
+        return next;
+      });
+    };
+    void mark();
+    const unsubscribe = queue.outbox.subscribe((event) => {
+      if (event.type === "sent" && event.item.kind === "reading" && event.item.measuredOn === day) {
+        const { animalId } = event.item;
+        const result = event.result as Reading;
+        setRows((current) =>
+          current[animalId]
+            ? {
+                ...current,
+                [animalId]: {
+                  ...current[animalId],
+                  status: "saved",
+                  saved: result.producao,
+                  measurementId: result.id,
+                  value: show(result.producao),
+                  message: null,
+                },
+              }
+            : current,
+        );
+      }
+      if (event.type === "refused") void mark();
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [queue, sheet, day]);
 
   function patch(animalId: string, changes: Partial<RowState>): void {
     setRows((current) => ({
@@ -192,7 +291,7 @@ export function ProductionPage({
   async function save(animalId: string, producao: number): Promise<void> {
     patch(animalId, { status: "saving", message: null });
     try {
-      const result = await onEnter(token, animalId, day, producao);
+      const result = await withTimeout(onEnter(token, animalId, day, producao), SAVE_TIMEOUT_MS);
       patch(animalId, {
         status: "saved",
         saved: result.producao,
@@ -200,6 +299,21 @@ export function ProductionPage({
         value: show(result.producao),
       });
     } catch (error) {
+      // No app, sem sinal (ou servidor fora do ar) vai para a fila do
+      // celular: recarregar ou sair da tela não perde mais o valor. Se o
+      // primeiro envio tiver chegado, reenviar o mesmo valor é seguro.
+      if (queue && isTransient(error)) {
+        const item = items.find((entry) => entry.animal_id === animalId);
+        await queue.outbox.addReading({
+          userId: queue.userId,
+          animalId,
+          label: item ? label(item) : "vaca",
+          measuredOn: day,
+          producao,
+        });
+        patch(animalId, { status: "queued", value: show(producao), message: QUEUED });
+        return;
+      }
       if (error instanceof TypeError) {
         // Sem sinal: o valor fica no campo até dar para enviar.
         patch(animalId, { status: "offline", message: "Sem conexão. O valor não foi salvo." });
@@ -331,6 +445,7 @@ export function ProductionPage({
   const savedRows = items.filter((item) => rows[item.animal_id]?.saved != null);
   const total = savedRows.reduce((sum, item) => sum + (rows[item.animal_id].saved ?? 0), 0);
   const progress = items.length === 0 ? 0 : savedRows.length / items.length;
+  const queuedCount = items.filter((item) => rows[item.animal_id]?.status === "queued").length;
 
   return (
     <section className="production">
@@ -396,6 +511,14 @@ export function ProductionPage({
 
       {loadError && <p role="alert">{loadError}</p>}
 
+      {staleAt !== null && (
+        <p className="warning">
+          Sem sinal: esta é a folha guardada às{" "}
+          {new Date(staleAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.
+          Pode lançar — fica guardado e vai quando o sinal voltar.
+        </p>
+      )}
+
       {sheet === null && !loadError && (
         <div className="skeleton" style={{ height: 180 }} aria-label="Carregando" />
       )}
@@ -413,7 +536,9 @@ export function ProductionPage({
             <div>
               <strong>{liters(total)} L</strong>
               <span>
-                {savedRows.length} de {items.length} lançadas · {lote} ·{" "}
+                {savedRows.length} de {items.length} lançadas
+                {queuedCount > 0 &&
+                  ` · ${queuedCount} ${queuedCount === 1 ? "guardada" : "guardadas"} no celular`} · {lote} ·{" "}
                 {brDate(day)}
               </span>
             </div>
@@ -500,6 +625,11 @@ export function ProductionPage({
                   </span>
                   <span className="prod-state" aria-live="polite">
                     {row.status === "saving" && "salvando…"}
+                    {row.status === "queued" && (
+                      <span className="queued" aria-label="guardado no celular" title="Guardado no celular">
+                        <Icons.guardado />
+                      </span>
+                    )}
                     {row.status === "saved" && (
                       <span className="ok" aria-label="salvo">
                         ✓
