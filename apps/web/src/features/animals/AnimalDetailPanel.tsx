@@ -95,6 +95,13 @@ function errorMessage(error: unknown): string {
 
 const br = brDate;
 
+/** Dias em lactação: do último parto até hoje, no dia da fazenda. */
+function daysInMilk(lastCalving: string | null, today: string): number | null {
+  if (!lastCalving) return null;
+  const days = Math.round((Date.parse(today) - Date.parse(lastCalving)) / 86_400_000);
+  return Number.isFinite(days) && days >= 0 ? days : null;
+}
+
 export function AnimalDetailPanel({
   token,
   animal,
@@ -119,6 +126,7 @@ export function AnimalDetailPanel({
     "none" | "brinco" | "tirar-brinco" | "lote" | "cadastro" | "baixa" | "desfazer" | "juntar"
   >("none");
   const merged = Boolean(animal.merged_into_id);
+  const del = daysInMilk(animal.ultimo_parto, today);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -211,6 +219,10 @@ export function AnimalDetailPanel({
             {animal.brinco ? (
               <>
                 Brinco <strong>{animal.brinco}</strong>
+                {/* O número antigo só diz algo quando é outro. */}
+                {animal.numero_legado && animal.numero_legado !== animal.brinco && (
+                  <> · nº antigo {animal.numero_legado}</>
+                )}
               </>
             ) : (
               <>
@@ -218,6 +230,7 @@ export function AnimalDetailPanel({
                 {animal.brinco_origem && (
                   <> — leitura ilegível registrada: {animal.brinco_origem}</>
                 )}
+                {animal.numero_legado && <> · nº antigo {animal.numero_legado}</>}
               </>
             )}
           </p>
@@ -240,11 +253,12 @@ export function AnimalDetailPanel({
         </div>
         <div>
           <dt>Último parto</dt>
-          <dd>{br(animal.ultimo_parto)}</dd>
-        </div>
-        <div>
-          <dt>Número legado</dt>
-          <dd>{animal.numero_legado ?? "—"}</dd>
+          <dd>
+            {br(animal.ultimo_parto)}
+            {animal.situacao === "Em lactação" && del !== null && (
+              <small>{del} dias em lactação</small>
+            )}
+          </dd>
         </div>
       </dl>
 

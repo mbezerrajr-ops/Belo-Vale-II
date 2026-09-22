@@ -110,6 +110,26 @@ export function AnimalSearchPage({
     }
   }
 
+  // Abre com o rebanho na tela: a busca refina, não é pré-requisito.
+  useEffect(() => {
+    void run({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  async function more(): Promise<void> {
+    if (result === null) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await onSearch(token, { ...lastSearch, offset: result.items.length });
+      setResult({ ...next, items: [...result.items, ...next.items] });
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function handleSearch(): void {
     const trimmed = term.trim();
     if (!trimmed) {
@@ -224,14 +244,14 @@ export function AnimalSearchPage({
       )}
 
       {error && <p role="alert">{error}</p>}
-      {busy && (
+      {busy && result === null && (
         <>
           <div className="skeleton" style={{ height: 64, margin: "12px 0" }} />
           <div className="skeleton" style={{ height: 64 }} />
         </>
       )}
 
-      {result && !busy && (
+      {result && (
         <>
           {result.items.length === 0 ? (
             <p className="chart-empty">Nenhum animal encontrado para essa busca.</p>
@@ -266,6 +286,11 @@ export function AnimalSearchPage({
                 </li>
               ))}
             </ul>
+          )}
+          {result.items.length < result.total && (
+            <button type="button" className="secondary show-more" disabled={busy} onClick={() => void more()}>
+              Mostrar mais ({result.total - result.items.length})
+            </button>
           )}
           <p className="count">
             {result.total} {result.total === 1 ? "animal" : "animais"}

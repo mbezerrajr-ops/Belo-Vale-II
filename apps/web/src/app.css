@@ -757,7 +757,7 @@ form h3 {
 .login-hero {
   position: relative;
   overflow: hidden;
-  padding: 28px 20px 0;
+  padding: 28px 16px 0;
   color: #fff;
   background:
     linear-gradient(180deg, #2f6d55 0%, #285e4a 55%, #1f4d3c 100%);
@@ -812,10 +812,12 @@ form h3 {
   height: 100%;
 }
 
+/* A marca começa onde o cartão começa: 460 px do painel menos o respiro
+   de 16 px de cada lado. */
 .login-brand {
   position: relative;
   z-index: 1;
-  max-width: 460px;
+  max-width: 428px;
   margin: 0 auto;
   padding-bottom: 150px;
   animation: rise 0.7s var(--ease-out) both;
@@ -886,11 +888,21 @@ form h3 {
   }
 }
 
+@media (max-width: 639px) {
+  .kpis-trio > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Seis tiles lado a lado só quando cada um cabe um valor em reais inteiro;
    abaixo disso, três colunas em duas linhas. */
 @media (min-width: 1400px) {
   .kpis {
     grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .kpis-trio {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -1696,6 +1708,20 @@ tbody tr:hover td {
   color: var(--ink);
 }
 
+.animal-fields dd small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* "Mostrar mais" no fim da lista de animais. */
+.show-more {
+  display: block;
+  margin: 4px auto 0;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -2127,7 +2153,6 @@ tbody tr:hover td {
 
 .row-msg,
 .row-retry,
-.row-void,
 .row-fix {
   grid-column: 1 / -1;
   margin: 0;
@@ -2142,10 +2167,24 @@ tbody tr:hover td {
   justify-self: start;
 }
 
+/* "Anular" junto da situação, sob o nome: texto pequeno, sem peso de
+   botão. Abre o motivo — não anula nada sozinho. */
 .row-void {
-  justify-self: end;
-  font-size: 0.82rem;
-  color: var(--muted);
+  min-height: 0;
+  margin-left: 10px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--brand);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.row-void:hover {
+  box-shadow: none;
+  color: var(--danger);
 }
 
 .row-fix {
@@ -2655,19 +2694,42 @@ tbody tr:hover td {
   gap: 10px;
 }
 
-.proposal-group h3 {
+/* O arquivo: título e detalhes de um lado, a folha ou a gravação do outro. */
+.source-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
-  margin: 6px 0 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  margin-top: 6px;
 }
 
-.proposal-group h3 small {
-  font-family: var(--font-body);
+.source-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.source-title h3 {
+  margin: 0;
+}
+
+.source-title small {
   font-size: 0.8rem;
-  font-weight: 400;
   color: var(--muted);
+}
+
+/* Situação e Atualizar na mesma linha; no celular, Atualizar desce. */
+.inbox-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.inbox-toolbar .search-shortcuts {
+  margin: 0;
 }
 
 .proposal-card {
@@ -2930,8 +2992,8 @@ form.send-photo {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-left: auto;
   font-size: 0.85rem;
+  font-weight: 700;
   text-decoration: none;
 }
 
@@ -2943,19 +3005,15 @@ form.send-photo {
   border-radius: var(--radius-sm);
 }
 
-/* Reler a caixa sem trocar de aba: a leitura da foto termina em segundo plano. */
-.refresh-inbox {
-  margin: 10px 0 4px;
-}
-
 /* A gravação ao lado das propostas: quem revisa ouve antes de aprovar. */
 .source-audio {
   display: block;
-  margin-top: 8px;
+  flex: 1 1 260px;
+  max-width: 420px;
 }
 .source-audio audio {
+  display: block;
   width: 100%;
-  max-width: 420px;
 }
 .source-media-error {
   display: block;
@@ -3210,4 +3268,70 @@ form.send-photo {
 form.change-password,
 .supplies > form {
   max-width: 40rem;
+}
+
+/* Histórico da ficha no celular: cada leitura empilhada, sem cortar o
+   responsável (um e-mail) nem esconder colunas numa rolagem lateral. */
+@media (max-width: 600px) {
+  .production-history .scroll-x {
+    overflow: visible;
+  }
+
+  .history-table {
+    min-width: 0;
+  }
+
+  .history-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .history-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "data litros"
+      "origem origem"
+      "por por"
+      "acoes acoes";
+    gap: 2px 12px;
+    padding: 10px 2px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .history-table td {
+    padding: 0;
+    border: 0;
+  }
+
+  .history-table td:nth-child(1) {
+    grid-area: data;
+    font-weight: 700;
+  }
+
+  .history-table td:nth-child(2) {
+    grid-area: litros;
+    font-weight: 700;
+  }
+
+  .history-table td:nth-child(3) {
+    grid-area: origem;
+    color: var(--ink-2);
+    font-size: 0.86rem;
+  }
+
+  .history-table td:nth-child(4) {
+    grid-area: por;
+    color: var(--muted);
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+  }
+
+  .history-table td:nth-child(5) {
+    grid-area: acoes;
+    padding-top: 4px;
+  }
 }

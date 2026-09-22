@@ -108,15 +108,17 @@ export function OfficialMeasurements({
         Só entram aqui leituras aprovadas por uma pessoa ou migradas da baseline.
       </p>
 
-      <div className="kpis">
-        <StatTile index={0} label="Medições ativas" value={records.length} />
+      {/* Três indicadores: no celular o total ocupa a linha, e os outros
+          dois dividem a de baixo — em vez de um ficar sozinho. */}
+      <div className="kpis kpis-trio">
         <StatTile
-          index={1}
+          index={0}
           label="Total no período"
           value={totalLiters(records)}
           format={fmt.liters}
           color="var(--series-3)"
         />
+        <StatTile index={1} label="Medições ativas" value={records.length} />
         <StatTile index={2} label="Animais medidos" value={byAnimal.length} />
       </div>
 

@@ -70,14 +70,15 @@ describe("AnimalSearchPage", () => {
     render(
       <AnimalSearchPage token={TOKEN} canEdit onSearch={search} onOpen={vi.fn()} />,
     );
+    await act(async () => {}); // a lista do rebanho, que abre sozinha
 
     fireEvent.change(screen.getByLabelText(/brinco ou nome/i), {
       target: { value: "389" },
     });
     fireEvent.click(screen.getByRole("button", { name: /buscar/i }));
 
-    await waitFor(() => expect(search).toHaveBeenCalled());
-    expect(search.mock.calls[0][1]).toMatchObject({ brinco: "389" });
+    await waitFor(() => expect(search).toHaveBeenCalledTimes(2));
+    expect(search.mock.calls[1][1]).toMatchObject({ brinco: "389" });
     expect(await screen.findByText("ÁGATA")).toBeInTheDocument();
   });
 
@@ -87,14 +88,15 @@ describe("AnimalSearchPage", () => {
     render(
       <AnimalSearchPage token={TOKEN} canEdit onSearch={search} onOpen={vi.fn()} />,
     );
+    await act(async () => {}); // a lista do rebanho, que abre sozinha
 
     fireEvent.change(screen.getByLabelText(/brinco ou nome/i), {
       target: { value: "agata" },
     });
     fireEvent.click(screen.getByRole("button", { name: /buscar/i }));
 
-    await waitFor(() => expect(search).toHaveBeenCalled());
-    expect(search.mock.calls[0][1]).toMatchObject({ name: "agata" });
+    await waitFor(() => expect(search).toHaveBeenCalledTimes(2));
+    expect(search.mock.calls[1][1]).toMatchObject({ name: "agata" });
   });
 
   it("oferece o filtro dos animais sem brinco", async () => {
@@ -103,11 +105,12 @@ describe("AnimalSearchPage", () => {
     render(
       <AnimalSearchPage token={TOKEN} canEdit onSearch={search} onOpen={vi.fn()} />,
     );
+    await act(async () => {}); // a lista do rebanho, que abre sozinha
 
     fireEvent.click(screen.getByRole("button", { name: /sem brinco/i }));
 
-    await waitFor(() => expect(search).toHaveBeenCalled());
-    expect(search.mock.calls[0][1]).toMatchObject({ semBrinco: true });
+    await waitFor(() => expect(search).toHaveBeenCalledTimes(2));
+    expect(search.mock.calls[1][1]).toMatchObject({ semBrinco: true });
   });
 
   it("mostra quando a busca não encontra nada, sem parecer erro", async () => {
@@ -119,6 +122,7 @@ describe("AnimalSearchPage", () => {
         onOpen={vi.fn()}
       />,
     );
+    await act(async () => {});
 
     fireEvent.change(screen.getByLabelText(/brinco ou nome/i), {
       target: { value: "9999" },
@@ -126,6 +130,35 @@ describe("AnimalSearchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /buscar/i }));
 
     expect(await screen.findByText(/nenhum animal/i)).toBeInTheDocument();
+  });
+
+  it("abre com o rebanho listado, sem precisar buscar", async () => {
+    const search = vi.fn().mockResolvedValue(page([animal()]));
+
+    render(<AnimalSearchPage token={TOKEN} canEdit onSearch={search} onOpen={vi.fn()} />);
+
+    expect(await screen.findByText("ÁGATA")).toBeInTheDocument();
+    expect(search.mock.calls[0][1]).toEqual({});
+  });
+
+  it("mostra mais animais sem perder os que já estão na tela", async () => {
+    const primeira = { items: [animal()], total: 2, limit: 25, offset: 0 };
+    const segunda = {
+      items: [animal({ id: "a-2", brinco: "633", name: "GIGANTE" })],
+      total: 2,
+      limit: 25,
+      offset: 25,
+    };
+    const search = vi.fn().mockResolvedValueOnce(primeira).mockResolvedValueOnce(segunda);
+    render(<AnimalSearchPage token={TOKEN} canEdit onSearch={search} onOpen={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /mostrar mais/i }));
+
+    expect(await screen.findByText("GIGANTE")).toBeInTheDocument();
+    expect(screen.getByText("ÁGATA")).toBeInTheDocument();
+    // Continua de onde a tela parou: um animal já estava nela.
+    expect(search.mock.calls[1][1]).toMatchObject({ offset: 1 });
+    expect(screen.queryByRole("button", { name: /mostrar mais/i })).not.toBeInTheDocument();
   });
 
   it("não pede fazenda ao usuário", () => {
@@ -154,6 +187,39 @@ describe("AnimalSearchPage", () => {
     expect(
       screen.queryByRole("button", { name: /cadastrar animal/i }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("AnimalDetailPanel — a ficha", () => {
+  it("mostra os dias em lactação de quem está em lactação", () => {
+    render(
+      <AnimalDetailPanel
+        token={TOKEN}
+        animal={animal({ ultimo_parto: "2026-08-23" })}
+        canEdit={false}
+        onChanged={vi.fn()}
+        today="2026-09-22"
+      />,
+    );
+
+    expect(screen.getByText("30 dias em lactação")).toBeInTheDocument();
+  });
+
+  it("o número antigo aparece só quando é outro que o brinco", () => {
+    const view = render(
+      <AnimalDetailPanel token={TOKEN} animal={animal()} canEdit={false} onChanged={vi.fn()} />,
+    );
+    expect(screen.queryByText(/nº antigo/)).not.toBeInTheDocument();
+
+    view.rerender(
+      <AnimalDetailPanel
+        token={TOKEN}
+        animal={animal({ numero_legado: "519" })}
+        canEdit={false}
+        onChanged={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/nº antigo 519/)).toBeInTheDocument();
   });
 });
 

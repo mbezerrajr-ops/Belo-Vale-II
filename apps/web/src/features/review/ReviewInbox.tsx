@@ -26,6 +26,7 @@ import { SendAudio } from "./SendAudio";
 import { SendPhoto } from "./SendPhoto";
 import { SourceMedia } from "./SourceMedia";
 import { brDate, liters } from "../../ui/dates";
+import { Icons } from "../../ui/Brand";
 
 /**
  * Caixa de revisão: cada evento lido de uma foto, áudio ou texto espera aqui
@@ -99,6 +100,17 @@ const SOURCE_LABEL: Record<string, string> = {
   audio: "Áudio",
   text: "Texto",
 };
+
+/**
+ * Origem e data do arquivo, sem repetir o que o título já diz: "Foto de
+ * 22/09" não precisa de "Foto" de novo ao lado.
+ */
+function sourceMeta(source: Proposal["source"]): string {
+  const kind = SOURCE_LABEL[source.kind] ?? source.kind;
+  const repeats = source.label.toLowerCase().startsWith(kind.toLowerCase());
+  const date = source.reference_date ? `data da leitura ${brDate(source.reference_date)}` : "sem data";
+  return repeats ? date : `${kind} · ${date}`;
+}
 
 const TABS: { status: ProposalStatus; label: string }[] = [
   { status: "pending", label: "Pendentes" },
@@ -722,26 +734,25 @@ export function ReviewInbox({
         aprovação.
       </p>
 
-      <div className="search-shortcuts" role="group" aria-label="Situação">
-        {TABS.map((option) => (
-          <button
-            key={option.status}
-            type="button"
-            aria-pressed={tab === option.status}
-            onClick={() => setTab(option.status)}
-          >
-            {option.label}
-          </button>
-        ))}
+      <div className="inbox-toolbar">
+        <div className="search-shortcuts" role="group" aria-label="Situação">
+          {TABS.map((option) => (
+            <button
+              key={option.status}
+              type="button"
+              aria-pressed={tab === option.status}
+              onClick={() => setTab(option.status)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {/* A leitura termina em segundo plano, e a caixa avisa o que chega;
+            Atualizar relê na hora — clicar na aba já escolhida não relê. */}
+        <button type="button" className="link-btn refresh-inbox" onClick={() => void reload(tab)}>
+          <Icons.atualizar /> Atualizar
+        </button>
       </div>
-
-      {/* A leitura termina em segundo plano. Quem enviou vê a caixa se
-          atualizar sozinha quando a SUA leitura termina; o que outra pessoa
-          enviou aparece aqui — clicar na aba já escolhida não recarrega
-          nada. */}
-      <button type="button" className="link-btn refresh-inbox" onClick={() => void reload(tab)}>
-        Atualizar
-      </button>
 
       {incoming && (
         <div role="status" className="inbox-news">
@@ -829,13 +840,16 @@ export function ReviewInbox({
       {tab === "pending" &&
         groups.map((group) => (
           <div key={group.source.id} className="proposal-group">
-            <h3>
-              {group.source.label}
-              <small>
-                {SOURCE_LABEL[group.source.kind] ?? group.source.kind}
-                {group.source.reference_date ? ` · ${brDate(group.source.reference_date)}` : ""} ·{" "}
-                {group.items.length} {group.items.length === 1 ? "evento" : "eventos"}
-              </small>
+            <header className="source-head">
+              <div className="source-title">
+                <h3>{group.source.label}</h3>
+                <small>
+                  {sourceMeta(group.source)} · {group.items.length}{" "}
+                  {group.items.length === 1 ? "evento" : "eventos"}
+                </small>
+              </div>
+              {/* A folha ou a gravação ao lado do título, fora dele: um
+                  tocador dentro do título tinha largura zero no celular. */}
               {group.source.media_url && (
                 <SourceMedia
                   url={group.source.media_url}
@@ -844,7 +858,7 @@ export function ReviewInbox({
                   onFetch={onFetchMedia}
                 />
               )}
-            </h3>
+            </header>
             <SourceDate
               source={group.source}
               pending={group.items.length}
