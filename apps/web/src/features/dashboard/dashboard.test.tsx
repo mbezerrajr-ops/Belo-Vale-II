@@ -173,6 +173,35 @@ describe("HerdDashboard", () => {
     expect(load.mock.calls[1][1]).toMatchObject({ lote: "LOTE 1" });
   });
 
+  it("com um lote escolhido, os outros lotes continuam na lista", async () => {
+    // O painel filtrado só traz o lote escolhido: a lista encolhia para
+    // "Todos" e ele, e trocar de lote exigia voltar a Todos antes.
+    const doisLotes = summary({
+      lots: [
+        { ...summary().lots[0], lote: "LOTE 1" },
+        { ...summary().lots[0], lote: "LOTE 2" },
+      ],
+    });
+    const soLote2 = summary({ lots: [{ ...summary().lots[0], lote: "LOTE 2" }] });
+    const load = vi
+      .fn()
+      .mockImplementation((_token: string, filters: { lote?: string }) =>
+        Promise.resolve(filters.lote ? soLote2 : doisLotes),
+      );
+
+    render(<HerdDashboard token={TOKEN} onLoad={load} />);
+    await screen.findAllByText("LOTE 1");
+    fireEvent.change(screen.getByLabelText("Lote de ordenha"), { target: { value: "LOTE 2" } });
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+
+    const filtro = screen.getByLabelText("Lote de ordenha");
+    await waitFor(() => expect(filtro).toHaveValue("LOTE 2"));
+    const opcoes = within(filtro)
+      .getAllByRole("option")
+      .map((option) => option.textContent);
+    expect(opcoes).toEqual(["Todos", "LOTE 1", "LOTE 2"]);
+  });
+
   it("permite escolher a data da coleta", async () => {
     const load = vi.fn().mockResolvedValue(summary());
 

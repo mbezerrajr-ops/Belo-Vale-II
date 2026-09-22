@@ -34,6 +34,13 @@ interface Props {
   onLoad?: LoadFn;
 }
 
+/** Junta as opções já vistas às que chegaram, em ordem natural (LOTE 2 antes de LOTE 10). */
+function mergeOptions(current: string[], seen: string[]): string[] {
+  const next = Array.from(new Set([...current, ...seen]));
+  next.sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }));
+  return next.length === current.length ? current : next;
+}
+
 function shortDate(iso: string): string {
   const [year, month, day] = iso.split("-");
   return `${day}/${month}/${year.slice(2)}`;
@@ -51,6 +58,17 @@ export function HerdDashboard({
   const [loading, setLoading] = useState(true);
   // Maiores e menores produções dividem um cartão: medem a mesma coisa.
   const [ranking, setRanking] = useState<"maiores" | "menores">("maiores");
+  // As opções dos filtros não podem vir só do painel filtrado: com LOTE 2
+  // escolhido, o servidor devolve só o LOTE 2, e a lista encolhia para
+  // "Todos" e ele — para trocar de lote era preciso voltar a Todos antes.
+  // Guarda tudo o que já apareceu.
+  const [lotOptions, setLotOptions] = useState<string[]>([]);
+  const [situationOptions, setSituationOptions] = useState<string[]>([]);
+  useEffect(() => {
+    if (panel === null) return;
+    setLotOptions((current) => mergeOptions(current, panel.lots.map((lot) => lot.lote)));
+    setSituationOptions((current) => mergeOptions(current, Object.keys(panel.by_situation)));
+  }, [panel]);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,7 +107,8 @@ export function HerdDashboard({
     );
   }
 
-  const lotNames = panel.lots.map((lot) => lot.lote);
+  const lotNames = mergeOptions(lotOptions, panel.lots.map((lot) => lot.lote));
+  const situationNames = mergeOptions(situationOptions, Object.keys(panel.by_situation));
   const partialCoverage =
     panel.measured_on !== null &&
     panel.animals_with_reading > 0 &&
@@ -142,7 +161,7 @@ export function HerdDashboard({
             }
           >
             <option value="">Todas</option>
-            {Object.keys(panel.by_situation).map((name) => (
+            {situationNames.map((name) => (
               <option key={name} value={name}>
                 {name}
               </option>

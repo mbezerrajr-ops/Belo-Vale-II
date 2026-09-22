@@ -2365,6 +2365,7 @@ form.milk-price .hint {
 @media (min-width: 900px) {
   .production {
     max-width: 50rem;
+    margin-inline: auto;
   }
 }
 
