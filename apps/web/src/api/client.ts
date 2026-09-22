@@ -19,6 +19,7 @@ import {
   type ProductionHistoryEntry,
   type SupplyPrice,
   type ImportMode,
+  type ImportReading,
   type ImportPreview,
   type ImportRecord,
   type PasswordReset,
@@ -132,6 +133,14 @@ export async function uploadImport(
     body: formData,
   });
   return parseJsonOrThrow<UploadResult>(response);
+}
+
+/** Como está a leitura do que foi enviado: a tela pergunta enquanto espera. */
+export async function getImportReading(importId: string, token: string): Promise<ImportReading> {
+  const response = await fetch(`${API_BASE_URL}/api/imports/${encodeURIComponent(importId)}`, {
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow<ImportReading>(response);
 }
 
 /**

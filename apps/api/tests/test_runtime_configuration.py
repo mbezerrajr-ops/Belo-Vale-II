@@ -96,6 +96,20 @@ def test_csp_blocks_third_party_scripts_and_framing() -> None:
     assert "object-src 'none'" in config
 
 
+def test_the_microphone_is_only_for_the_app_itself() -> None:
+    """A gravação da ordenha é feita dentro do app: com `microphone=()` o
+    navegador recusaria o gravador sempre, sem nem perguntar. Liberado só
+    para a própria origem; câmera e localização continuam fechadas."""
+    [policy] = [
+        line for line in _nginx_config().splitlines()
+        if line.strip().startswith("add_header Permissions-Policy")
+    ]
+
+    assert "microphone=(self)" in policy
+    assert "camera=()" in policy
+    assert "geolocation=()" in policy
+
+
 def test_hsts_stays_disabled_until_there_is_tls() -> None:
     """Habilitar HSTS sem certificado torna o site inacessível pelo max-age."""
     config = _nginx_config()

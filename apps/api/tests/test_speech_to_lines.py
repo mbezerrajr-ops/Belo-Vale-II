@@ -130,6 +130,104 @@ class TestTheBrinco:
         assert linha["manha"] == "18"
 
 
+class TestTheBrincoAfterAPause:
+    """Achado pelo avaliador, com ruído somado a uma gravação do titular: o
+    whisper cortou o trecho entre o nome e o brinco,
+
+        E por fim, a vaca aceitona
+        117
+        14 litros no total
+
+    e o 117 sumia sem aviso — a vaca chegava sem brinco. Um número com cara
+    de brinco logo depois de uma vaca que ainda não tem brinco nem litros é o
+    brinco dela."""
+
+    def test_the_brinco_on_the_next_line_is_the_cow_s(self) -> None:
+        [linha] = _linhas("E por fim, a vaca aceitona\n117\n14 litros no total")
+
+        assert (linha["brinco"], linha["nome"], linha["total"]) == ("117", "ACEITONA", "14")
+
+    def test_after_a_full_stop_too(self) -> None:
+        [linha] = _linhas("Vaca Pandora. 417. Produziu 8 litros.")
+
+        assert (linha["brinco"], linha["nome"], linha["total"]) == ("417", "PANDORA", "8")
+
+    def test_a_brinco_with_another_name_is_another_cow(self) -> None:
+        """ "649, redonda" depois de uma vaca sem litros é outra vaca, com
+        nome próprio — não o brinco da anterior."""
+        linhas = _linhas("Vaca Pandora\n649, redonda, produziu 5 litros")
+
+        assert ("649", "REDONDA", "5") in [(l["brinco"], l["nome"], l["total"]) for l in linhas]
+
+    def test_a_cow_that_already_has_liters_does_not_take_it(self) -> None:
+        linhas = _linhas("Vaca Pandora produziu 8 litros\n633\nproduziu 4 litros")
+
+        assert [(l["brinco"], l["total"]) for l in linhas] == [(None, "8"), ("633", "4")]
+
+
+class TestTheNameSaidTwice:
+    """Da gravação feita pelo gravador do navegador: o whisper cortou o nome
+    repetido em duas linhas,
+
+        Pequina
+        Pequina produziu
+
+    e o primeiro "Pequina" ficava solto — virava uma observação "No áudio:
+    Pequina" na vaca anterior, uma proposta inútil esperando alguém
+    rejeitar. O nome repetido é o mesmo nome, com pausa ou sem."""
+
+    def test_across_a_pause_the_repeated_name_is_one_cow(self) -> None:
+        linhas = _linhas(
+            "Vaca quartinha, 406\nProduziu 12 litros no total do dia\n"
+            "7 pela manhã, mais 5 da tarde\nPequina\nPequina produziu\n6,5 litros\n"
+            "O número de Pequina é 701"
+        )
+
+        assert [(l["brinco"], l["nome"], l["total"], l["anotacao"]) for l in linhas] == [
+            ("406", "QUARTINHA", "12", None),
+            ("701", "PEQUINA", "6,5", None),
+        ]
+
+    def test_the_evidence_of_the_cow_starts_at_the_first_name(self) -> None:
+        [_, pequina] = _linhas("Vaca 406 produziu 12\nPequina\nPequina produziu 6,5 litros")
+
+        assert pequina["trecho"].startswith("Pequina")
+        assert pequina["trecho"].count("Pequina") == 2
+
+
+class TestTheNameAfterAPause:
+    """Medido com ruído forte somado: o whisper cortou cada vaca em pedaços,
+
+        vaca 417
+        Pandora
+        produziu 5 litros pela manhã
+
+    e o nome sozinho na linha virava observação ("No áudio: Pandora"). Logo
+    depois do brinco, antes dos litros, uma linha só com um nome é o nome da
+    vaca."""
+
+    def test_the_name_on_its_own_line_is_the_cow_s(self) -> None:
+        [linha] = _linhas("vaca 417\nPandora\nproduziu 5 litros pela manhã\n3 da tarde")
+
+        assert (linha["brinco"], linha["nome"], linha["total"], linha["anotacao"]) == (
+            "417", "PANDORA", "8", None,
+        )
+
+    def test_with_the_order_to_dry_off_nothing_is_left(self) -> None:
+        texto = "a vaca 633\ngigante\nproduziu 2 litros pela manhã\nmais 2 litros à tarde\n4\ndeve ser secada depois"
+        [linha] = _linhas(texto)
+
+        assert (linha["nome"], linha["total"], linha["anotacao"]) == ("GIGANTE", "4", "secar")
+
+    def test_a_sentence_after_the_brinco_is_not_a_name(self) -> None:
+        """"Mancando da perna" não é nome: a linha continua depois da
+        palavra. Vira observação, como sempre."""
+        [linha] = _linhas("vaca 417\nmancando da perna\nproduziu 8 litros")
+
+        assert linha["nome"] is None
+        assert "mancando da perna" in linha["anotacao"]
+
+
 class TestWhatIsNotUnderstoodIsKept:
     def test_a_command_goes_to_the_annotation(self) -> None:
         [linha] = _linhas("a 406 vai para o terceiro lote")
@@ -137,6 +235,12 @@ class TestWhatIsNotUnderstoodIsKept:
         assert linha["brinco"] == "406"
         assert linha["total"] is None
         assert "3º lote" in linha["anotacao"]
+
+    def test_how_the_milk_was_divided_is_not_a_note(self) -> None:
+        """"Dividida" é o jeito de dizer manhã e tarde, não informação nova."""
+        [linha] = _linhas("vaca 117 deu 14 litros no total, dividida, 7 pela manhã e 7 pela noite")
+
+        assert (linha["manha"], linha["tarde"], linha["total"], linha["anotacao"]) == ("7", "7", "14", None)
 
     def test_the_rest_of_the_sentence_becomes_a_note(self) -> None:
         [linha] = _linhas("a 497 deu 18 de manhã e a bezerra da ponta curta tá mancando")

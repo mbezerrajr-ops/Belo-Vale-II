@@ -29,7 +29,7 @@ from app.services.reading_to_events import lines_to_events
 
 EXTRACTOR_NAME = "leitor-local-fala"
 #: Muda quando as regras do tradutor da fala mudam: a nota é por versão.
-GRAMMAR_VERSION = "fala-v2"
+GRAMMAR_VERSION = "fala-v4"
 
 
 class SpokenEventReader:

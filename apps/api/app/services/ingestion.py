@@ -44,6 +44,11 @@ class ImportAlreadyProcessingError(IngestionError):
     pass
 
 
+class ReprocessNotAllowedError(IngestionError):
+    """Ler de novo um arquivo cuja leitura deu certo é decisão de revisor:
+    criaria outra cópia de cada proposta na caixa."""
+
+
 @dataclass(frozen=True)
 class ImportStatus:
     id: UUID
@@ -122,7 +127,15 @@ async def create_import(
     return ImportStatus(id=import_row.id, status=import_row.status, extraction_run_id=run.id)
 
 
-async def reprocess_import(session: AsyncSession, *, import_id: UUID) -> ImportStatus:
+async def reprocess_import(
+    session: AsyncSession, *, import_id: UUID, only_if_failed: bool = False
+) -> ImportStatus:
+    """Uma leitura nova do arquivo guardado.
+
+    `only_if_failed`: para quem não é revisor — tentar de novo a leitura que
+    falhou (transcritor fora do ar não é culpa de quem gravou) é permitido; a
+    que deu certo, não.
+    """
     import_row = await session.get(Import, import_id)
     if import_row is None:
         raise ImportNotFoundError(str(import_id))
@@ -141,6 +154,15 @@ async def reprocess_import(session: AsyncSession, *, import_id: UUID) -> ImportS
     )
     if active_run is not None:
         raise ImportAlreadyProcessingError(str(import_id))
+    if only_if_failed:
+        latest = await session.scalar(
+            select(ExtractionRun)
+            .where(ExtractionRun.media_asset_id == image.id)
+            .order_by(ExtractionRun.created_at.desc(), ExtractionRun.id.desc())
+            .limit(1)
+        )
+        if latest is None or latest.status != "failed":
+            raise ReprocessNotAllowedError(str(import_id))
 
     run = ExtractionRun(media_asset_id=image.id, status="pending")
     session.add(run)

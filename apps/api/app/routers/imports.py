@@ -3,14 +3,16 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
-from app.core.security import require_minimum_role
-from app.db.models import User
+from app.core.security import has_minimum_role, require_minimum_role
+from app.db.models import Farm, User
 from app.db.session import get_db_session
+from app.routers.registry import resolve_current_farm
 from app.services.ingestion import ImportStatus, create_import, reprocess_import
+from app.services.media_reading import reading_status
 from app.services.normalization import normalize_date
 from app.services.storage import ObjectStorage, get_object_storage
 from app.workers.tasks import ExtractionDispatcher, get_extraction_dispatcher
@@ -54,8 +56,37 @@ async def reprocess(
     import_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     dispatcher: Annotated[ExtractionDispatcher, Depends(get_extraction_dispatcher)],
-    _: Annotated[User, Depends(require_minimum_role("reviewer"))],
+    user: Annotated[User, Depends(require_minimum_role("operator"))],
 ) -> dict[str, str]:
-    created = await reprocess_import(session, import_id=import_id)
+    # Quem enviou tenta de novo a leitura que falhou; ler de novo a que deu
+    # certo é de revisor.
+    created = await reprocess_import(
+        session, import_id=import_id, only_if_failed=not has_minimum_role(user, "reviewer")
+    )
     dispatcher.dispatch(created.extraction_run_id)
     return _response(created)
+
+
+@router.get("/{import_id}")
+async def import_reading(
+    import_id: UUID,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    farm: Annotated[Farm, Depends(resolve_current_farm)],
+    _: Annotated[User, Depends(require_minimum_role("operator"))],
+) -> dict[str, str | int | None]:
+    """Como está a leitura do que foi enviado.
+
+    É o que a tela pergunta enquanto espera: sem isto, o aviso "as propostas
+    aparecem aqui quando terminar" ficava na tela mesmo quando a leitura
+    tinha falhado.
+    """
+    reading = await reading_status(session, import_id=import_id, farm_id=farm.id)
+    if reading is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Envio não encontrado.")
+    return {
+        "id": str(reading.import_id),
+        "kind": reading.kind,
+        "status": reading.status,
+        "proposals": reading.proposals,
+        "failure": reading.failure,
+    }

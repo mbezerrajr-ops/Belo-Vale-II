@@ -2744,3 +2744,109 @@ form.send-photo {
   gap: 12px;
   align-items: flex-start;
 }
+
+/* ---------- revisão: gravar a ordenha no próprio app ---------- */
+
+.recorder {
+  display: grid;
+  gap: 8px;
+}
+
+/* O botão de gravar é o maior da área: no curral, com a mão ocupada, é ele
+   que se aperta. O ponto vermelho é o sinal universal de "gravar". */
+.recorder-start {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding-inline: 18px;
+  font-size: 1rem;
+}
+
+.recorder-dot {
+  flex: 0 0 12px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent);
+}
+
+.recorder-live {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+}
+
+.recorder-live .recorder-dot {
+  animation: recording 1.2s ease-in-out infinite;
+}
+
+.recorder-time {
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.recorder-time small {
+  color: var(--ink-2);
+  font-weight: 400;
+}
+
+.recorder-stop {
+  min-height: 44px;
+  margin-left: auto;
+}
+
+.recorder-take {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.recorder-take audio {
+  flex: 1 1 240px;
+  max-width: 100%;
+}
+
+.recorder-take .hint {
+  flex-basis: 100%;
+}
+
+@keyframes recording {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* A leitura em andamento: um pulso discreto diz que a tela não travou. */
+.reading-live {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reading-pulse {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-2);
+  animation: recording 1.6s ease-in-out infinite;
+}
+
+.reading-failed {
+  flex-wrap: wrap;
+}
+
+.reading-failed p {
+  flex: 1 1 220px;
+  margin: 0;
+}

@@ -279,8 +279,23 @@ class MediaAsset(TimestampedModel, Base):
     byte_size: Mapped[int | None] = mapped_column(Integer)
 
 
+#: Por que uma leitura falhou, para quem enviou saber o que fazer:
+#: `reader_unavailable` (leitor fora do ar: o arquivo está bom, tente depois),
+#: `unreadable` (o arquivo não tem o que ler: mande outro),
+#: `sender_unknown` (ninguém responde pela leitura) e `internal` (o resto).
+FAILURE_CODES = ("reader_unavailable", "unreadable", "sender_unknown", "internal")
+
+
 class ExtractionRun(TimestampedModel, Base):
     __tablename__ = "extraction_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "failure_code IS NULL OR (status = 'failed' AND failure_code IN ("
+            + ", ".join(f"'{code}'" for code in FAILURE_CODES)
+            + "))",
+            name="ck_extraction_runs_failure_code",
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(
         PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()")
@@ -291,6 +306,7 @@ class ExtractionRun(TimestampedModel, Base):
     raw_response: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    failure_code: Mapped[str | None] = mapped_column(String(32))
 
 
 class ExtractedLine(TimestampedModel, Base):

@@ -193,6 +193,10 @@ async def get_current_user(
     return user
 
 
+def has_minimum_role(user: User, minimum_role: Role) -> bool:
+    return _ROLE_LEVEL.get(user.role, -1) >= _ROLE_LEVEL[minimum_role]
+
+
 def require_minimum_role(minimum_role: Role) -> Callable[..., User]:
     minimum_level = _ROLE_LEVEL[minimum_role]
 

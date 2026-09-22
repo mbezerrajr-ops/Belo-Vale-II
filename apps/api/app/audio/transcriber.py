@@ -10,25 +10,40 @@ O endereço só pode ser da própria máquina ou da rede interna
 
 from __future__ import annotations
 
+import array
+import io
 import json
 import logging
+import math
 import socket
+import sys
 import urllib.error
 import urllib.request
 import uuid
+import wave
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Protocol
 
+from app.audio.speech_to_lines import is_phantom
 from app.core.local_url import ensure_local_url
+from app.services.event_extraction import ReaderUnavailableError, UnreadableContentError
 
 logger = logging.getLogger(__name__)
 
 #: Buraco entre trechos transcritos a partir do qual a fala foi PULADA. Numa
 #: gravação boa do titular o maior buraco foi de 0,44 s; na que falhou, 28 s.
 SKIP_GAP_SECONDS = 8.0
+#: Abaixo disto o buraco é pausa de verdade, e não se pergunta nada: whisper
+#: sobre silêncio inventa frase. Medido: fala a -18 dBFS, pausa a -44 dBFS
+#: (gravação do celular) ou -57 dBFS (gravador do navegador).
+SILENCE_DBFS = -40.0
+#: Quantas vezes um trecho recuperado ainda pode ter o próprio buraco ouvido
+#: de novo.
+MAX_RECOVERY_DEPTH = 2
 
 
-class TranscriberUnavailable(RuntimeError):
+class TranscriberUnavailable(ReaderUnavailableError):
     """O transcritor local não respondeu (desligado, sem modelo)."""
 
 
@@ -36,7 +51,7 @@ class TranscriberTimeout(TranscriberUnavailable):
     """A transcrição passou do tempo."""
 
 
-class TranscriberFormatError(ValueError):
+class TranscriberFormatError(UnreadableContentError):
     """O transcritor respondeu algo que não é transcrição, ou a gravação não
     tem fala que se possa transcrever."""
 
@@ -124,26 +139,52 @@ class WhisperCppTranscriber:
         return self.model
 
     def transcribe(self, wav: bytes) -> str:
-        """A gravação transcrita — sem trecho pulado.
+        """A gravação transcrita, um trecho por linha — sem trecho pulado.
 
-        Medido numa gravação do titular com um pouco de ruído: o whisper
-        transcreveu "Mensagem de teste" (0 a 1,7 s) e SALTOU para 29,98 s,
-        levando três vacas junto, em silêncio. É o salto de marca de tempo: o
-        modelo prevê o fim da janela antes da hora. Sem marcas de tempo ele
-        não tem para onde saltar — mas sem elas também erra mais dígito (na
-        mesma medição, "462" virou "4162").
+        Medido com as gravações do titular: o whisper transcreveu "Mensagem de
+        teste" (0 a 1,6 s) e SALTOU para 29,98 s, levando duas ou três vacas
+        junto, sem erro nenhum. É o salto de marca de tempo: o modelo prevê o
+        fim da janela antes da hora. Aconteceu com ruído leve somado e, sem
+        ruído nenhum, com a mesma gravação passada pelo gravador do navegador.
 
-        Então a primeira pergunta vem com marcas de tempo, que servem de
-        detector: buraco grande entre trechos quer dizer fala pulada, e aí a
-        gravação é perguntada de novo sem marcas. Brinco errado aparece na caixa
-        de Revisão (o animal não existe, e o nome dito sugere o certo); vaca
-        pulada não aparece em lugar nenhum.
+        As marcas de tempo servem de detector: buraco grande entre trechos
+        quer dizer fala pulada. E o remédio medido é ouvir de novo SÓ o
+        trecho pulado: sozinho, ele saiu perfeito. Perguntar a gravação
+        inteira de novo sem marcas foi o primeiro remédio, e não bastou — na
+        gravação do navegador ela pulou igual, e sem marcas o modelo ainda
+        erra mais dígito ("462" virou "4162"). Brinco errado aparece na caixa
+        de Revisão; vaca pulada não aparece em lugar nenhum.
         """
-        detalhada = self._ask(wav, {"response_format": "verbose_json"})
-        if not _skipped_speech(detalhada):
-            return _by_segment(detalhada)
-        logger.warning("transcrição pulou fala; perguntando de novo sem marcas de tempo")
-        return _text(self._ask(wav, {"response_format": "json", "no_timestamps": "true"}))
+        resposta = self._ask(wav, {"response_format": "verbose_json"})
+        trechos = _segments(resposta, offset=0.0)
+        if not trechos:
+            return _text(resposta)
+        buracos = _gaps(trechos, 0.0, _duration(resposta))
+        if buracos:
+            logger.warning(
+                "transcrição pulou %d trecho(s) de fala; ouvindo de novo só esses trechos",
+                len(buracos),
+            )
+            trechos = sorted(
+                trechos + self._recover(wav, buracos, depth=1), key=lambda trecho: trecho.start
+            )
+        return _lines(trechos)
+
+    def _recover(
+        self, wav: bytes, buracos: list[tuple[float, float]], *, depth: int
+    ) -> list[_Segment]:
+        """Cada trecho pulado, ouvido sozinho — a não ser que seja silêncio."""
+        recuperados: list[_Segment] = []
+        for de, ate in buracos:
+            fatia = _slice(wav, de, ate)
+            if fatia is None or _level_dbfs(fatia) < SILENCE_DBFS:
+                continue  # pausa de verdade: nada a recuperar
+            resposta = self._ask(fatia, {"response_format": "verbose_json"})
+            novos = [t for t in _segments(resposta, offset=de) if not is_phantom(t.text)]
+            recuperados += novos
+            if novos and depth < MAX_RECOVERY_DEPTH:
+                recuperados += self._recover(wav, _gaps(novos, de, ate), depth=depth + 1)
+        return recuperados
 
     def _ask(self, wav: bytes, extra: dict[str, str]) -> dict:
         corpo = self._post(
@@ -168,31 +209,99 @@ def _text(resposta: dict) -> str:
     return texto.strip()
 
 
-def _by_segment(resposta: dict) -> str:
-    """Um trecho por linha. Cada trecho é uma pausa natural da fala, e o
-    tradutor usa a quebra de linha como fronteira — é por ela que acha "Pequina
-    produziu" no começo de frase. O texto corrido às vezes perde o ponto entre
-    uma vaca e outra."""
-    trechos = [
-        str(s.get("text", "")).strip()
-        for s in resposta.get("segments") or []
-        if isinstance(s, dict)
-    ]
-    trechos = [t for t in trechos if t]
-    return "\n".join(trechos) if trechos else _text(resposta)
+@dataclass(frozen=True)
+class _Segment:
+    start: float
+    end: float
+    text: str
+    #: O trecho continua a palavra do anterior: o whisper partiu "litros" em
+    #: "...8 lit" e "ros no total". Trecho que começa palavra nova começa com
+    #: espaço; este, não.
+    glued: bool = False
 
 
-def _skipped_speech(resposta: dict) -> bool:
-    """Há buraco grande entre os trechos transcritos — ou no fim?"""
-    trechos = [s for s in resposta.get("segments") or [] if isinstance(s, dict)]
-    if not trechos:
-        return False  # nada transcrito: é silêncio, e quem decide é quem lê
+def _lines(trechos: list[_Segment]) -> str:
+    """Um trecho por linha — menos a palavra partida, que volta a ser uma."""
+    linhas: list[str] = []
+    for trecho in trechos:
+        if trecho.glued and linhas and linhas[-1][-1:].isalpha():
+            linhas[-1] += trecho.text
+        else:
+            linhas.append(trecho.text)
+    return "\n".join(linhas)
+
+
+def _segments(resposta: dict, *, offset: float) -> list[_Segment]:
+    """Os trechos, na hora da gravação inteira. Cada trecho é uma pausa
+    natural da fala, e vira uma linha: o tradutor usa a quebra de linha como
+    fronteira — é por ela que acha "Pequina produziu" no começo de frase. O
+    texto corrido às vezes perde o ponto entre uma vaca e outra."""
+    trechos: list[_Segment] = []
+    for bruto in resposta.get("segments") or []:
+        if not isinstance(bruto, dict):
+            continue
+        cru = str(bruto.get("text", ""))
+        texto = cru.strip()
+        try:
+            inicio, fim = float(bruto["start"]), float(bruto["end"])
+        except (KeyError, TypeError, ValueError):
+            inicio = fim = trechos[-1].end - offset if trechos else 0.0
+        if texto:
+            colado = bool(trechos) and not cru[:1].isspace() and cru[:1].isalpha()
+            trechos.append(_Segment(offset + inicio, offset + fim, texto, glued=colado))
+    return trechos
+
+
+def _duration(resposta: dict) -> float:
     try:
-        fins = [0.0] + [float(s["end"]) for s in trechos]
-        buracos = [float(s["start"]) - fim for s, fim in zip(trechos, fins)]
-        duracao = float(resposta.get("duration") or 0.0)
-    except (KeyError, TypeError, ValueError):
-        return False
-    if duracao:
-        buracos.append(duracao - fins[-1])
-    return max(buracos) > SKIP_GAP_SECONDS
+        return float(resposta.get("duration") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _gaps(trechos: list[_Segment], inicio: float, fim: float) -> list[tuple[float, float]]:
+    """Os buracos grandes: antes do primeiro trecho, entre trechos e depois do
+    último (quando se sabe onde a gravação acaba)."""
+    buracos: list[tuple[float, float]] = []
+    anterior = inicio
+    for trecho in sorted(trechos, key=lambda t: t.start):
+        if trecho.start - anterior > SKIP_GAP_SECONDS:
+            buracos.append((anterior, trecho.start))
+        anterior = max(anterior, trecho.end)
+    if fim and fim - anterior > SKIP_GAP_SECONDS:
+        buracos.append((anterior, fim))
+    return buracos
+
+
+def _slice(wav: bytes, de: float, ate: float) -> bytes | None:
+    """O pedaço da gravação entre `de` e `ate` segundos, em WAV."""
+    try:
+        with wave.open(io.BytesIO(wav)) as entrada:
+            taxa = entrada.getframerate()
+            parametros = entrada.getparams()
+            entrada.setpos(min(int(de * taxa), entrada.getnframes()))
+            quadros = entrada.readframes(max(0, int((ate - de) * taxa)))
+    except (wave.Error, EOFError, ValueError):
+        return None
+    if not quadros:
+        return None
+    saida = io.BytesIO()
+    with wave.open(saida, "wb") as arquivo:
+        arquivo.setparams(parametros)
+        arquivo.writeframes(quadros)
+    return saida.getvalue()
+
+
+def _level_dbfs(wav: bytes) -> float:
+    """O volume médio do trecho, em dBFS (0 é o máximo)."""
+    with wave.open(io.BytesIO(wav)) as arquivo:
+        if arquivo.getsampwidth() != 2:
+            return 0.0  # formato inesperado: melhor ouvir do que descartar
+        amostras = array.array("h")
+        amostras.frombytes(arquivo.readframes(arquivo.getnframes()))
+    if sys.byteorder == "big":
+        amostras.byteswap()
+    if not amostras:
+        return -math.inf
+    rms = math.sqrt(sum(a * a for a in amostras) / len(amostras))
+    return 20 * math.log10(rms / 32768) if rms else -math.inf

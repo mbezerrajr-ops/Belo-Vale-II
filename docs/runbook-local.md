@@ -203,6 +203,20 @@ Para chamadas diretas à API (sem passar pelo proxy do nginx):
     uma vez (revisor ou administrador). "DEL", "ontem" e os alertas de data
     se recalculam; data escrita na própria linha e propostas já decididas não
     mudam. A data lida continua registrada, com quem corrigiu.
+  - **Enviar foto ou áudio:** "Enviar foto" abre a câmera; "Enviar áudio"
+    tem **Gravar agora** (grava no próprio app: Parar, ouvir, Enviar) e o
+    campo para escolher uma gravação feita em outro app. Depois do envio a
+    tela acompanha a leitura até o fim e diz o resultado: quantas propostas
+    saíram, nada entendido (grave ou fotografe de novo), ou leitor fora do
+    ar (o arquivo ficou guardado; "Ouvir de novo" / "Ler de novo").
+  - **Gravar no app precisa de conexão segura** (https, ou a própria
+    máquina em `localhost`): sem ela o navegador nem oferece o microfone, e
+    fica só o campo de arquivo. No celular pela rede da fazenda (`http://`
+    e o IP), é o campo de arquivo até o deploy com HTTPS. A gravação para
+    sozinha em 5 minutos e mantém a tela acesa enquanto grava.
+  - **Tentar de novo uma leitura que falhou:** qualquer conta. Ler de novo
+    um arquivo que já foi lido com sucesso é de revisor ou administrador —
+    criaria outra cópia de cada proposta.
 - **Imprimir**: em Produção, "Imprimir folha em branco" gera a folha do lote
   para preencher no curral; em Animais, "Imprimir lista" imprime todos os
   animais do filtro.
@@ -396,6 +410,29 @@ subir com o transcritor falso, e recusa `whisper` sem `AUDIO_URL`.
 **Memória de vídeo:** o whisper ocupa ~0,6 GB e o modelo de visão ~6 GB.
 Medido com os dois carregados: 7,08 GB dos 8 GB da RX 7600, e os dois
 continuam 100% na GPU.
+
+**Dar nota ao ouvido.** Para cada gravação com um `<nome>.gabarito.json` ao
+lado, o avaliador converte, transcreve com o whisper, traduz e compara vaca a
+vaca pelo brinco: vacas certas, faltando, **erradas** (as que chegariam à
+Revisão com número trocado), ordens de secar, trocas de lote e observações a
+mais. Roda no contêiner do worker, que tem o ffmpeg:
+
+```bash
+docker compose --env-file infra/.env.local -f infra/docker-compose.yml run --rm \
+  -v "$PWD/docs/Treinamento_audios:/gravacoes" worker \
+  uv run --no-sync python -m app.core.evaluate_transcriber --samples /gravacoes
+```
+
+- `--reuse`: reaproveita a transcrição salva (`<nome>.transcricao.json`) —
+  mexer no tradutor não precisa de GPU.
+- `--ruido 0.03,0.08,0.15,0.30`: ouve cada gravação também com ruído grave
+  somado, e mede a relação voz/ruído. É sintético: não substitui o curral.
+- O gabarito: `{"linhas": [{"brinco": "633", "nome": "GIGANTE", "manha":
+  "2", "tarde": "2", "total": "4", "secar": true, "lote": "1", "nota":
+  "7 meses"}]}` — `secar`, `lote` e `nota` só quando foram ditos; `nota` é um
+  pedaço do texto que a observação daquela vaca precisa ter.
+
+As gravações e os gabaritos ficam fora do Git (`docs/Treinamento_audios/`).
 
 ## 7. Rodar os testes de backend
 
