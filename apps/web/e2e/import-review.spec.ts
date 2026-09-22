@@ -106,7 +106,9 @@ test.describe("foto da folha até a medição oficial", () => {
     }).toPass({ timeout: 45_000, intervals: [1_000, 2_000, 3_000] });
   });
 
-  test("gravação pela Revisão vira proposta de áudio", async ({ page }) => {
+  test("gravação pela Revisão vira proposta de áudio, e a caixa se atualiza sozinha", async ({
+    page,
+  }) => {
     await loginAsAdmin(page);
     await openArea(page, /Revisão/);
 
@@ -115,14 +117,13 @@ test.describe("foto da folha até a medição oficial", () => {
     await page.getByRole("button", { name: "Enviar", exact: true }).click();
     await expect(page.getByText(/ouvindo a grava[çc][ãa]o/i)).toBeVisible();
 
-    // O worker ouve em segundo plano: a caixa é relida até o arquivo de áudio
-    // aparecer. A frase do transcritor falso é "A 497 deu 18 litros de manhã
-    // e 15 à tarde", e o tradutor de verdade a transforma na produção de 33 L.
-    const fonte = page.getByText(/^[ÁA]udio de /).first();
-    const refresh = page.getByRole("button", { name: "Atualizar", exact: true });
-    await expect(async () => {
-      await refresh.click();
-      await expect(fonte).toBeVisible({ timeout: 2_000 });
-    }).toPass({ timeout: 45_000, intervals: [500, 1000, 2000] });
+    // Sem apertar "Atualizar": a tela pergunta ao servidor como está a
+    // leitura e, quando termina, diz quantas propostas saíram e relê a caixa.
+    // A frase do transcritor falso ("A 497 deu 18 litros de manhã e 15 à
+    // tarde") vira, pelo tradutor de verdade, uma produção de 33 L.
+    await expect(page.getByText(/pronto: 1 proposta da grava[çc][ãa]o/i)).toBeVisible({
+      timeout: 45_000,
+    });
+    await expect(page.getByText(/^[ÁA]udio de /).first()).toBeVisible();
   });
 });

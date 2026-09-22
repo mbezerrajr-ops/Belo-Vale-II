@@ -39,6 +39,23 @@ export interface UploadResult {
   status: string;
 }
 
+/**
+ * Por que a leitura falhou, para quem enviou saber o que fazer:
+ * `reader_unavailable` — o leitor está fora do ar; o arquivo está bom, tente
+ * de novo depois. `unreadable` — o arquivo não tem o que ler; mande outro.
+ */
+export type ReadingFailure = "reader_unavailable" | "unreadable" | "sender_unknown" | "internal";
+
+/** Como está a leitura de um arquivo enviado. */
+export interface ImportReading {
+  id: string;
+  kind: "photo" | "audio";
+  status: "pending" | "processing" | "extracted" | "failed";
+  /** Quantas propostas saíram — só quando a leitura terminou bem. */
+  proposals: number | null;
+  failure: ReadingFailure | null;
+}
+
 export type DecisionAction = "approve" | "reject";
 
 export interface DecisionRequest {

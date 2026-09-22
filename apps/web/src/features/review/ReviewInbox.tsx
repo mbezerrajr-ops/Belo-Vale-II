@@ -16,10 +16,12 @@ import {
   type ApproveProposalInput,
   type EventType,
   type ExitReason,
+  type ImportReading,
   type Proposal,
   type ProposalStatus,
   type UploadResult,
 } from "../../api/types";
+import type { RecorderApi } from "./AudioRecorder";
 import { SendAudio } from "./SendAudio";
 import { SendPhoto } from "./SendPhoto";
 import { SourceMedia } from "./SourceMedia";
@@ -67,6 +69,10 @@ interface Props {
   onRedate?: RedateFn;
   onUpload?: UploadFn;
   onReprocess?: ReprocessFn;
+  /** Pergunta como está a leitura do que foi enviado; dublê nos testes. */
+  onWatch?: (importId: string, token: string) => Promise<ImportReading>;
+  /** Gravador do navegador; dublê nos testes. */
+  recorder?: RecorderApi | null;
   /** Busca o arquivo da leitura com o login; dublê nos testes. */
   onFetchMedia?: (url: string, token: string) => Promise<Blob>;
   /** Chamado depois de cada decisão, para atualizar contadores. */
@@ -615,6 +621,8 @@ export function ReviewInbox({
   onRedate = redateSource,
   onUpload,
   onReprocess,
+  onWatch,
+  recorder,
   onFetchMedia,
   farmId,
   onChanged,
@@ -683,9 +691,10 @@ export function ReviewInbox({
         ))}
       </div>
 
-      {/* A leitura da foto termina em segundo plano: sem isto, quem enviou fica
-          olhando uma tela parada, porque clicar na aba já escolhida não
-          recarrega nada. */}
+      {/* A leitura termina em segundo plano. Quem enviou vê a caixa se
+          atualizar sozinha quando a SUA leitura termina; o que outra pessoa
+          enviou aparece aqui — clicar na aba já escolhida não recarrega
+          nada. */}
       <button type="button" className="link-btn refresh-inbox" onClick={() => void reload(tab)}>
         Atualizar
       </button>
@@ -697,6 +706,7 @@ export function ReviewInbox({
             farmId={farmId}
             onUpload={onUpload}
             onReprocess={onReprocess}
+            onWatch={onWatch}
             onSent={() => void reload("pending")}
           />
           <SendAudio
@@ -704,6 +714,8 @@ export function ReviewInbox({
             farmId={farmId}
             onUpload={onUpload}
             onReprocess={onReprocess}
+            onWatch={onWatch}
+            recorder={recorder}
             onSent={() => void reload("pending")}
           />
         </div>
