@@ -958,3 +958,70 @@ no curral, com a ordenhadeira ligada — que ainda não existem.
 - O Chromium grava MP4 fragmentado; o Firefox, Ogg; Chrome mais antigo, WebM.
   Os três entram, conferidos com arquivos reais, e WebM ou Ogg com vídeo são
   recusados como o MP4 com vídeo.
+
+## Juntar fichas, reforços e análise visual (22/09/2026)
+
+### Juntar duas fichas do mesmo animal
+
+A pendência "ainda falta um jeito de juntar duas fichas" (ver a conferência
+de 25/08, acima) foi resolvida com as regras de sempre:
+
+- **A ficha que fica é a que tem o brinco.** Duas fichas com brinco são dois
+  animais: tirar um brinco errado é um ato com evidência, feito antes.
+- **Nada se apaga.** Cada produção ativa da ficha duplicada é relançada na
+  que fica, como lançamento manual de quem juntou, apontando para a original
+  (que passa a `superseded`). A duplicada fica arquivada (`merged_into_id`,
+  migração 0015) — fora do rebanho, das buscas, das sugestões e do painel,
+  sem aceitar edição, produção ou aprovação — e o banco garante que ela nunca
+  tem brinco, para nenhum arquivo novo a alcançar.
+- **Nada se decide em silêncio.** Produção das duas no mesmo dia bloqueia; a
+  duplicada com produção depois da baixa da que fica, também.
+- Campo vazio na que fica é preenchido pela duplicada; lote que a que fica
+  não tem, ela passa a ter a partir de hoje; proposta pendente passa a
+  apontar para a que ficou.
+
+**Limite:** a junção não se desfaz pela tela. As medições movidas e a
+auditoria dizem exatamente o que aconteceu, e desfazer é anular as
+relançadas e relançar na outra — como era antes de existir a junção.
+
+### Reforços
+
+- **O envio vai para a fazenda do servidor.** `POST /api/imports` confiava no
+  `farm_id` mandado pelo navegador; agora usa a fazenda resolvida no
+  servidor e recusa outra (404 `farm_not_found`).
+- **A Revisão avisa quem revisa** do que chegou com a caixa aberta, a cada
+  30 s com a tela visível.
+- **Gravação escolhida acima de 5 minutos** é avisada na hora de escolher.
+- **npm audit zerado** (ver a seção do esbuild, acima): Vite 8, Vitest 5,
+  Node 22.
+
+### A análise visual
+
+Todas as telas foram fotografadas no celular (390 px) e no computador
+(1366 px), em tema claro e escuro, com a baseline real. Achados e
+correções, além dos já listados nos commits:
+
+- **Defeito funcional achado pela análise:** o campo do preço do leite
+  aparecia vazio com o preço definido — `GET /api/farms/current` não o
+  mandava.
+- **Contraste no escuro:** texto branco sobre o verde claro dos botões dava
+  ~2:1. Agora há tokens de texto sobre cor cheia por tema.
+- **A página do Painel rolava para o lado no celular** por causa dos balões
+  de dica escondidos, que ainda ocupavam lugar.
+- **O gráfico de produção saía verde sólido** por um choque de nomes de
+  classe (`area`) com o contêiner de cada tela.
+- **Escalas honestas:** maiores e menores produções na mesma escala (8,5 L
+  aparecia quase cheio), e o comparativo por lote com os valores ao lado das
+  linhas de grade.
+- **Barra do celular:** quatro áreas e "Mais", em vez de oito destinos
+  espremidos com o último rótulo cortado.
+
+### Limpeza do legado — aguardando decisão do titular
+
+Sem referência em código, teste, CI ou documentação por nome, em
+`belo-vale-ii-projeto-completo/plataforma/`: `dashboard_template.html`,
+`v1_full.html`, `v1_publicado.html` e `v1_template.html` (~730 KB). Mas o
+README os cita em grupo ("`v1_*.html`... mantida como histórico/referência")
+— uma decisão registrada de guardá-los. Não foram apagados. Apagar é
+reversível pelo Git (o histórico guarda tudo), e tira do HEAD cópias antigas
+dos dados reais do rebanho embutidas nesses HTMLs; a decisão é do titular.
