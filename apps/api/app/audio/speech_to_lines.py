@@ -77,7 +77,7 @@ _FILLER = _VERBS | {
 _DISCOURSE = {
     "assim", "como", "onde", "bom", "bem", "certo", "obrigado", "obrigada", "viu", "ne",
     "isso", "fim", "bora", "la", "meu", "minha", "amigo", "gente", "teste", "mensagem",
-    "audio", "lembro", "lembrar", "falei", "falar", "eu", "se", "nao", "sim", "dividido",
+    "audio", "lembro", "lembrar", "falei", "falar", "eu", "se", "nao", "sim", "dividido", "dividida",
     "voce", "sabe", "quanto", "sei", "acho", "tipo", "olha", "ok", "pronto", "beleza",
     "entendeu", "deve", "ser", "ideal", "precisa", "tem", "depois", "posteriormente",
     "disso", "logo", "aqui", "ao", "numero",
@@ -293,6 +293,23 @@ def _cows(tokens: list[_Token], numeros: list[_Number]) -> list[_Cow]:
             inicio_de_frase = False
             continue
 
+        # O nome dito depois do brinco, do outro lado de uma pausa: "vaca
+        # 417" / "Pandora" / "produziu 5 litros". Só uma linha curta — o nome
+        # e mais nada, ou o nome e o verbo: "mancando da perna" continua
+        # depois da palavra, e é observação.
+        if (
+            inicio_de_frase
+            and atual is not None
+            and atual.brinco is not None
+            and atual.nome is None
+            and _is_name_word(token)
+            and not _has_liters(numeros, atual.start, i, tokens)
+            and _only_a_name(tokens, por_inicio, i)
+        ):
+            i = _read_name(tokens, i, atual)
+            inicio_de_frase = False
+            continue
+
         # Âncora 3: nome no começo da frase seguido de "produziu".
         if (
             inicio_de_frase
@@ -301,9 +318,13 @@ def _cows(tokens: list[_Token], numeros: list[_Number]) -> list[_Cow]:
             and _verb_follows(tokens, i)
             and (atual is None or _has_liters(numeros, atual.start, i, tokens))
         ):
-            atual = _open(vacas, tokens, i)
+            # "Pequina" / "Pequina produziu": o mesmo nome dito logo antes, do
+            # outro lado de uma pausa, é o começo desta vaca — e não sobra
+            # da anterior.
+            inicio = _repeated_name_before(tokens, i, atual)
+            atual = _open(vacas, tokens, inicio)
             atual.nome = token.text.upper()
-            atual.used.add(i)
+            atual.used.update({inicio, i})
             # "Pequina, pequina produziu": o nome repetido é o mesmo nome.
             if i + 1 < len(tokens) and tokens[i + 1].folded == token.folded:
                 atual.used.add(i + 1)
@@ -356,6 +377,35 @@ def _read_name(tokens: list[_Token], j: int, vaca: _Cow) -> int:
         vaca.used.update(partes)
         return partes[-1] + 1
     return j
+
+
+def _only_a_name(tokens: list[_Token], por_inicio: dict[int, _Number], i: int) -> bool:
+    """Em `i` há um nome (de uma ou duas palavras) seguido de pausa, verbo ou
+    número — e não o começo de uma frase qualquer."""
+    fim = _read_name(tokens, i, _Cow(start=i))
+    if fim >= len(tokens):
+        return True
+    depois = tokens[fim]
+    # "da" fica de fora: sem acento, "dá" (o verbo) e "da" (a preposição) são
+    # a mesma palavra, e "mancando da perna" não é nome.
+    return depois.kind == "stop" or depois.folded in _VERBS - {"da"} or fim in por_inicio
+
+
+def _repeated_name_before(tokens: list[_Token], i: int, anterior: _Cow | None) -> int:
+    """Onde começa a vaca do nome em `i`: no mesmo nome dito antes da pausa,
+    se houver, ou no próprio `i`."""
+    j = i - 1
+    while j >= 0 and tokens[j].kind == "stop":
+        j -= 1
+    if (
+        j < i - 1
+        and j >= 0
+        and tokens[j].kind == "word"
+        and tokens[j].folded == tokens[i].folded
+        and (anterior is None or j not in anterior.used)
+    ):
+        return j
+    return i
 
 
 def _names_another_cow(tokens: list[_Token], j: int, vaca: _Cow) -> bool:
