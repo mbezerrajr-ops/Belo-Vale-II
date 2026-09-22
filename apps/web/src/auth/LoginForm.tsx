@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 
 import { login } from "../api/client";
 import { ApiError, type LoginResult } from "../api/types";
+import { Icons } from "../ui/Brand";
 
 interface LoginFormProps {
   /** Pode ser assíncrono (abrir a conta depois do login): a falha dele
@@ -58,10 +59,16 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [state, setState] = useState<LoginState>("idle");
   const [message, setMessage] = useState(GENERIC_ERROR);
+  // Só a resposta sobre a credencial marca os campos: sem sinal, a senha
+  // pode estar certa.
+  const [badCredentials, setBadCredentials] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     setState("submitting");
+    setShowPassword(false);
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -71,12 +78,17 @@ export function LoginForm({
       // solto com o botão travado em "Entrando…".
       await onLoggedIn(result);
     } catch (error) {
-      setMessage(loginError(error));
+      const text = loginError(error);
+      setMessage(text);
+      setBadCredentials(text === GENERIC_ERROR);
       setState("error");
     } finally {
       window.clearTimeout(timer);
     }
   };
+
+  const failed = state === "error";
+  const invalid = failed && badCredentials ? true : undefined;
 
   return (
     <form onSubmit={handleSubmit} aria-label="Entrar">
@@ -85,26 +97,72 @@ export function LoginForm({
       <label htmlFor="login-email">E-mail</label>
       <input
         id="login-email"
+        name="email"
         type="email"
         value={email}
         onChange={(event) => setEmail(event.target.value)}
         autoComplete="username"
         inputMode="email"
+        // Teclado do celular: sem maiúscula nem correção no e-mail, e a
+        // tecla de ação leva para a senha.
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        enterKeyHint="next"
+        aria-invalid={invalid}
+        aria-describedby={failed ? "login-error" : undefined}
         required
       />
       <label htmlFor="login-password">Senha</label>
-      <input
-        id="login-password"
-        type="password"
-        value={password}
-        onChange={(event) => setPassword(event.target.value)}
-        autoComplete="current-password"
-        required
-      />
+      <div className="password-field">
+        <input
+          id="login-password"
+          name="password"
+          type={showPassword ? "text" : "password"}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          onKeyUp={(event) => setCapsLock(event.getModifierState("CapsLock"))}
+          onBlur={() => setCapsLock(false)}
+          autoComplete="current-password"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="go"
+          aria-invalid={invalid}
+          aria-describedby={
+            [failed ? "login-error" : "", capsLock ? "login-caps" : ""].filter(Boolean).join(" ") ||
+            undefined
+          }
+          required
+        />
+        {/* No sol, sem ver o que se digita, errar a senha é o mais comum. */}
+        <button
+          type="button"
+          className="password-toggle"
+          aria-pressed={showPassword}
+          aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
+          onClick={() => setShowPassword((shown) => !shown)}
+        >
+          {showPassword ? <Icons.olhoFechado /> : <Icons.olho />}
+        </button>
+      </div>
+      {capsLock && (
+        <p className="caps-hint" id="login-caps">
+          Caps Lock ligado — a senha diferencia maiúsculas.
+        </p>
+      )}
+      {/* Antes do botão: embaixo dele, com o teclado aberto, sumia. */}
+      {failed && (
+        <p role="alert" id="login-error">
+          {message}
+        </p>
+      )}
       <button type="submit" disabled={state === "submitting"}>
         {state === "submitting" ? "Entrando…" : "Entrar"}
       </button>
-      {state === "error" ? <p role="alert">{message}</p> : null}
+      <p className="login-help">
+        Esqueceu a senha? Peça ao administrador uma senha provisória — ele gera em Contas.
+      </p>
     </form>
   );
 }

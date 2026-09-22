@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -144,6 +144,105 @@ describe("LoginForm — o que dizer quando não entra", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/sem conexão/i);
     expect(screen.getByRole("button", { name: "Entrar" })).toBeEnabled();
+  });
+});
+
+describe("LoginForm — digitar no celular", () => {
+  const originalFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("mostra e esconde a senha, sem perder o que foi digitado", async () => {
+    // No sol, sem ver o que se digita, errar a senha é o mais comum.
+    const user = userEvent.setup();
+    render(<LoginForm onLoggedIn={vi.fn()} />);
+    const senha = screen.getByLabelText("Senha");
+    await user.type(senha, "capim gordura");
+
+    const mostrar = screen.getByRole("button", { name: "Mostrar senha" });
+    expect(mostrar).toHaveAttribute("aria-pressed", "false");
+    await user.click(mostrar);
+
+    expect(senha).toHaveAttribute("type", "text");
+    expect(senha).toHaveValue("capim gordura");
+    expect(screen.getByRole("button", { name: "Esconder senha" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    // Mostrar não é enviar: o botão não submete o formulário.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("a senha volta a ficar escondida ao enviar", async () => {
+    // Para o gerenciador de senhas oferecer salvar, e para ninguém ao lado
+    // ler a senha na tela enquanto o app abre.
+    globalThis.fetch = vi.fn(() => new Promise(() => {})) as unknown as typeof fetch;
+    const user = userEvent.setup();
+    render(<LoginForm onLoggedIn={vi.fn()} />);
+    await user.type(screen.getByLabelText("E-mail"), "a@b.test");
+    await user.type(screen.getByLabelText("Senha"), "capim gordura");
+    await user.click(screen.getByRole("button", { name: "Mostrar senha" }));
+
+    await user.click(screen.getByRole("button", { name: "Entrar" }));
+
+    expect(screen.getByLabelText("Senha")).toHaveAttribute("type", "password");
+  });
+
+  it("teclado do celular: e-mail sem maiúscula automática, Próximo e Entrar", () => {
+    render(<LoginForm onLoggedIn={vi.fn()} />);
+    const email = screen.getByLabelText("E-mail");
+    expect(email).toHaveAttribute("autocapitalize", "none");
+    expect(email).toHaveAttribute("spellcheck", "false");
+    expect(email).toHaveAttribute("enterkeyhint", "next");
+    expect(screen.getByLabelText("Senha")).toHaveAttribute("enterkeyhint", "go");
+  });
+
+  it("avisa quando o Caps Lock está ligado", async () => {
+    render(<LoginForm onLoggedIn={vi.fn()} />);
+    const senha = screen.getByLabelText("Senha");
+
+    fireEvent.keyUp(senha, { key: "A", modifierCapsLock: true } as KeyboardEventInit);
+    expect(await screen.findByText(/caps lock ligado/i)).toBeInTheDocument();
+
+    fireEvent.keyUp(senha, { key: "a", modifierCapsLock: false } as KeyboardEventInit);
+    expect(screen.queryByText(/caps lock ligado/i)).not.toBeInTheDocument();
+  });
+
+  it("diz o que fazer quando a senha foi esquecida", () => {
+    render(<LoginForm onLoggedIn={vi.fn()} />);
+    expect(screen.getByText(/esqueceu a senha/i)).toHaveTextContent(/administrador/i);
+  });
+
+  it("o erro aparece antes do botão e marca os campos, para não sumir atrás do teclado", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ detail: "Invalid email or password" }),
+    }) as unknown as typeof fetch;
+    const user = userEvent.setup();
+    render(<LoginForm onLoggedIn={vi.fn()} />);
+    await user.type(screen.getByLabelText("E-mail"), "a@b.test");
+    await user.type(screen.getByLabelText("Senha"), "errada");
+    await user.click(screen.getByRole("button", { name: "Entrar" }));
+
+    const alert = await screen.findByRole("alert");
+    const entrar = screen.getByRole("button", { name: "Entrar" });
+    expect(alert.compareDocumentPosition(entrar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByLabelText("Senha")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("E-mail")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("sem conexão os campos não ficam marcados como errados", async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError("Failed to fetch")) as unknown as typeof fetch;
+    const user = userEvent.setup();
+    render(<LoginForm onLoggedIn={vi.fn()} />);
+    await user.type(screen.getByLabelText("E-mail"), "a@b.test");
+    await user.type(screen.getByLabelText("Senha"), "certa");
+    await user.click(screen.getByRole("button", { name: "Entrar" }));
+
+    await screen.findByRole("alert");
+    expect(screen.getByLabelText("Senha")).not.toHaveAttribute("aria-invalid", "true");
   });
 });
 

@@ -19,13 +19,18 @@ export function LogoMark({ size = 38 }: { size?: number }): JSX.Element {
           <stop offset="0" stopColor="#3f8a5f" />
           <stop offset="1" stopColor="#1f4d3c" />
         </linearGradient>
+        <clipPath id="bv-c">
+          <circle cx="32" cy="32" r="31" />
+        </clipPath>
       </defs>
       <circle cx="32" cy="32" r="31" fill="url(#bv-g)" />
-      {/* colinas */}
+      {/* colinas, recortadas no círculo: soltas, formavam um retângulo claro
+          abaixo da marca */}
       <path
-        d="M4 44c9-10 18-12 28-6s17 6 28 0v18H4z"
+        d="M0 44c10-10 19-12 32-6s19 6 32 0v26H0z"
         fill="#f4efe4"
         opacity="0.18"
+        clipPath="url(#bv-c)"
       />
       {/* cabeça de vaca estilizada */}
       <path
@@ -197,6 +202,17 @@ export const Icons = {
   juntar: (): JSX.Element => (
     <svg {...ICON_PROPS} width={18} height={18}>
       <path d="M6 4v4a4 4 0 0 0 4 4h4a4 4 0 0 1 4 4v4M18 4v4a4 4 0 0 1-4 4" />
+    </svg>
+  ),
+  olho: (): JSX.Element => (
+    <svg {...ICON_PROPS} width={20} height={20}>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ),
+  olhoFechado: (): JSX.Element => (
+    <svg {...ICON_PROPS} width={20} height={20}>
+      <path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2" />
     </svg>
   ),
   menu: (): JSX.Element => (

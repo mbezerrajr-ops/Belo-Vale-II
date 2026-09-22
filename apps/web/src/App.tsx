@@ -140,8 +140,19 @@ export function App(): JSX.Element {
 
   if (session.status === "checking") {
     return (
-      <main className="shell">
-        <div className="skeleton skeleton-card" aria-label="Carregando" />
+      // Enquanto confere a sessão: a marca, não um retângulo cinza — com rede
+      // lenta no celular, o cinza parecia travado.
+      <main className="splash" aria-busy="true">
+        <span className="sr-only" role="status">
+          Carregando
+        </span>
+        <LogoMark size={72} />
+        <strong>Belo Vale II</strong>
+        <span className="splash-dots" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
       </main>
     );
   }
@@ -199,13 +210,14 @@ export function App(): JSX.Element {
             </div>
           </div>
           <div className="login-brand">
-            <span className="wordmark">
+            {/* O nome da fazenda é o título da página (antes não havia h1). */}
+            <h1 className="wordmark">
               <LogoMark size={52} />
               <span>
                 <strong>Belo Vale II</strong>
                 <small>Gestão do rebanho leiteiro</small>
               </span>
-            </span>
+            </h1>
             <p>
               Produção, cadastro e custos da fazenda no seu bolso — do curral ao
               escritório.
