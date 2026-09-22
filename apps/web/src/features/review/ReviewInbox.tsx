@@ -832,7 +832,7 @@ export function ReviewInbox({
       {items !== null && items.length === 0 && (
         <p className="chart-empty">
           {tab === "pending"
-            ? "Nada esperando revisão. Quando as leituras de fotos e áudios estiverem ligadas, cada evento lido aparece aqui."
+            ? "Nada esperando revisão. Envie a foto da folha ou a gravação da ordenha: o que for lido aparece aqui para aprovar."
             : "Nenhuma proposta nesta situação."}
         </p>
       )}
