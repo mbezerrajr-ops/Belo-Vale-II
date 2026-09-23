@@ -27,6 +27,8 @@ function summary(overrides: Partial<DashboardSummary> = {}): DashboardSummary {
     total_animals: 401,
     animals_without_lot: 118,
     animals_with_reading: 45,
+    lot_animals: 100,
+    lot_animals_with_reading: 45,
     by_situation: { "Em lactação": 250, Seca: 151 },
     by_status: { Ativo: 401 },
     by_management_group: { BEZERREIRO: 28, ENGORDA: 14 },
@@ -238,20 +240,28 @@ describe("HerdDashboard", () => {
       <HerdDashboard
         token={TOKEN}
         onLoad={vi.fn().mockResolvedValue(
-          summary({ total_animals: 401, animals_with_reading: 45 }),
+          summary({ lot_animals: 57, lot_animals_with_reading: 45 }),
         )}
       />,
     );
 
-    expect(await screen.findByText(/subestimados/i)).toBeInTheDocument();
+    const aviso = await screen.findByText(/subestimados/i);
+    expect(aviso).toHaveTextContent(/45 de 57 animais dos lotes de ordenha/);
   });
 
-  it("não avisa quando todos os animais têm leitura", async () => {
+  it("não avisa quando todos os animais dos lotes têm leitura", async () => {
+    // Caso real: 197 secas fora de lote não têm custo de dieta. Contá-las
+    // faria o aviso aparecer em toda data, e ele deixaria de dizer algo.
     render(
       <HerdDashboard
         token={TOKEN}
         onLoad={vi.fn().mockResolvedValue(
-          summary({ total_animals: 45, animals_with_reading: 45 }),
+          summary({
+            total_animals: 401,
+            animals_with_reading: 45,
+            lot_animals: 45,
+            lot_animals_with_reading: 45,
+          }),
         )}
       />,
     );

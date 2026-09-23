@@ -310,6 +310,9 @@ export interface DashboardSummary {
   total_animals: number;
   animals_without_lot: number;
   animals_with_reading: number;
+  /** Animais em lote de ordenha, e quantos deles têm leitura na data. */
+  lot_animals: number;
+  lot_animals_with_reading: number;
   by_situation: Record<string, number>;
   by_status: Record<string, number>;
   by_management_group: Record<string, number>;

@@ -142,6 +142,21 @@ class TestHerdComposition:
 
         _run(scenario)
 
+    def test_reading_coverage_counts_only_animals_in_milking_lots(self) -> None:
+        # O aviso de cobertura compara o custo do lote com a receita das vacas
+        # lidas. Quem está fora de lote de ordenha não tem custo de dieta: com
+        # as secas do rebanho inteiro na conta, o aviso apareceria sempre.
+        async def scenario(factory) -> None:
+            async with factory() as session:
+                farm = await _scenario_farm(session, "Cobertura dos lotes")
+                panel = await build_dashboard(session, farm_id=farm.id)
+
+                assert panel.lot_animals == 3  # AURORA, BONITA e CIGANA
+                assert panel.lot_animals_with_reading == 2  # CIGANA está seca
+                assert panel.animals_with_reading == 3  # DALIA foi lida, sem lote
+
+        _run(scenario)
+
 
 class TestLotComparison:
     def test_feed_cost_is_diet_times_price(self) -> None:

@@ -109,10 +109,12 @@ export function HerdDashboard({
 
   const lotNames = mergeOptions(lotOptions, panel.lots.map((lot) => lot.lote));
   const situationNames = mergeOptions(situationOptions, Object.keys(panel.by_situation));
+  // Só os lotes de ordenha contam: é deles o custo de dieta. Seca fora de
+  // lote não tem custo, e contá-la faria o aviso aparecer em toda data.
   const partialCoverage =
     panel.measured_on !== null &&
-    panel.animals_with_reading > 0 &&
-    panel.animals_with_reading < panel.total_animals;
+    panel.lot_animals_with_reading > 0 &&
+    panel.lot_animals_with_reading < panel.lot_animals;
 
   const lotsWithData = panel.lots.filter((lot) => lot.animals > 0 || lot.feed_cost > 0);
   const lotsWithCost = lotsWithData.filter((lot) => lot.feed_cost > 0);
@@ -207,9 +209,10 @@ export function HerdDashboard({
         // O custo é o do lote inteiro e a receita só das vacas lidas: com
         // pouca leitura, o lucro sai baixo. Uma linha, sem esconder isso.
         <p className="warning coverage">
-          Leitura de {fmt.int(panel.animals_with_reading)} de {fmt.int(panel.total_animals)}{" "}
-          animais ({fmt.pct(panel.animals_with_reading / panel.total_animals)}) — receita e
-          lucro saem subestimados; compare datas com cobertura parecida.
+          Leitura de {fmt.int(panel.lot_animals_with_reading)} de {fmt.int(panel.lot_animals)}{" "}
+          animais dos lotes de ordenha (
+          {fmt.pct(panel.lot_animals_with_reading / panel.lot_animals)}) — receita e lucro saem
+          subestimados; compare datas com cobertura parecida.
         </p>
       )}
 
