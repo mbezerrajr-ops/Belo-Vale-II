@@ -3063,19 +3063,15 @@ form.milk-price .hint {
     background: #fff !important;
   }
 
-  body * {
-    visibility: hidden;
-  }
-
-  .print-area,
-  .print-area * {
-    visibility: visible;
+  /* Só a folha vai para o papel. O app sai do fluxo de vez: invisível, ele
+     ainda ocupava a altura da tela e virava páginas em branco no fim. */
+  body > :not(.print-area) {
+    display: none !important;
   }
 
   .print-area {
     display: block;
-    position: absolute;
-    inset: 0 auto auto 0;
+    position: static;
     width: 100%;
     color: #000;
     font-family: var(--font-body);

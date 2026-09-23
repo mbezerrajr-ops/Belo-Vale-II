@@ -30,6 +30,7 @@ import { brDate, liters, farmToday } from "../../ui/dates";
 const ImportPanel = lazy(() => import("./ImportPanel").then((m) => ({ default: m.ImportPanel })));
 import { Icons } from "../../ui/Brand";
 import { PrintHeader } from "../../ui/PrintHeader";
+import { PrintPortal } from "../../ui/PrintPortal";
 import { PageHeader } from "../../ui/PageHeader";
 import { isTransient, withTimeout, type QueuedReading } from "../../offline/outbox";
 import { useOutbox } from "../../offline/OutboxContext";
@@ -1066,7 +1067,9 @@ export function ProductionPage({
 
       {/* Só aparece no papel. */}
       {printing && sheet !== null && items.length > 0 && (
-        <PrintSheet items={items} rows={rows} lote={lote} day={day} />
+        <PrintPortal>
+          <PrintSheet items={items} rows={rows} lote={lote} day={day} />
+        </PrintPortal>
       )}
     </section>
   );
