@@ -188,6 +188,8 @@ class TestAfterExit:
         painel = api.get("/api/dashboard", headers=auth(reviewer)).json()
 
         assert painel["total_animals"] == 1
+        # Nem na cobertura dos lotes: a baixa encerra o lote de ordenha.
+        assert painel["lot_animals"] == 1
 
     def test_it_cannot_be_moved_to_a_lot(self, api, farm) -> None:
         reviewer, cow = self._gone(api, farm)

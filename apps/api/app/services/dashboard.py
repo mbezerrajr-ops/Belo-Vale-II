@@ -111,6 +111,10 @@ class DashboardSummary:
     total_animals: int
     animals_without_lot: int
     animals_with_reading: int
+    #: Animais em lote de ordenha, e quantos deles têm leitura na data. É a
+    #: cobertura que importa para o lucro: o custo de dieta é do lote inteiro.
+    lot_animals: int
+    lot_animals_with_reading: int
     by_situation: dict[str, int]
     by_status: dict[str, int]
     #: Quantos animais em cada área/categoria da fazenda (BEZERREIRO, ENGORDA…).
@@ -344,6 +348,8 @@ async def build_dashboard(
         total_animals=len(selected),
         animals_without_lot=without_lot,
         animals_with_reading=sum(1 for a in selected if a.id in readings),
+        lot_animals=sum(1 for a in selected if a.id in lots),
+        lot_animals_with_reading=sum(1 for a in selected if a.id in lots and a.id in readings),
         by_situation=by_situation,
         by_status=by_status,
         by_management_group=dict(sorted(by_group.items())),

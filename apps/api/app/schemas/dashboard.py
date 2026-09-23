@@ -61,6 +61,8 @@ class DashboardRead(BaseModel):
     total_animals: int
     animals_without_lot: int
     animals_with_reading: int
+    lot_animals: int
+    lot_animals_with_reading: int
     by_situation: dict[str, int]
     by_status: dict[str, int]
     by_management_group: dict[str, int]
