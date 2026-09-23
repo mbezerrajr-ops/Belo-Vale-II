@@ -84,7 +84,6 @@
 
   /* movimento */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
   --dur: 420ms;
   --dur-fast: 180ms;
 }
@@ -795,12 +794,15 @@ textarea {
   transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
 }
 
+/* A sombra é o anel de foco no dia a dia; o contorno transparente é o que
+   o modo de alto contraste do Windows pinta, porque ele apaga sombras. */
 input:focus,
 select:focus,
 textarea:focus {
   border-color: var(--brand);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 16%, transparent);
-  outline: none;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
 }
 
 textarea {
@@ -896,7 +898,7 @@ form h3 {
 .warning {
   background: var(--warn-soft);
   color: var(--ink);
-  border-left: 4px solid var(--warn);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
 }
 
 .warning::before,
@@ -2414,17 +2416,17 @@ form.milk-price .hint {
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   font-size: 0.88rem;
-  border-left: 4px solid var(--line-strong);
+  border: 1px solid var(--line);
   background: var(--surface-2);
 }
 
 .review-line li[data-severity="error"] {
-  border-left-color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
   background: var(--danger-soft);
 }
 
 .review-line li[data-severity="warning"] {
-  border-left-color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
   background: var(--warn-soft);
 }
 
@@ -2445,7 +2447,7 @@ form.milk-price .hint {
   border-radius: var(--radius-sm);
   background: var(--warn-soft);
   color: var(--ink);
-  border-left: 4px solid var(--warn);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
   font-weight: 400;
 }
 
@@ -2588,7 +2590,8 @@ form.milk-price .hint {
   height: 100%;
   border-radius: 999px;
   background: var(--series-1);
-  transition: width var(--dur) var(--ease-out);
+  /* O recorte anda sem recalcular o layout e sem achatar as pontas. */
+  transition: clip-path var(--dur) var(--ease-out);
 }
 
 .prod-list {
@@ -2839,7 +2842,6 @@ form.milk-price .hint {
   padding: 12px 14px;
   margin: 12px 0;
   border: 1px solid var(--line-strong);
-  border-left: 4px solid var(--muted);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
 }
@@ -3387,13 +3389,24 @@ form.milk-price .hint {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 4px 10px;
-  padding: 6px 10px;
-  border-left: 3px solid var(--line-strong);
+  padding: 6px 10px 6px 0;
   font-size: 0.88rem;
 }
 
-.price-history li:first-child {
-  border-left-color: var(--brand);
+.price-history li::before {
+  content: "";
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  transform: translateY(-1px);
+}
+
+/* O primeiro é o preço em vigor. */
+.price-history li:first-child::before {
+  border-color: var(--brand);
+  background: var(--brand);
 }
 
 .price-history small {
@@ -3551,8 +3564,8 @@ form.milk-price .hint {
   gap: 2px;
   margin: 0;
   padding: 8px 12px;
-  border-left: 3px solid var(--line-strong);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
   background: var(--surface-2);
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
   font-size: 0.9rem;
