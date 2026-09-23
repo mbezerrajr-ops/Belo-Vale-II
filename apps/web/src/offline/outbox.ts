@@ -1,4 +1,4 @@
-import { ApiError, type Reading, type UploadResult } from "../api/types";
+import { ApiError, type Reading, type ReadingInput, type UploadResult } from "../api/types";
 
 /**
  * O que foi lançado sem sinal fica guardado no celular até dar para enviar.
@@ -35,7 +35,11 @@ export interface QueuedReading extends Base {
   /** Nome ou brinco, para a lista dizer de que vaca é. */
   label: string;
   measuredOn: string;
+  /** Total do dia: a soma de manhã e tarde, quando lançadas separadas. */
   producao: number;
+  manha?: number | null;
+  tarde?: number | null;
+  observacao?: string | null;
 }
 
 export interface QueuedUpload extends Base {
@@ -112,7 +116,12 @@ export function indexedDbStore(): OutboxStore {
 }
 
 export interface Senders {
-  enterReading: (token: string, animalId: string, measuredOn: string, producao: number) => Promise<Reading>;
+  enterReading: (
+    token: string,
+    animalId: string,
+    measuredOn: string,
+    input: number | ReadingInput,
+  ) => Promise<Reading>;
   uploadImport: (
     input: { farmId: string; file: File; declaredLot?: string },
     token: string,
@@ -273,7 +282,7 @@ export class Outbox {
 
   private async sendOne(item: OutboxItem, token: string, send: Senders): Promise<void> {
     if (item.kind === "reading") {
-      const result = await send.enterReading(token, item.animalId, item.measuredOn, item.producao);
+      const result = await send.enterReading(token, item.animalId, item.measuredOn, queuedInput(item));
       await this.store.remove(item.id);
       this.emit({ type: "sent", item, result });
       this.emit({ type: "changed" });
@@ -295,6 +304,17 @@ export class Outbox {
     }
     this.emit({ type: "changed" });
   }
+}
+
+/** O que reenviar. Itens guardados antes das ordenhas separadas têm só o total. */
+function queuedInput(item: QueuedReading): number | ReadingInput {
+  const parts: ReadingInput = {};
+  if (item.manha != null) parts.manha = item.manha;
+  if (item.tarde != null) parts.tarde = item.tarde;
+  if (item.observacao) parts.observacao = item.observacao;
+  if (Object.keys(parts).length === 0) return item.producao;
+  if (parts.manha === undefined && parts.tarde === undefined) parts.producao = item.producao;
+  return parts;
 }
 
 function newId(): string {

@@ -46,6 +46,7 @@ interface Props {
 const STATUS_LABEL: Record<ImportRowStatus, string> = {
   new: "Nova",
   same: "Já lançada (igual)",
+  complete: "Completa o lançado",
   different: "Diferente do lançado",
   not_found: "Brinco não encontrado",
   no_brinco: "Sem brinco",
@@ -58,6 +59,7 @@ const STATUS_LABEL: Record<ImportRowStatus, string> = {
 const STATUS_TONE: Record<ImportRowStatus, "good" | "neutral" | "warn" | "bad"> = {
   new: "good",
   same: "neutral",
+  complete: "good",
   different: "warn",
   not_found: "bad",
   no_brinco: "bad",
@@ -213,6 +215,8 @@ export function ImportPanel({
               Importação concluída: {plural(done.summary.created, "leitura nova", "leituras novas")}
               {done.summary.replaced > 0 &&
                 `, ${plural(done.summary.replaced, "substituída", "substituídas")}`}
+              {(done.summary.completed ?? 0) > 0 &&
+                `, ${plural(done.summary.completed ?? 0, "completada", "completadas")}`}
               .
             </>
           )}
@@ -264,6 +268,13 @@ export function ImportPanel({
                     </td>
                     <td className="num">
                       {liters(item.producao)}
+                      {(item.manha != null || item.tarde != null) && (
+                        <small className="import-note">
+                          {item.manha != null ? liters(item.manha) : "—"} +{" "}
+                          {item.tarde != null ? liters(item.tarde) : "—"}
+                        </small>
+                      )}
+                      {item.observacao && <small className="import-note">{item.observacao}</small>}
                       {item.status === "different" && item.existing_producao !== null && (
                         <small className="import-note">lançado: {liters(item.existing_producao)}</small>
                       )}

@@ -4,8 +4,10 @@
  * Quem usa está de pé, com o celular numa mão e o caderno na outra. Os testes
  * cobrem o que não pode falhar ali:
  *
- * - digitar e seguir para a próxima vaca sem tocar em botão de salvar;
+ * - digitar manhã e tarde e seguir para a próxima vaca sem tocar em botão de
+ *   salvar; a vaca é salva quando se sai dela;
  * - vírgula decimal, como se escreve no caderno;
+ * - completar a tarde depois da manhã, ou a observação depois, é livre;
  * - sinal ruim não perde o valor digitado;
  * - um valor diferente do já lançado nunca sobrescreve: o operador é avisado,
  *   o revisor corrige com motivo.
@@ -112,34 +114,92 @@ describe("ProductionPage", () => {
     );
   });
 
-  it("salva ao sair do campo, aceitando vírgula decimal", async () => {
+  it("salva manhã e tarde ao sair da vaca, aceitando vírgula decimal", async () => {
     const { onEnter } = setup();
 
-    const field = await screen.findByLabelText("Litros de BORBOREMA");
-    fireEvent.change(field, { target: { value: "21,5" } });
-    fireEvent.blur(field);
+    const morning = await screen.findByLabelText("Manhã de BORBOREMA");
+    const afternoon = screen.getByLabelText("Tarde de BORBOREMA");
+    fireEvent.change(morning, { target: { value: "12,5" } });
+    // Passar da manhã para a tarde da mesma vaca não salva ainda.
+    fireEvent.blur(morning, { relatedTarget: afternoon });
+    expect(onEnter).not.toHaveBeenCalled();
+    fireEvent.change(afternoon, { target: { value: "9" } });
+    expect(screen.getByLabelText("Total de BORBOREMA")).toHaveTextContent("21,5 L");
+    fireEvent.blur(afternoon);
 
-    await waitFor(() => expect(onEnter).toHaveBeenCalledWith(TOKEN, "a-027", DAY, 21.5));
+    await waitFor(() =>
+      expect(onEnter).toHaveBeenCalledWith(TOKEN, "a-027", DAY, { manha: 12.5, tarde: 9 }),
+    );
     expect(await screen.findByText(/1 de 2 lançadas/i)).toBeInTheDocument();
   });
 
-  it("Enter salva e leva para a próxima vaca", async () => {
+  it("Enter passa da manhã para a tarde, e da tarde para a próxima vaca", async () => {
     setup();
 
-    const first = await screen.findByLabelText("Litros de BORBOREMA");
-    first.focus();
-    fireEvent.change(first, { target: { value: "18" } });
-    fireEvent.keyDown(first, { key: "Enter" });
+    const morning = await screen.findByLabelText("Manhã de BORBOREMA");
+    morning.focus();
+    fireEvent.change(morning, { target: { value: "18" } });
+    fireEvent.keyDown(morning, { key: "Enter" });
+    await waitFor(() => expect(screen.getByLabelText("Tarde de BORBOREMA")).toHaveFocus());
+
+    fireEvent.keyDown(screen.getByLabelText("Tarde de BORBOREMA"), { key: "Enter" });
+    await waitFor(() => expect(screen.getByLabelText("Manhã de ÁGATA")).toHaveFocus());
+  });
+
+  it("a tarde lançada depois completa a manhã, sem pedir correção", async () => {
+    const onEnter = vi.fn().mockResolvedValue(reading({ id: "m-2", producao: 33, manha: 18, tarde: 15 }));
+    setup(
+      { onEnter },
+      sheet({
+        items: [
+          {
+            animal_id: "a-027",
+            brinco: "027",
+            name: "BORBOREMA",
+            situacao: "Em lactação",
+            producao: 18,
+            manha: 18,
+            tarde: null,
+            measurement_id: "m-1",
+            provenance: "manual_entry",
+          },
+        ],
+      }),
+    );
+
+    const afternoon = await screen.findByLabelText("Tarde de BORBOREMA");
+    fireEvent.change(afternoon, { target: { value: "15" } });
+    fireEvent.blur(afternoon);
 
     await waitFor(() =>
-      expect(screen.getByLabelText("Litros de ÁGATA")).toHaveFocus(),
+      expect(onEnter).toHaveBeenCalledWith(TOKEN, "a-027", DAY, { manha: 18, tarde: 15 }),
+    );
+    expect(await screen.findByText("33 L")).toBeInTheDocument();
+  });
+
+  it("a observação vai junto dos litros", async () => {
+    const { onEnter } = setup();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Anotar observação de BORBOREMA" }));
+    const note = screen.getByLabelText("Observação de BORBOREMA");
+    fireEvent.change(screen.getByLabelText("Manhã de BORBOREMA"), { target: { value: "4" } });
+    fireEvent.change(screen.getByLabelText("Tarde de BORBOREMA"), { target: { value: "3" } });
+    fireEvent.change(note, { target: { value: "→ Seca" } });
+    fireEvent.blur(note);
+
+    await waitFor(() =>
+      expect(onEnter).toHaveBeenCalledWith(TOKEN, "a-027", DAY, {
+        manha: 4,
+        tarde: 3,
+        observacao: "→ Seca",
+      }),
     );
   });
 
   it("recusa valor fora do plausível sem chamar o servidor", async () => {
     const { onEnter } = setup();
 
-    const field = await screen.findByLabelText("Litros de BORBOREMA");
+    const field = await screen.findByLabelText("Manhã de BORBOREMA");
     fireEvent.change(field, { target: { value: "215" } });
     fireEvent.blur(field);
 
@@ -154,7 +214,7 @@ describe("ProductionPage", () => {
       .mockResolvedValue(reading());
     setup({ onEnter });
 
-    const field = await screen.findByLabelText("Litros de BORBOREMA");
+    const field = await screen.findByLabelText("Manhã de BORBOREMA");
     fireEvent.change(field, { target: { value: "21,5" } });
     fireEvent.blur(field);
 
@@ -171,24 +231,24 @@ describe("ProductionPage", () => {
       code: "conflict",
       detail: {
         message: "Esta vaca já tem produção lançada nesta data, com outro valor.",
-        existing: reading({ producao: 30, entered_by: "maria@belovale" }),
+        existing: reading({ producao: 30, manha: 18, tarde: 12, entered_by: "maria@belovale" }),
       },
     });
     setup({ onEnter: vi.fn().mockRejectedValue(conflict) });
 
-    const field = await screen.findByLabelText("Litros de BORBOREMA");
+    const field = await screen.findByLabelText("Manhã de BORBOREMA");
     fireEvent.change(field, { target: { value: "12" } });
     fireEvent.blur(field);
 
-    const row = (await screen.findByText(/já lançado: 30 L/i)).closest("li");
+    const row = (await screen.findByText(/já lançado: 18 \+ 12 = 30 L/i)).closest("li");
     expect(row).not.toBeNull();
     expect(within(row as HTMLElement).getByText(/maria@belovale/)).toBeInTheDocument();
     expect(within(row as HTMLElement).getByText(/revisor/i)).toBeInTheDocument();
-    expect(field).toHaveValue("30");
+    expect(field).toHaveValue("18");
   });
 
   it("revisor corrige um valor já lançado informando o motivo", async () => {
-    const onCorrect = vi.fn().mockResolvedValue(reading({ id: "m-2", producao: 12 }));
+    const onCorrect = vi.fn().mockResolvedValue(reading({ id: "m-2", producao: 21, manha: 12, tarde: 9 }));
     setup(
       { canCorrect: true, onCorrect },
       sheet({
@@ -199,6 +259,8 @@ describe("ProductionPage", () => {
             name: "BORBOREMA",
             situacao: "Em lactação",
             producao: 21.5,
+            manha: 12.5,
+            tarde: 9,
             measurement_id: "m-1",
             provenance: "manual_entry",
           },
@@ -206,8 +268,8 @@ describe("ProductionPage", () => {
       }),
     );
 
-    const field = await screen.findByLabelText("Litros de BORBOREMA");
-    expect(field).toHaveValue("21,5");
+    const field = await screen.findByLabelText("Manhã de BORBOREMA");
+    expect(field).toHaveValue("12,5");
     fireEvent.change(field, { target: { value: "12" } });
     fireEvent.blur(field);
 
@@ -217,7 +279,12 @@ describe("ProductionPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /salvar correção/i }));
 
     await waitFor(() =>
-      expect(onCorrect).toHaveBeenCalledWith(TOKEN, "m-1", 12, "anotado errado"),
+      expect(onCorrect).toHaveBeenCalledWith(
+        TOKEN,
+        "m-1",
+        { manha: 12, tarde: 9, observacao: null },
+        "anotado errado",
+      ),
     );
   });
 
@@ -232,6 +299,8 @@ describe("ProductionPage", () => {
             name: "BORBOREMA",
             situacao: "Em lactação",
             producao: 21.5,
+            manha: 12.5,
+            tarde: 9,
             measurement_id: "m-1",
             provenance: "manual_entry",
           },
@@ -239,13 +308,13 @@ describe("ProductionPage", () => {
       }),
     );
 
-    const field = await screen.findByLabelText("Litros de BORBOREMA");
+    const field = await screen.findByLabelText("Manhã de BORBOREMA");
     fireEvent.change(field, { target: { value: "12" } });
     fireEvent.blur(field);
 
     expect(await screen.findByText(/peça a um revisor/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/motivo da correção/i)).not.toBeInTheDocument();
-    expect(field).toHaveValue("21,5");
+    expect(field).toHaveValue("12,5");
   });
 
   it("revisor anula pela própria linha, com motivo", async () => {
@@ -260,6 +329,8 @@ describe("ProductionPage", () => {
             name: "BORBOREMA",
             situacao: "Em lactação",
             producao: 21.5,
+            manha: 12.5,
+            tarde: 9,
             measurement_id: "m-1",
             provenance: "manual_entry",
           },
@@ -287,6 +358,8 @@ describe("ProductionPage", () => {
             name: "BORBOREMA",
             situacao: "Em lactação",
             producao: 21.5,
+            manha: 12.5,
+            tarde: 9,
             measurement_id: "m-1",
             provenance: "manual_entry",
           },
@@ -294,7 +367,7 @@ describe("ProductionPage", () => {
       }),
     );
 
-    await screen.findByLabelText("Litros de BORBOREMA");
+    await screen.findByLabelText("Manhã de BORBOREMA");
     expect(screen.queryByRole("button", { name: /anular/i })).not.toBeInTheDocument();
   });
 
@@ -317,6 +390,8 @@ describe("ProductionPage", () => {
             name: "BORBOREMA",
             situacao: "Em lactação",
             producao: 21.5,
+            manha: 12.5,
+            tarde: 9,
             measurement_id: "m-1",
             provenance: "manual_entry",
           },

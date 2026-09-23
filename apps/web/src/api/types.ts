@@ -353,6 +353,11 @@ export interface Reading {
   animal_id: string;
   measured_on: string;
   producao: number | null;
+  /** As duas ordenhas, quando lançadas separadas. O total é a soma. */
+  manha?: number | null;
+  tarde?: number | null;
+  /** Anotação da pesagem ("→ Seca", "→ 3º Lote"). */
+  observacao?: string | null;
   provenance: string;
   entered_by: string | null;
   supersedes: string | null;
@@ -365,8 +370,21 @@ export interface SheetItem {
   name: string | null;
   situacao: string | null;
   producao: number | null;
+  manha?: number | null;
+  tarde?: number | null;
+  observacao?: string | null;
   measurement_id: string | null;
   provenance: string | null;
+  /** A pesagem anterior da vaca: referência na folha em branco. */
+  anterior?: { measured_on: string; producao: number | null } | null;
+}
+
+/** O que se lança numa vaca: o total, ou manhã e tarde, e a anotação. */
+export interface ReadingInput {
+  producao?: number;
+  manha?: number;
+  tarde?: number;
+  observacao?: string | null;
 }
 
 export interface ProductionSheet {
@@ -390,6 +408,7 @@ export type ImportMode = "new_only" | "replace";
 export type ImportRowStatus =
   | "new"
   | "same"
+  | "complete"
   | "different"
   | "not_found"
   | "no_brinco"
@@ -403,6 +422,9 @@ export interface ImportPreviewRow {
   brinco: string | null;
   nome_arquivo: string | null;
   producao: number;
+  manha?: number | null;
+  tarde?: number | null;
+  observacao?: string | null;
   status: ImportRowStatus;
   animal_id: string | null;
   animal_nome: string | null;
@@ -440,6 +462,8 @@ export interface ImportPreview {
 export interface ImportSummary {
   created: number;
   replaced: number;
+  /** Leituras que ganharam manhã, tarde ou observação, sem mudar o total. */
+  completed?: number;
   skipped_same: number;
   skipped_different: number;
   not_found: number;

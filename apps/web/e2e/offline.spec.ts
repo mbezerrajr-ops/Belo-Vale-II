@@ -29,12 +29,15 @@ test("lança sem sinal, recarrega sem sinal e o valor chega quando o sinal volta
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
   await openArea(page, "Produção");
   await page.getByRole("group", { name: "Lote de ordenha" }).getByRole("button", { name: "LOTE 3" }).click();
-  const field = page.getByLabel(`Litros de ${cow.name}`);
+  const field = page.getByLabel(`Manhã de ${cow.name}`);
   await expect(field).toBeVisible();
 
   await context.setOffline(true);
-  await field.fill("23,5");
-  await field.press("Tab");
+  await field.fill("12");
+  const afternoon = page.getByLabel(`Tarde de ${cow.name}`);
+  await afternoon.fill("11,5");
+  // Sair da vaca é o que salva.
+  await afternoon.press("Tab");
 
   await expect(page.getByText(/guardado neste celular/i).first()).toBeVisible();
   await expect(page.getByRole("button", { name: /1 guardado/ })).toBeVisible();
@@ -44,7 +47,8 @@ test("lança sem sinal, recarrega sem sinal e o valor chega quando o sinal volta
   await page.reload();
   await expect(page.getByRole("heading", { name: "Produção do dia" })).toBeVisible();
   await page.getByRole("group", { name: "Lote de ordenha" }).getByRole("button", { name: "LOTE 3" }).click();
-  await expect(page.getByLabel(`Litros de ${cow.name}`)).toHaveValue("23,5");
+  await expect(page.getByLabel(`Manhã de ${cow.name}`)).toHaveValue("12");
+  await expect(page.getByLabel(`Tarde de ${cow.name}`)).toHaveValue("11,5");
   await expect(page.getByText(/folha guardada/i)).toBeVisible();
 
   // Uma tela nunca aberta também abre sem sinal: as partes do app que são
@@ -61,6 +65,7 @@ test("lança sem sinal, recarrega sem sinal e o valor chega quando o sinal volta
   // E está no servidor: recarregar com sinal mostra o valor lançado.
   await page.reload();
   await page.getByRole("group", { name: "Lote de ordenha" }).getByRole("button", { name: "LOTE 3" }).click();
-  await expect(page.getByLabel(`Litros de ${cow.name}`)).toHaveValue("23,5");
+  await expect(page.getByLabel(`Manhã de ${cow.name}`)).toHaveValue("12");
+  await expect(page.getByLabel(`Tarde de ${cow.name}`)).toHaveValue("11,5");
   await expect(page.getByText(/folha guardada/i)).toHaveCount(0);
 });
