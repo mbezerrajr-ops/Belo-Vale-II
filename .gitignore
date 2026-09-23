@@ -22,3 +22,5 @@ docs/Treinamento_audios/
 docs/Treinamento-Audio/
 # Relatórios com dados reais do rebanho (fechamentos): ficam só nesta máquina.
 relatorios/
+# Folhas e planilhas de pesagem (dados reais do rebanho): ficam só nesta máquina.
+docs/pesagem_*/

@@ -62,7 +62,7 @@ function sheet(launched: boolean): ProductionSheet {
 }
 
 function printSheet(launched: boolean, button: RegExp): Promise<HTMLElement> {
-  const { container } = render(
+  render(
     <ProductionPage
       token={TOKEN}
       canCorrect={false}
@@ -71,10 +71,12 @@ function printSheet(launched: boolean, button: RegExp): Promise<HTMLElement> {
       onEnter={vi.fn()}
     />,
   );
+  // A folha fica direto no <body>, fora do app: é o que evita páginas em
+  // branco no fim da impressão.
   return screen.findByRole("button", { name: button }).then((found) => {
     fireEvent.click(found);
     expect(print).toHaveBeenCalled();
-    return container.querySelector(".print-area") as HTMLElement;
+    return document.body.querySelector(":scope > .print-area") as HTMLElement;
   });
 }
 
@@ -138,7 +140,7 @@ describe("Folha de coleta", () => {
   it("sem manhã e tarde lançadas, a folha preenchida mostra só o total", async () => {
     const onlyTotals = sheet(true);
     onlyTotals.items[0] = { ...onlyTotals.items[0], manha: null, tarde: null };
-    const { container } = render(
+    render(
       <ProductionPage
         token={TOKEN}
         canCorrect={false}
@@ -148,7 +150,7 @@ describe("Folha de coleta", () => {
       />,
     );
     fireEvent.click(await screen.findByRole("button", { name: /imprimir folha preenchida/i }));
-    const area = container.querySelector(".print-area") as HTMLElement;
+    const area = document.body.querySelector(":scope > .print-area") as HTMLElement;
 
     const header = Array.from(area.querySelectorAll("th"), (cell) => cell.textContent);
     expect(header).toEqual(["Brinco", "Nome", "Total", "Obs."]);
@@ -170,7 +172,7 @@ describe("Lista de animais impressa", () => {
       return page;
     });
 
-    const { container } = render(
+    render(
       <AnimalSearchPage token={TOKEN} canEdit={false} onOpen={vi.fn()} onSearch={search} />,
     );
 
@@ -178,7 +180,7 @@ describe("Lista de animais impressa", () => {
     fireEvent.click(await screen.findByRole("button", { name: /imprimir lista/i }));
 
     await waitFor(() => expect(print).toHaveBeenCalled());
-    const area = container.querySelector(".print-area") as HTMLElement;
+    const area = document.body.querySelector(":scope > .print-area") as HTMLElement;
     expect(area.querySelectorAll("tbody tr")).toHaveLength(230);
     expect(area).toHaveTextContent("230 animais");
     expect(search).toHaveBeenCalledWith(TOKEN, expect.objectContaining({ limit: 200, offset: 200 }));
