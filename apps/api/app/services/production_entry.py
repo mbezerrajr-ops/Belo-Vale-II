@@ -71,6 +71,14 @@ class ConflictingReading(ProductionEntryError):
         self.existing = existing
 
 
+class ImplausibleValue(ProductionEntryError):
+    """Litros fora do plausível ou ausentes."""
+
+
+class MilkingsDoNotAddUp(ImplausibleValue):
+    """Manhã + tarde diferente do total informado."""
+
+
 def producao_of(measurement: OfficialMeasurement) -> float | None:
     """A baseline e o lançamento gravam `producao`; o OCR grava `total`."""
     values = measurement.values or {}
@@ -83,6 +91,31 @@ def producao_of(measurement: OfficialMeasurement) -> float | None:
     return None
 
 
+#: As duas ordenhas do dia, guardadas no `values` da leitura ao lado do total.
+MILKINGS = ("manha", "tarde")
+
+
+def milkings_of(measurement: OfficialMeasurement) -> dict[str, float]:
+    """Manhã e tarde que a leitura tem. Leituras antigas têm só o total."""
+    values = measurement.values or {}
+    found = {}
+    for key in MILKINGS:
+        try:
+            if values.get(key) is not None:
+                found[key] = float(values[key])
+        except (TypeError, ValueError):
+            continue
+    return found
+
+
+def clean_note(observacao: str | None) -> str | None:
+    """Anotação sem espaços sobrando; vazia vira ``None``."""
+    if observacao is None:
+        return None
+    cleaned = " ".join(observacao.split())
+    return cleaned[:200] or None
+
+
 @dataclass(frozen=True)
 class EntryResult:
     measurement: OfficialMeasurement
@@ -93,10 +126,77 @@ def _check_plausible(producao: float) -> float:
     # A validação do schema já barra isto; repetir aqui mantém o serviço
     # seguro para quem o chamar sem passar pela API.
     if producao < 0 or producao > MAX_LITERS:
-        raise ProductionEntryError(
+        raise ImplausibleValue(
             f"Produção fora do plausível (0 a {MAX_LITERS:g} L). Confira o valor."
         )
     return round(float(producao), 2)
+
+
+def reading_values(
+    *, producao: float | None = None, manha: float | None = None, tarde: float | None = None
+) -> dict[str, float]:
+    """O `values` de uma leitura: o total e, quando houver, as ordenhas.
+
+    Com manhã ou tarde, o total é a soma delas; um total informado junto
+    precisa bater com ela (a planilha em que 15,5 + 14 dá "29" é recusada,
+    não arredondada).
+    """
+    milkings = {
+        key: _check_plausible(value)
+        for key, value in (("manha", manha), ("tarde", tarde))
+        if value is not None
+    }
+    if not milkings:
+        if producao is None:
+            raise ImplausibleValue("Informe os litros: manhã, tarde ou o total do dia.")
+        return {"producao": _check_plausible(producao)}
+    soma = round(sum(milkings.values()), 2)
+    if producao is not None and abs(float(producao) - soma) > 0.05:
+        raise MilkingsDoNotAddUp(
+            f"Manhã + tarde dá {soma:g} L, e o total informado é {float(producao):g} L. "
+            "Confira os valores."
+        )
+    return {"producao": _check_plausible(soma), **milkings}
+
+
+def _normalized(measurement: OfficialMeasurement) -> dict[str, float]:
+    return {"producao": producao_of(measurement), **milkings_of(measurement)}
+
+
+def merge_reading(
+    existing: OfficialMeasurement, values: dict[str, float], observacao: str | None
+) -> tuple[dict[str, float], str | None] | None:
+    """A leitura que resulta de acrescentar `values` e a anotação à existente.
+
+    Acrescentar é preencher o que falta: a tarde de quem só tinha a manhã, as
+    duas ordenhas de uma leitura antiga só com o total (se somarem o mesmo), a
+    anotação de quem não tinha. Mudar o que já está lançado não é acrescentar:
+    devolve ``None``, e quem chamou trata como conflito.
+    """
+    old_milkings = milkings_of(existing)
+    new_milkings = {key: values[key] for key in MILKINGS if key in values}
+    total = producao_of(existing)
+
+    if not new_milkings:
+        if values["producao"] != total:
+            return None
+        merged = _normalized(existing)
+    elif not old_milkings:
+        if len(new_milkings) < len(MILKINGS) or values["producao"] != total:
+            return None
+        merged = dict(values)
+    else:
+        combined = dict(old_milkings)
+        for key, value in new_milkings.items():
+            if key in combined and combined[key] != value:
+                return None
+            combined[key] = value
+        merged = {"producao": _check_plausible(sum(combined.values())), **combined}
+
+    note = existing.observacao
+    if observacao and note and observacao != note:
+        return None
+    return merged, note or observacao
 
 
 async def _load_animal(session: AsyncSession, *, farm_id: UUID, animal_id: UUID) -> Animal:
@@ -169,6 +269,8 @@ def _snapshot(measurement: OfficialMeasurement) -> dict:
         "animal_id": str(measurement.animal_id),
         "measured_on": measurement.measured_on.isoformat(),
         "producao": producao_of(measurement),
+        **milkings_of(measurement),
+        "observacao": measurement.observacao,
         "provenance": measurement.provenance,
     }
 
@@ -180,10 +282,19 @@ async def record_reading(
     user: User,
     animal_id: UUID,
     measured_on: date,
-    producao: float,
+    producao: float | None = None,
+    manha: float | None = None,
+    tarde: float | None = None,
+    observacao: str | None = None,
 ) -> EntryResult:
-    """Lança a produção de uma vaca num dia. Não faz commit."""
-    producao = _check_plausible(producao)
+    """Lança a produção de uma vaca num dia. Não faz commit.
+
+    Se a vaca já tem leitura na data, repetir é inofensivo e completar o que
+    falta (a tarde, a anotação) cria uma versão nova; mudar o que já está
+    lançado é conflito.
+    """
+    values = reading_values(producao=producao, manha=manha, tarde=tarde)
+    observacao = clean_note(observacao)
     if measured_on > farm_today():
         raise FutureDate("A data da coleta não pode ser no futuro.")
 
@@ -198,14 +309,28 @@ async def record_reading(
         session, animal_id=animal_id, measured_on=measured_on
     )
     if existing is not None:
-        if producao_of(existing) == producao:
+        merged = merge_reading(existing, values, observacao)
+        if merged is None:
+            raise ConflictingReading(existing)
+        merged_values, merged_note = merged
+        if merged_values == _normalized(existing) and merged_note == existing.observacao:
             return EntryResult(measurement=existing, created=False)
-        raise ConflictingReading(existing)
+        completed = await supersede(
+            session,
+            farm_id=farm_id,
+            user=user,
+            previous=existing,
+            values=merged_values,
+            observacao=merged_note,
+            action="measurement_completed",
+        )
+        return EntryResult(measurement=completed, created=True)
 
     measurement = OfficialMeasurement(
         animal_id=animal_id,
         measured_on=measured_on,
-        values={"producao": producao},
+        values=values,
+        observacao=observacao,
         status="active",
         provenance="manual_entry",
         entered_by_user_id=user.id,
@@ -227,6 +352,58 @@ async def record_reading(
     return EntryResult(measurement=measurement, created=True)
 
 
+async def supersede(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    user: User,
+    previous: OfficialMeasurement,
+    values: dict[str, float],
+    observacao: str | None,
+    action: str,
+    reason: str | None = None,
+    production_import_id: UUID | None = None,
+) -> OfficialMeasurement:
+    """Nova versão de uma leitura ativa; a anterior fica no histórico.
+
+    Com `production_import_id`, a versão nova aponta para o arquivo que a
+    completou; sem ele, é lançamento de quem está na tela.
+    """
+    previous.status = "superseded"
+    # O índice único parcial permite uma ativa por vaca e data: a antiga
+    # precisa deixar de ser ativa antes de a nova ser inserida.
+    await session.flush()
+
+    replacement = OfficialMeasurement(
+        animal_id=previous.animal_id,
+        measured_on=previous.measured_on,
+        values=values,
+        observacao=observacao,
+        status="active",
+        provenance="file_import" if production_import_id else "manual_entry",
+        production_import_id=production_import_id,
+        entered_by_user_id=None if production_import_id else user.id,
+        reviewed_by=user.email,
+        lote_observado=previous.lote_observado,
+        supersedes_measurement_id=previous.id,
+    )
+    session.add(replacement)
+    await session.flush()
+    new = _snapshot(replacement)
+    if reason is not None:
+        new["reason"] = reason
+    _audit(
+        session,
+        farm_id=farm_id,
+        actor=user.email,
+        action=action,
+        measurement_id=replacement.id,
+        previous=_snapshot(previous) | {"measurement_id": str(previous.id)},
+        new=new,
+    )
+    return replacement
+
+
 async def _load_active_for_change(
     session: AsyncSession, *, farm_id: UUID, measurement_id: UUID
 ) -> OfficialMeasurement:
@@ -245,51 +422,40 @@ async def _load_active_for_change(
     return measurement
 
 
+#: Na correção, "não mexer na anotação" é diferente de "apagar a anotação".
+KEEP_NOTE = object()
+
+
 async def correct_reading(
     session: AsyncSession,
     *,
     farm_id: UUID,
     user: User,
     measurement_id: UUID,
-    producao: float,
     reason: str,
+    producao: float | None = None,
+    manha: float | None = None,
+    tarde: float | None = None,
+    observacao: str | None | object = KEEP_NOTE,
 ) -> OfficialMeasurement:
     """Substitui o valor de uma leitura ativa. Não faz commit."""
-    producao = _check_plausible(producao)
+    values = reading_values(producao=producao, manha=manha, tarde=tarde)
     previous = await _load_active_for_change(
         session, farm_id=farm_id, measurement_id=measurement_id
     )
-    if producao_of(previous) == producao:
+    note = previous.observacao if observacao is KEEP_NOTE else clean_note(observacao)  # type: ignore[arg-type]
+    if values == _normalized(previous) and note == previous.observacao:
         raise NothingToCorrect("O valor informado é igual ao já lançado.")
-
-    previous.status = "superseded"
-    # O índice único parcial permite uma ativa por vaca e data: a antiga
-    # precisa deixar de ser ativa antes de a nova ser inserida.
-    await session.flush()
-
-    corrected = OfficialMeasurement(
-        animal_id=previous.animal_id,
-        measured_on=previous.measured_on,
-        values={"producao": producao},
-        status="active",
-        provenance="manual_entry",
-        entered_by_user_id=user.id,
-        reviewed_by=user.email,
-        lote_observado=previous.lote_observado,
-        supersedes_measurement_id=previous.id,
-    )
-    session.add(corrected)
-    await session.flush()
-    _audit(
+    return await supersede(
         session,
         farm_id=farm_id,
-        actor=user.email,
+        user=user,
+        previous=previous,
+        values=values,
+        observacao=note,
         action="measurement_corrected",
-        measurement_id=corrected.id,
-        previous=_snapshot(previous) | {"measurement_id": str(previous.id)},
-        new=_snapshot(corrected) | {"reason": reason},
+        reason=reason,
     )
-    return corrected
 
 
 async def void_reading(
@@ -324,6 +490,8 @@ class SheetRow:
     name: str | None
     situacao: str | None
     measurement: OfficialMeasurement | None
+    #: A pesagem mais recente antes do dia: referência na folha em branco.
+    previous: OfficialMeasurement | None = None
 
 
 async def milking_lots(session: AsyncSession, *, farm_id: UUID) -> list[str]:
@@ -369,6 +537,19 @@ async def build_sheet(
             )
         )
     }
+    previous = {
+        m.animal_id: m
+        for m in await session.scalars(
+            select(OfficialMeasurement)
+            .where(
+                OfficialMeasurement.animal_id.in_([a.id for a in animals]),
+                OfficialMeasurement.measured_on < measured_on,
+                OfficialMeasurement.status == "active",
+            )
+            .distinct(OfficialMeasurement.animal_id)
+            .order_by(OfficialMeasurement.animal_id, OfficialMeasurement.measured_on.desc())
+        )
+    }
     # Ordem do caderno: pelo brinco, e os sem brinco no fim, por nome.
     animals.sort(key=lambda a: (a.brinco is None, a.brinco or "", a.name or ""))
     return [
@@ -378,6 +559,7 @@ async def build_sheet(
             name=a.name,
             situacao=a.situacao,
             measurement=readings.get(a.id),
+            previous=previous.get(a.id),
         )
         for a in animals
     ]

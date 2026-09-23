@@ -20,6 +20,7 @@ from app.db.session import get_db_session
 from app.routers.registry import resolve_current_farm
 from app.schemas.production import (
     CorrectionIn,
+    PreviousReading,
     ReadingIn,
     ReadingOut,
     SheetItem,
@@ -30,9 +31,12 @@ from app.services import production_entry as entry
 from app.services.production_entry import (
     AnimalNotFound,
     ConflictingReading,
+    KEEP_NOTE,
     FutureDate,
+    ImplausibleValue,
     MeasurementNotFound,
     ProductionEntryError,
+    milkings_of,
     producao_of,
 )
 
@@ -45,6 +49,8 @@ def _out(measurement: OfficialMeasurement) -> ReadingOut:
         animal_id=measurement.animal_id,
         measured_on=measurement.measured_on,
         producao=producao_of(measurement),
+        **milkings_of(measurement),
+        observacao=measurement.observacao,
         provenance=measurement.provenance,
         entered_by=measurement.reviewed_by,
         supersedes=measurement.supersedes_measurement_id,
@@ -55,7 +61,7 @@ def _out(measurement: OfficialMeasurement) -> ReadingOut:
 def _http_error(error: ProductionEntryError) -> HTTPException:
     if isinstance(error, (AnimalNotFound, MeasurementNotFound)):
         return HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error))
-    if isinstance(error, FutureDate):
+    if isinstance(error, (FutureDate, ImplausibleValue)):
         return HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error))
     if isinstance(error, ConflictingReading):
         # O valor existente vai junto: a tela mostra o que já está lançado em
@@ -98,8 +104,18 @@ async def production_sheet(
                 name=row.name,
                 situacao=row.situacao,
                 producao=producao_of(row.measurement) if row.measurement else None,
+                **(milkings_of(row.measurement) if row.measurement else {}),
+                observacao=row.measurement.observacao if row.measurement else None,
                 measurement_id=row.measurement.id if row.measurement else None,
                 provenance=row.measurement.provenance if row.measurement else None,
+                anterior=(
+                    PreviousReading(
+                        measured_on=row.previous.measured_on,
+                        producao=producao_of(row.previous),
+                    )
+                    if row.previous
+                    else None
+                ),
             )
             for row in rows
         ],
@@ -123,6 +139,9 @@ async def enter_reading(
                 animal_id=payload.animal_id,
                 measured_on=payload.measured_on,
                 producao=payload.producao,
+                manha=payload.manha,
+                tarde=payload.tarde,
+                observacao=payload.observacao,
             )
             await session.commit()
             break
@@ -163,6 +182,12 @@ async def correct_reading(
             user=user,
             measurement_id=measurement_id,
             producao=payload.producao,
+            manha=payload.manha,
+            tarde=payload.tarde,
+            # Sem `observacao` no pedido, a anotação fica como está.
+            observacao=(
+                payload.observacao if "observacao" in payload.model_fields_set else KEEP_NOTE
+            ),
             reason=payload.reason,
         )
     except ProductionEntryError as error:

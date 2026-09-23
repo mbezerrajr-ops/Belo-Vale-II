@@ -443,6 +443,8 @@ class OfficialMeasurement(TimestampedModel, Base):
         String(32), default="ocr_review", server_default=text("'ocr_review'"), nullable=False
     )
     lote_observado: Mapped[str | None] = mapped_column(String(64))
+    #: Anotação da pesagem para esta vaca ("→ Seca", "→ 3º Lote").
+    observacao: Mapped[str | None] = mapped_column(String(200))
     reviewed_by: Mapped[str | None] = mapped_column(String(255))
     #: Quem lançou, quando a origem é `manual_entry`.
     entered_by_user_id: Mapped[UUID | None] = mapped_column(

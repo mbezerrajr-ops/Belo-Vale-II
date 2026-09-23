@@ -37,7 +37,14 @@ from app.db.models import (
     User,
 )
 from app.services.brinco import normalize_brinco
-from app.services.production_entry import MAX_LITERS, diet_lot_on, producao_of
+from app.services.production_entry import (
+    MAX_LITERS,
+    diet_lot_on,
+    merge_reading,
+    milkings_of,
+    producao_of,
+    supersede,
+)
 from app.services.production_files import FileProblem, ParsedFile
 
 MODE_NEW_ONLY = "new_only"
@@ -49,6 +56,9 @@ STATUS_NEW = "new"
 STATUS_SAME = "same"
 #: Já existe leitura ativa diferente: `replace` substitui, `new_only` pula.
 STATUS_DIFFERENT = "different"
+#: Já existe leitura com o mesmo total, e o arquivo traz o que ela não tem
+#: (manhã e tarde, a observação): completa em qualquer modo, sem mudar nada.
+STATUS_COMPLETE = "complete"
 STATUS_NOT_FOUND = "not_found"
 STATUS_NO_BRINCO = "no_brinco"
 STATUS_INVALID = "invalid"
@@ -81,6 +91,9 @@ class PreviewRow:
     nome_arquivo: str | None
     producao: float
     status: str
+    manha: float | None = None
+    tarde: float | None = None
+    observacao: str | None = None
     animal_id: UUID | None = None
     animal_nome: str | None = None
     existing_measurement_id: UUID | None = None
@@ -114,6 +127,7 @@ class Preview:
         return {status: counted.get(status, 0) for status in (
             STATUS_NEW,
             STATUS_SAME,
+            STATUS_COMPLETE,
             STATUS_DIFFERENT,
             STATUS_NOT_FOUND,
             STATUS_NO_BRINCO,
@@ -121,6 +135,11 @@ class Preview:
             STATUS_EXITED,
             STATUS_DUPLICATE,
         )}
+
+
+def _values(row: PreviewRow) -> dict[str, float]:
+    milkings = {key: value for key, value in (("manha", row.manha), ("tarde", row.tarde)) if value is not None}
+    return {"producao": row.producao, **milkings}
 
 
 def sha256_of(content: bytes) -> str:
@@ -140,7 +159,7 @@ def _mark_duplicates(rows: list[PreviewRow]) -> None:
     for brinco, group in by_brinco.items():
         if len(group) < 2:
             continue
-        values = {row.producao for row in group}
+        values = {(row.producao, row.manha, row.tarde) for row in group}
         if len(values) > 1:
             for row in group:
                 row.status = STATUS_DUPLICATE
@@ -202,6 +221,9 @@ async def build_preview(
             nome_arquivo=parsed_row.nome,
             producao=round(parsed_row.producao, 2),
             status=STATUS_NEW,
+            manha=parsed_row.manha,
+            tarde=parsed_row.tarde,
+            observacao=parsed_row.observacao,
         )
         rows.append(row)
 
@@ -245,9 +267,16 @@ async def build_preview(
             row.existing_measurement_id = existing.id
             row.existing_producao = producao_of(existing)
             row.existing_provenance = existing.provenance
-            row.status = (
-                STATUS_SAME if row.existing_producao == row.producao else STATUS_DIFFERENT
-            )
+            merged = merge_reading(existing, _values(row), row.observacao)
+            if merged is None:
+                row.status = STATUS_DIFFERENT
+            elif merged == (
+                {"producao": producao_of(existing), **milkings_of(existing)},
+                existing.observacao,
+            ):
+                row.status = STATUS_SAME
+            else:
+                row.status = STATUS_COMPLETE
 
     _mark_duplicates(rows)
 
@@ -340,7 +369,8 @@ async def commit_import(
         if mode == MODE_REPLACE
         else []
     )
-    if not to_create and not to_replace:
+    to_complete = [row for row in preview.rows if row.status == STATUS_COMPLETE]
+    if not to_create and not to_replace and not to_complete:
         raise NothingToImport(
             "Nada a importar: todas as leituras válidas do arquivo já estão lançadas"
             + (" (as diferentes só entram no modo substituir)." if mode == MODE_NEW_ONLY else ".")
@@ -350,6 +380,7 @@ async def commit_import(
     summary = {
         "created": len(to_create),
         "replaced": len(to_replace),
+        "completed": len(to_complete),
         "skipped_same": counts[STATUS_SAME],
         "skipped_different": counts[STATUS_DIFFERENT] - len(to_replace),
         "not_found": counts[STATUS_NOT_FOUND],
@@ -392,7 +423,8 @@ async def commit_import(
             OfficialMeasurement(
                 animal_id=row.animal_id,
                 measured_on=measured_on,
-                values={"producao": row.producao},
+                values=_values(row),
+                observacao=row.observacao,
                 status="active",
                 provenance="file_import",
                 production_import_id=record.id,
@@ -404,6 +436,22 @@ async def commit_import(
             )
         )
     await session.flush()
+
+    # Completar não muda o que estava lançado: nova versão com o que faltava.
+    for row in to_complete:
+        old = await session.get(OfficialMeasurement, row.existing_measurement_id)
+        merged_values, merged_note = merge_reading(old, _values(row), row.observacao)
+        await supersede(
+            session,
+            farm_id=farm_id,
+            user=user,
+            previous=old,
+            values=merged_values,
+            observacao=merged_note,
+            action="measurement_completed",
+            reason=f"Completada pela importação de {filename}",
+            production_import_id=record.id,
+        )
 
     # O arquivo fica no registro de importação; a auditoria guarda o resumo.
     session.add(
