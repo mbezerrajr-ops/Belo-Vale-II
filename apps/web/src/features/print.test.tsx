@@ -127,10 +127,31 @@ describe("Folha de coleta", () => {
       "ÁGATA",
       "",
       "",
-      "",
+      "—",
       "",
     ]);
-    expect(area).toHaveTextContent("Total do lote: 35 L · 1 de 2 vacas lançadas");
+    expect(area).toHaveTextContent("Registro da pesagem de leite");
+    expect(area).toHaveTextContent(/Total do lote\s*35 L/);
+    expect(area).toHaveTextContent(/Vacas lançadas\s*1 de 2/);
+  });
+
+  it("sem manhã e tarde lançadas, a folha preenchida mostra só o total", async () => {
+    const onlyTotals = sheet(true);
+    onlyTotals.items[0] = { ...onlyTotals.items[0], manha: null, tarde: null };
+    const { container } = render(
+      <ProductionPage
+        token={TOKEN}
+        canCorrect={false}
+        today="2026-09-18"
+        onLoadSheet={vi.fn().mockResolvedValue(onlyTotals)}
+        onEnter={vi.fn()}
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /imprimir folha preenchida/i }));
+    const area = container.querySelector(".print-area") as HTMLElement;
+
+    const header = Array.from(area.querySelectorAll("th"), (cell) => cell.textContent);
+    expect(header).toEqual(["Brinco", "Nome", "Total", "Obs."]);
   });
 });
 

@@ -3145,6 +3145,190 @@ form.milk-price .hint {
     width: 24%;
   }
 
+  /* ---------- folha de coleta com a cara do sistema ----------
+     Cores fixas de papel (o tema escuro da tela não vale aqui) e pouca
+     tinta: a marca aparece em traços e em fundos claros, nunca em blocos
+     cheios. */
+  .print-area.ps {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color: #1c2a24;
+    font-size: 10.5pt;
+  }
+
+  .ps-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .ps-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ps-brand strong {
+    display: block;
+    color: #1f4d3c;
+    font-family: var(--font-display);
+    font-size: 19pt;
+    font-weight: 600;
+    line-height: 1.05;
+  }
+
+  .ps-brand span {
+    color: #5f6a63;
+    font-size: 9pt;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .ps-when {
+    display: grid;
+    justify-items: end;
+    gap: 2px;
+  }
+
+  .ps-lot {
+    padding: 2px 12px;
+    border: 1.5px solid #285e4a;
+    border-radius: 999px;
+    color: #1f4d3c;
+    font-size: 10pt;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  .ps-date {
+    color: #1c2a24;
+    font-family: var(--font-display);
+    font-size: 15pt;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ps-hills {
+    display: block;
+    width: 100%;
+    height: 14px;
+    margin: 6px 0 10px;
+  }
+
+  .ps-hills path {
+    fill: none;
+    stroke: #3f8a5f;
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .ps-summary {
+    display: flex;
+    gap: 0;
+    margin: 0 0 12px;
+    border-top: 1px solid #c9c0ab;
+    border-bottom: 1px solid #c9c0ab;
+  }
+
+  .ps-figure {
+    flex: 1;
+    padding: 6px 12px;
+    border-left: 1px solid #ddd6c6;
+  }
+
+  .ps-figure:first-child {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .ps-figure dt {
+    color: #5f6a63;
+    font-size: 7.5pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .ps-figure dd {
+    margin: 1px 0 0;
+    font-size: 14pt;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ps-figure:first-child dd {
+    color: #285e4a;
+  }
+
+  .ps-figure dd small {
+    display: block;
+    color: #5f6a63;
+    font-size: 8pt;
+    font-weight: 400;
+  }
+
+  .print-area.ps th,
+  .print-area.ps td {
+    padding: 4px 8px;
+    border: 0;
+    border-bottom: 1px solid #ddd6c6;
+  }
+
+  .print-area.ps th {
+    background: #dcebe1;
+    color: #1f4d3c;
+    font-size: 7.5pt;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-bottom: 1.5px solid #285e4a;
+  }
+
+  .print-area.ps tbody tr:nth-child(even) td {
+    background: #faf7ef;
+  }
+
+  .print-area.ps .ps-tag {
+    width: 12%;
+    color: #1f4d3c;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Na folha para preencher, as colunas de escrever têm linha de caderno. */
+  .print-area.ps td.write-in {
+    height: 24px;
+    border-left: 1px solid #ddd6c6;
+  }
+
+  .print-area.ps tr.ps-missing td {
+    color: #5f6a63;
+    font-style: italic;
+  }
+
+  .ps-foot {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 32px;
+    margin-top: 28px;
+    break-inside: avoid;
+  }
+
+  .ps-sign {
+    padding-top: 4px;
+    border-top: 1px solid #1c2a24;
+    color: #5f6a63;
+    font-size: 8.5pt;
+  }
+
+  .ps-foot p {
+    grid-column: 1 / -1;
+    margin: 6px 0 0;
+    padding-top: 6px;
+    border-top: 2px solid #285e4a;
+    color: #5f6a63;
+    font-size: 8pt;
+  }
+
   .print-area td.write-in {
     height: 22px;
   }
