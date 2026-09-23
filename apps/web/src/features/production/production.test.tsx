@@ -4,10 +4,10 @@
  * Quem usa está de pé, com o celular numa mão e o caderno na outra. Os testes
  * cobrem o que não pode falhar ali:
  *
- * - digitar manhã e tarde e seguir para a próxima vaca sem tocar em botão de
- *   salvar; a vaca é salva quando se sai dela;
+ * - digitar e seguir para a próxima vaca sem tocar em botão de salvar;
  * - vírgula decimal, como se escreve no caderno;
- * - completar a tarde depois da manhã, ou a observação depois, é livre;
+ * - na tela, só o total: manhã e tarde ficam para a folha impressa;
+ * - a observação da pesagem vai junto, e anotá-la depois não é correção;
  * - sinal ruim não perde o valor digitado;
  * - um valor diferente do já lançado nunca sobrescreve: o operador é avisado,
  *   o revisor corrige com motivo.
@@ -114,92 +114,36 @@ describe("ProductionPage", () => {
     );
   });
 
-  it("salva manhã e tarde ao sair da vaca, aceitando vírgula decimal", async () => {
+  it("salva ao sair do campo, aceitando vírgula decimal", async () => {
     const { onEnter } = setup();
 
-    const morning = await screen.findByLabelText("Manhã de BORBOREMA");
-    const afternoon = screen.getByLabelText("Tarde de BORBOREMA");
-    fireEvent.change(morning, { target: { value: "12,5" } });
-    // Passar da manhã para a tarde da mesma vaca não salva ainda.
-    fireEvent.blur(morning, { relatedTarget: afternoon });
-    expect(onEnter).not.toHaveBeenCalled();
-    fireEvent.change(afternoon, { target: { value: "9" } });
-    expect(screen.getByLabelText("Total de BORBOREMA")).toHaveTextContent("21,5 L");
-    fireEvent.blur(afternoon);
+    const field = await screen.findByLabelText("Litros de BORBOREMA");
+    fireEvent.change(field, { target: { value: "21,5" } });
+    fireEvent.blur(field);
 
     await waitFor(() =>
-      expect(onEnter).toHaveBeenCalledWith(TOKEN, "a-027", DAY, { manha: 12.5, tarde: 9 }),
+      expect(onEnter).toHaveBeenCalledWith(TOKEN, "a-027", DAY, { producao: 21.5 }),
     );
     expect(await screen.findByText(/1 de 2 lançadas/i)).toBeInTheDocument();
   });
 
-  it("Enter passa da manhã para a tarde, e da tarde para a próxima vaca", async () => {
+  it("Enter salva e leva para a próxima vaca", async () => {
     setup();
 
-    const morning = await screen.findByLabelText("Manhã de BORBOREMA");
-    morning.focus();
-    fireEvent.change(morning, { target: { value: "18" } });
-    fireEvent.keyDown(morning, { key: "Enter" });
-    await waitFor(() => expect(screen.getByLabelText("Tarde de BORBOREMA")).toHaveFocus());
-
-    fireEvent.keyDown(screen.getByLabelText("Tarde de BORBOREMA"), { key: "Enter" });
-    await waitFor(() => expect(screen.getByLabelText("Manhã de ÁGATA")).toHaveFocus());
-  });
-
-  it("a tarde lançada depois completa a manhã, sem pedir correção", async () => {
-    const onEnter = vi.fn().mockResolvedValue(reading({ id: "m-2", producao: 33, manha: 18, tarde: 15 }));
-    setup(
-      { onEnter },
-      sheet({
-        items: [
-          {
-            animal_id: "a-027",
-            brinco: "027",
-            name: "BORBOREMA",
-            situacao: "Em lactação",
-            producao: 18,
-            manha: 18,
-            tarde: null,
-            measurement_id: "m-1",
-            provenance: "manual_entry",
-          },
-        ],
-      }),
-    );
-
-    const afternoon = await screen.findByLabelText("Tarde de BORBOREMA");
-    fireEvent.change(afternoon, { target: { value: "15" } });
-    fireEvent.blur(afternoon);
+    const first = await screen.findByLabelText("Litros de BORBOREMA");
+    first.focus();
+    fireEvent.change(first, { target: { value: "18" } });
+    fireEvent.keyDown(first, { key: "Enter" });
 
     await waitFor(() =>
-      expect(onEnter).toHaveBeenCalledWith(TOKEN, "a-027", DAY, { manha: 18, tarde: 15 }),
-    );
-    expect(await screen.findByText("33 L")).toBeInTheDocument();
-  });
-
-  it("a observação vai junto dos litros", async () => {
-    const { onEnter } = setup();
-
-    fireEvent.click(await screen.findByRole("button", { name: "Anotar observação de BORBOREMA" }));
-    const note = screen.getByLabelText("Observação de BORBOREMA");
-    fireEvent.change(screen.getByLabelText("Manhã de BORBOREMA"), { target: { value: "4" } });
-    fireEvent.change(screen.getByLabelText("Tarde de BORBOREMA"), { target: { value: "3" } });
-    fireEvent.change(note, { target: { value: "→ Seca" } });
-    fireEvent.blur(note);
-
-    await waitFor(() =>
-      expect(onEnter).toHaveBeenCalledWith(TOKEN, "a-027", DAY, {
-        manha: 4,
-        tarde: 3,
-        observacao: "→ Seca",
-      }),
+      expect(screen.getByLabelText("Litros de ÁGATA")).toHaveFocus(),
     );
   });
 
   it("recusa valor fora do plausível sem chamar o servidor", async () => {
     const { onEnter } = setup();
 
-    const field = await screen.findByLabelText("Manhã de BORBOREMA");
+    const field = await screen.findByLabelText("Litros de BORBOREMA");
     fireEvent.change(field, { target: { value: "215" } });
     fireEvent.blur(field);
 
@@ -214,7 +158,7 @@ describe("ProductionPage", () => {
       .mockResolvedValue(reading());
     setup({ onEnter });
 
-    const field = await screen.findByLabelText("Manhã de BORBOREMA");
+    const field = await screen.findByLabelText("Litros de BORBOREMA");
     fireEvent.change(field, { target: { value: "21,5" } });
     fireEvent.blur(field);
 
@@ -231,24 +175,24 @@ describe("ProductionPage", () => {
       code: "conflict",
       detail: {
         message: "Esta vaca já tem produção lançada nesta data, com outro valor.",
-        existing: reading({ producao: 30, manha: 18, tarde: 12, entered_by: "maria@belovale" }),
+        existing: reading({ producao: 30, entered_by: "maria@belovale" }),
       },
     });
     setup({ onEnter: vi.fn().mockRejectedValue(conflict) });
 
-    const field = await screen.findByLabelText("Manhã de BORBOREMA");
+    const field = await screen.findByLabelText("Litros de BORBOREMA");
     fireEvent.change(field, { target: { value: "12" } });
     fireEvent.blur(field);
 
-    const row = (await screen.findByText(/já lançado: 18 \+ 12 = 30 L/i)).closest("li");
+    const row = (await screen.findByText(/já lançado: 30 L/i)).closest("li");
     expect(row).not.toBeNull();
     expect(within(row as HTMLElement).getByText(/maria@belovale/)).toBeInTheDocument();
     expect(within(row as HTMLElement).getByText(/revisor/i)).toBeInTheDocument();
-    expect(field).toHaveValue("18");
+    expect(field).toHaveValue("30");
   });
 
   it("revisor corrige um valor já lançado informando o motivo", async () => {
-    const onCorrect = vi.fn().mockResolvedValue(reading({ id: "m-2", producao: 21, manha: 12, tarde: 9 }));
+    const onCorrect = vi.fn().mockResolvedValue(reading({ id: "m-2", producao: 12 }));
     setup(
       { canCorrect: true, onCorrect },
       sheet({
@@ -259,8 +203,6 @@ describe("ProductionPage", () => {
             name: "BORBOREMA",
             situacao: "Em lactação",
             producao: 21.5,
-            manha: 12.5,
-            tarde: 9,
             measurement_id: "m-1",
             provenance: "manual_entry",
           },
@@ -268,8 +210,8 @@ describe("ProductionPage", () => {
       }),
     );
 
-    const field = await screen.findByLabelText("Manhã de BORBOREMA");
-    expect(field).toHaveValue("12,5");
+    const field = await screen.findByLabelText("Litros de BORBOREMA");
+    expect(field).toHaveValue("21,5");
     fireEvent.change(field, { target: { value: "12" } });
     fireEvent.blur(field);
 
@@ -282,7 +224,7 @@ describe("ProductionPage", () => {
       expect(onCorrect).toHaveBeenCalledWith(
         TOKEN,
         "m-1",
-        { manha: 12, tarde: 9, observacao: null },
+        { producao: 12, observacao: null },
         "anotado errado",
       ),
     );
@@ -299,8 +241,6 @@ describe("ProductionPage", () => {
             name: "BORBOREMA",
             situacao: "Em lactação",
             producao: 21.5,
-            manha: 12.5,
-            tarde: 9,
             measurement_id: "m-1",
             provenance: "manual_entry",
           },
@@ -308,13 +248,13 @@ describe("ProductionPage", () => {
       }),
     );
 
-    const field = await screen.findByLabelText("Manhã de BORBOREMA");
+    const field = await screen.findByLabelText("Litros de BORBOREMA");
     fireEvent.change(field, { target: { value: "12" } });
     fireEvent.blur(field);
 
     expect(await screen.findByText(/peça a um revisor/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/motivo da correção/i)).not.toBeInTheDocument();
-    expect(field).toHaveValue("12,5");
+    expect(field).toHaveValue("21,5");
   });
 
   it("revisor anula pela própria linha, com motivo", async () => {
@@ -329,8 +269,6 @@ describe("ProductionPage", () => {
             name: "BORBOREMA",
             situacao: "Em lactação",
             producao: 21.5,
-            manha: 12.5,
-            tarde: 9,
             measurement_id: "m-1",
             provenance: "manual_entry",
           },
@@ -358,8 +296,6 @@ describe("ProductionPage", () => {
             name: "BORBOREMA",
             situacao: "Em lactação",
             producao: 21.5,
-            manha: 12.5,
-            tarde: 9,
             measurement_id: "m-1",
             provenance: "manual_entry",
           },
@@ -367,8 +303,80 @@ describe("ProductionPage", () => {
       }),
     );
 
-    await screen.findByLabelText("Manhã de BORBOREMA");
+    await screen.findByLabelText("Litros de BORBOREMA");
     expect(screen.queryByRole("button", { name: /anular/i })).not.toBeInTheDocument();
+  });
+
+  it("leitura com manhã e tarde aparece na tela só com o total", async () => {
+    setup(
+      {},
+      sheet({
+        items: [
+          {
+            animal_id: "a-027",
+            brinco: "027",
+            name: "BORBOREMA",
+            situacao: "Em lactação",
+            producao: 33,
+            manha: 18,
+            tarde: 15,
+            measurement_id: "m-1",
+            provenance: "file_import",
+          },
+        ],
+      }),
+    );
+
+    expect(await screen.findByLabelText("Litros de BORBOREMA")).toHaveValue("33");
+    expect(screen.queryByLabelText(/manhã de/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/tarde de/i)).not.toBeInTheDocument();
+  });
+
+  it("a observação vai junto dos litros", async () => {
+    const { onEnter } = setup();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Anotar observação de BORBOREMA" }));
+    fireEvent.change(screen.getByLabelText("Litros de BORBOREMA"), { target: { value: "7" } });
+    const note = screen.getByLabelText("Observação de BORBOREMA");
+    fireEvent.change(note, { target: { value: "→ Seca" } });
+    fireEvent.blur(note);
+
+    await waitFor(() =>
+      expect(onEnter).toHaveBeenCalledWith(TOKEN, "a-027", DAY, { producao: 7, observacao: "→ Seca" }),
+    );
+  });
+
+  it("anotar a observação depois não pede correção", async () => {
+    const onEnter = vi.fn().mockResolvedValue(reading({ producao: 21.5, observacao: "→ 3º Lote" }));
+    setup(
+      { onEnter },
+      sheet({
+        items: [
+          {
+            animal_id: "a-027",
+            brinco: "027",
+            name: "BORBOREMA",
+            situacao: "Em lactação",
+            producao: 21.5,
+            measurement_id: "m-1",
+            provenance: "manual_entry",
+          },
+        ],
+      }),
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Anotar observação de BORBOREMA" }));
+    const note = screen.getByLabelText("Observação de BORBOREMA");
+    fireEvent.change(note, { target: { value: "→ 3º Lote" } });
+    fireEvent.blur(note);
+
+    await waitFor(() =>
+      expect(onEnter).toHaveBeenCalledWith(TOKEN, "a-027", DAY, {
+        producao: 21.5,
+        observacao: "→ 3º Lote",
+      }),
+    );
+    expect(screen.queryByText(/peça a um revisor/i)).not.toBeInTheDocument();
   });
 
   it("trocar de lote recarrega a folha", async () => {
@@ -390,8 +398,6 @@ describe("ProductionPage", () => {
             name: "BORBOREMA",
             situacao: "Em lactação",
             producao: 21.5,
-            manha: 12.5,
-            tarde: 9,
             measurement_id: "m-1",
             provenance: "manual_entry",
           },

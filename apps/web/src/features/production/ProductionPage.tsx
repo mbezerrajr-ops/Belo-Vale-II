@@ -36,15 +36,16 @@ import { useOutbox } from "../../offline/OutboxContext";
 /**
  * Lançamento de produção, vaca a vaca.
  *
- * Feito para o curral: manhã e tarde de cada vaca, na ordem do caderno, e a
- * observação da pesagem quando houver ("→ Seca"). Cada vaca é salva sozinha
- * quando se sai dela — não existe botão "salvar tudo" que uma queda de sinal
- * possa perder. Enter passa da manhã para a tarde, e da tarde para a próxima
- * vaca.
+ * Feito para o curral: um campo por vaca com os litros do dia, na ordem do
+ * caderno, e a observação da pesagem quando houver ("→ Seca"). Cada valor é
+ * salvo sozinho ao sair da vaca — não existe botão "salvar tudo" que uma
+ * queda de sinal possa perder. Enter pula para a próxima vaca.
  *
- * Completar o que falta (a tarde lançada à noite, a observação anotada
- * depois) é livre. Um valor já lançado nunca é mudado daqui: o operador vê
- * quem lançou e pede a correção; o revisor corrige informando o motivo.
+ * Na tela, só o total: manhã e tarde aparecem na folha impressa, quando a
+ * leitura as tem (a importação da planilha da fazenda traz as duas).
+ *
+ * Um valor já lançado nunca é sobrescrito daqui. Anotar a observação depois é
+ * livre; mudar os litros é correção, de revisor, com motivo.
  */
 
 /** Teto de plausibilidade, igual ao do servidor. */
@@ -132,9 +133,8 @@ interface Saved {
 }
 
 interface RowState {
-  /** O que está nos campos, como digitado. */
-  manha: string;
-  tarde: string;
+  /** Os litros, como digitados. */
+  value: string;
   obs: string;
   /** O campo de observação aberto (ou já com texto). */
   noteOpen: boolean;
@@ -173,20 +173,12 @@ function savedOf(source: {
 }
 
 /** Os campos da linha a partir do que está gravado. */
-function fieldsOf(saved: Saved | null): Pick<RowState, "manha" | "tarde" | "obs" | "noteOpen"> {
+function fieldsOf(saved: Saved | null): Pick<RowState, "value" | "obs" | "noteOpen"> {
   return {
-    manha: show(saved?.manha),
-    tarde: show(saved?.tarde),
+    value: show(saved?.producao),
     obs: saved?.observacao ?? "",
     noteOpen: Boolean(saved?.observacao),
   };
-}
-
-/** `18 + 15 = 33 L`, ou só `21,5 L` quando a leitura tem só o total. */
-function describe(saved: Saved): string {
-  const total = `${show(saved.producao)} L`;
-  if (saved.manha === null && saved.tarde === null) return total;
-  return `${show(saved.manha) || "—"} + ${show(saved.tarde) || "—"} = ${total}`;
 }
 
 function initialRows(items: SheetItem[]): Record<string, RowState> {
@@ -225,33 +217,14 @@ function label(item: SheetItem): string {
   return item.name ?? item.brinco ?? "animal sem identificação";
 }
 
-/** O que foi digitado na linha, ou `"invalid"` se algum valor não serve. */
-function readFields(row: RowState): { manha: number | null; tarde: number | null; obs: string | null } | "invalid" {
-  const manha = parse(row.manha);
-  const tarde = parse(row.tarde);
-  if (Number.isNaN(manha) || Number.isNaN(tarde)) return "invalid";
-  if ((manha ?? 0) + (tarde ?? 0) > MAX_LITERS) return "invalid";
+/** A anotação digitada, sem espaços sobrando; vazia vira `null`. */
+function noteOf(row: RowState): string | null {
   const obs = row.obs.trim().replace(/\s+/g, " ");
-  return { manha, tarde, obs: obs === "" ? null : obs };
+  return obs === "" ? null : obs;
 }
 
-function inputOf(values: { manha: number | null; tarde: number | null; obs: string | null }): ReadingInput {
-  const input: ReadingInput = {};
-  if (values.manha !== null) input.manha = values.manha;
-  if (values.tarde !== null) input.tarde = values.tarde;
-  if (values.obs !== null) input.observacao = values.obs;
-  return input;
-}
-
-/** Total da linha: o que está nos campos, ou o que está gravado. */
-function rowTotal(row: RowState): number | null {
-  const manha = parse(row.manha);
-  const tarde = parse(row.tarde);
-  if (manha !== null && !Number.isNaN(manha)) {
-    return tarde !== null && !Number.isNaN(tarde) ? manha + tarde : manha;
-  }
-  if (tarde !== null && !Number.isNaN(tarde)) return tarde;
-  return row.saved?.producao ?? null;
+function inputOf(producao: number, obs: string | null): ReadingInput {
+  return obs === null ? { producao } : { producao, observacao: obs };
 }
 
 interface RowActions {
@@ -283,7 +256,6 @@ const ProductionRow = memo(function ProductionRow({
   actions: RowActions;
 }): JSX.Element {
   const adjusting = row.status === "correcting" || row.status === "voiding";
-  const total = rowTotal(row);
   const who = label(item);
   // Sair de um campo para outro da mesma vaca não salva; sair da vaca salva.
   const leave = (event: FocusEvent<HTMLElement>): void => {
@@ -336,39 +308,19 @@ const ProductionRow = memo(function ProductionRow({
         </small>
       </span>
       <span className="prod-input">
-        <label className="milking">
-          <span aria-hidden="true">manhã</span>
-          <input
-            ref={(element) => actions.registerInput(index * 2, element)}
-            aria-label={`Manhã de ${who}`}
-            inputMode="decimal"
-            enterKeyHint="next"
-            autoComplete="off"
-            value={row.manha}
-            disabled={row.status === "saving"}
-            onChange={(event) => actions.patch(item.animal_id, { manha: event.target.value })}
-            onBlur={leave}
-            onKeyDown={onEnter(index * 2)}
-          />
-        </label>
-        <label className="milking">
-          <span aria-hidden="true">tarde</span>
-          <input
-            ref={(element) => actions.registerInput(index * 2 + 1, element)}
-            aria-label={`Tarde de ${who}`}
-            inputMode="decimal"
-            enterKeyHint="next"
-            autoComplete="off"
-            value={row.tarde}
-            disabled={row.status === "saving"}
-            onChange={(event) => actions.patch(item.animal_id, { tarde: event.target.value })}
-            onBlur={leave}
-            onKeyDown={onEnter(index * 2 + 1)}
-          />
-        </label>
-        <output className="prod-total" aria-label={`Total de ${who}`}>
-          {total === null ? "" : `= ${liters(total)} L`}
-        </output>
+        <input
+          ref={(element) => actions.registerInput(index, element)}
+          aria-label={`Litros de ${who}`}
+          inputMode="decimal"
+          enterKeyHint="next"
+          autoComplete="off"
+          value={row.value}
+          disabled={row.status === "saving"}
+          onChange={(event) => actions.patch(item.animal_id, { value: event.target.value })}
+          onBlur={leave}
+          onKeyDown={onEnter(index)}
+        />
+        <span className="unit">L</span>
       </span>
       <span className="prod-state" aria-live="polite">
         {row.status === "saving" && "salvando…"}
@@ -395,7 +347,7 @@ const ProductionRow = memo(function ProductionRow({
           disabled={row.status === "saving"}
           onChange={(event) => actions.patch(item.animal_id, { obs: event.target.value })}
           onBlur={leave}
-          onKeyDown={onEnter(index * 2 + 1)}
+          onKeyDown={onEnter(index)}
         />
       )}
 
@@ -415,9 +367,7 @@ const ProductionRow = memo(function ProductionRow({
         <div className="row-fix">
           <label htmlFor={`reason-${item.animal_id}`}>
             {row.status === "correcting"
-              ? `Motivo da correção (${row.saved ? describe(row.saved) : "—"} → ${
-                  total === null ? "—" : `${liters(total)} L`
-                })`
+              ? `Motivo da correção (${show(row.saved?.producao)} → ${row.value} L)`
               : "Motivo para anular este lançamento"}
           </label>
           <input
@@ -788,9 +738,7 @@ export function ProductionPage({
           animalId,
           label: item ? label(item) : "vaca",
           measuredOn: day,
-          producao: input.producao ?? (input.manha ?? 0) + (input.tarde ?? 0),
-          manha: input.manha ?? null,
-          tarde: input.tarde ?? null,
+          producao: input.producao ?? 0,
           observacao: input.observacao ?? null,
         });
         patch(animalId, { status: "queued", message: QUEUED });
@@ -811,7 +759,7 @@ export function ProductionPage({
           saved,
           measurementId: detail.existing.id,
           message:
-            `Já lançado: ${describe(saved)}${who}. ` +
+            `Já lançado: ${show(saved.producao)} L${who}. ` +
             (canCorrect
               ? "Altere o valor de novo para corrigir."
               : "Para mudar, peça a um revisor."),
@@ -830,57 +778,36 @@ export function ProductionPage({
     if (!row || row.status === "saving" || row.status === "correcting" || row.status === "voiding") {
       return;
     }
-    const typed = readFields(row);
-    if (typed === "invalid") {
+    const parsed = parse(row.value);
+    const obs = noteOf(row);
+    if (Number.isNaN(parsed)) {
       patch(animalId, {
         status: "invalid",
-        message: `Confira o valor: de 0 a ${MAX_LITERS} litros no dia.`,
+        message: `Confira o valor: de 0 a ${MAX_LITERS} litros.`,
       });
       return;
     }
 
     const saved = row.saved;
     if (saved === null) {
-      if (typed.manha === null && typed.tarde === null) {
-        if (typed.obs !== null) {
+      if (parsed === null) {
+        if (obs !== null) {
           patch(animalId, { status: "idle", message: "Anote os litros junto da observação." });
         } else if (row.status === "invalid") {
           patch(animalId, { status: "idle", message: null });
         }
         return;
       }
-      void save(animalId, inputOf(typed));
+      void save(animalId, inputOf(parsed, obs));
       return;
     }
 
-    // Campo apagado não apaga o que está lançado: isso é anular, com motivo.
-    const manha = typed.manha ?? saved.manha;
-    const tarde = typed.tarde ?? saved.tarde;
-    const obs = typed.obs ?? saved.observacao;
+    // Apagar o campo não apaga um lançamento: isso é anular, com motivo.
+    const value = parsed ?? saved.producao;
+    const note = obs ?? saved.observacao;
     const restore = { ...fieldsOf(saved), noteOpen: row.noteOpen || Boolean(saved.observacao) };
-    const totalOnly = saved.manha === null && saved.tarde === null;
-
-    let changed =
-      (saved.manha !== null && manha !== saved.manha) ||
-      (saved.tarde !== null && tarde !== saved.tarde) ||
-      (saved.observacao !== null && obs !== saved.observacao);
-    const added =
-      (saved.manha === null && manha !== null) ||
-      (saved.tarde === null && tarde !== null) ||
-      (saved.observacao === null && obs !== null);
-
-    // Leitura antiga, só com o total: manhã e tarde completam se somarem o
-    // mesmo total; uma só não dá para conferir.
-    if (totalOnly && (manha !== null || tarde !== null)) {
-      if (manha === null || tarde === null) {
-        patch(animalId, {
-          status: "saved",
-          message: `Preencha manhã e tarde: o total lançado é ${show(saved.producao)} L.`,
-        });
-        return;
-      }
-      if (Math.abs(manha + tarde - (saved.producao ?? 0)) > 0.05) changed = true;
-    }
+    const changed =
+      value !== saved.producao || (saved.observacao !== null && note !== saved.observacao);
 
     if (changed) {
       if (canCorrect && row.measurementId !== null) {
@@ -890,15 +817,13 @@ export function ProductionPage({
       patch(animalId, {
         ...restore,
         status: "locked",
-        message: `Já lançado: ${describe(saved)}. Para mudar, peça a um revisor.`,
+        message: `Já lançado: ${show(saved.producao)} L. Para mudar, peça a um revisor.`,
       });
       return;
     }
-    if (added) {
-      const input = inputOf({ manha, tarde, obs });
-      // Só a anotação, numa leitura com o total: o total vai junto.
-      if (manha === null && tarde === null && saved.producao !== null) input.producao = saved.producao;
-      void save(animalId, input);
+    // Só a anotação, numa vaca já lançada: completa sem mexer nos litros.
+    if (saved.observacao === null && note !== null && saved.producao !== null) {
+      void save(animalId, inputOf(saved.producao, note));
       return;
     }
     patch(animalId, { ...restore, status: "saved", message: null });
@@ -906,12 +831,8 @@ export function ProductionPage({
 
   async function submitCorrection(animalId: string): Promise<void> {
     const row = rows[animalId];
-    const typed = readFields(row);
-    if (row.measurementId === null || typed === "invalid") return;
-    if (typed.manha === null && typed.tarde === null) {
-      patch(animalId, { message: "Informe manhã e tarde corrigidas." });
-      return;
-    }
+    const parsed = parse(row.value);
+    if (row.measurementId === null || parsed === null || Number.isNaN(parsed)) return;
     if (row.reason.trim().length < 3) {
       patch(animalId, { message: "Explique o motivo em poucas palavras." });
       return;
@@ -921,7 +842,7 @@ export function ProductionPage({
       const result = await onCorrect(
         token,
         row.measurementId,
-        { ...inputOf(typed), observacao: typed.obs },
+        { producao: parsed, observacao: noteOf(row) },
         row.reason.trim(),
       );
       const saved = savedOf(result);
@@ -1032,7 +953,7 @@ export function ProductionPage({
         {/* A frase fala do modo escolhido: "Enter passa para a próxima vaca"
             não diz nada a quem está importando uma planilha. */}
         {how === "digitar"
-          ? "Manhã e tarde de cada vaca; salva ao passar para a próxima. Enter avança."
+          ? "Cada valor é salvo ao sair do campo; Enter passa para a próxima vaca."
           : "Planilha (CSV ou XLSX) ou PDF com o brinco e os litros — total, ou manhã e tarde — e a observação, se houver. Nada é gravado antes da prévia."}
       </PageHeader>
 
@@ -1163,13 +1084,8 @@ export function ProductionPage({
 
 /** Os campos de uma leitura guardada no celular. */
 function queuedFields(item: QueuedReading): Partial<RowState> {
-  if (item.manha == null && item.tarde == null) {
-    // Guardada antes das ordenhas separadas: só o total.
-    return { message: `${QUEUED} (${liters(item.producao)} L)` };
-  }
   return {
-    manha: show(item.manha),
-    tarde: show(item.tarde),
+    value: show(item.producao),
     obs: item.observacao ?? "",
     noteOpen: Boolean(item.observacao),
   };
