@@ -16,7 +16,13 @@ test.beforeAll(() => {
   cow = createMilkingCow(`${TAG}O`);
 });
 
-test("lança sem sinal, recarrega sem sinal e o valor chega quando o sinal volta", async ({ page, context }) => {
+test("lança sem sinal, recarrega sem sinal e o valor chega quando o sinal volta", async ({ page, context, browserName }) => {
+  // No WebKit do Windows o service worker registra, controla a página e
+  // guarda o app inteiro (conferido), mas o Playwright não consegue simular
+  // a falta de rede numa navegação atendida por ele ("internal error" do
+  // próprio Playwright). No iPhone isso se confere no teste de campo, com o
+  // modo avião — ver docs/teste-de-campo-iphone.md.
+  test.skip(browserName === "webkit", "Playwright/WebKit no Windows não simula rede ausente com service worker");
   test.setTimeout(120_000);
   await loginAsAdmin(page);
   // O app fica guardado no celular antes de o sinal cair.

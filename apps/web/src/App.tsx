@@ -32,6 +32,7 @@ import { ChangePasswordForm } from "./features/users/ChangePasswordForm";
 import { Cows, Hills, Icons, LogoMark, type IconName } from "./ui/Brand";
 import { PageHeader } from "./ui/PageHeader";
 import { AreaBoundary } from "./ui/AreaBoundary";
+import { InstallHint } from "./ui/InstallHint";
 import { closeAndReturn, usePanelFocus } from "./ui/usePanelFocus";
 import { useRoute, type AreaRoute } from "./router";
 import { deviceOutbox } from "./offline/outbox";
@@ -781,6 +782,7 @@ function AppShell({
                 {user.email}
               </PageHeader>
               <ChangePasswordForm token={token} />
+              <InstallHint />
             </>
           )}
           </Suspense>

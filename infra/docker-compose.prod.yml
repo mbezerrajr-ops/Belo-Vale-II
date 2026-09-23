@@ -1,0 +1,49 @@
+# Produção neste PC — soma-se ao docker-compose.yml, sem mudar o que a
+# demonstração e os testes usam:
+#
+#   docker compose -p belo-vale --env-file infra/.env.production \
+#     -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up -d --build
+#
+# O que muda em relação ao desenvolvimento:
+#
+# - ENVIRONMENT=production: a API se recusa a subir sem segredo forte, com o
+#   cookie de sessão sem `Secure` ou com leitor/transcritor falso.
+# - Leitura de foto e de áudio de verdade (Ollama e whisper.cpp, fora do
+#   Docker, na RX 7600).
+# - Reinício automático: depois de queda de energia ou reinício do Windows,
+#   tudo volta sozinho quando o Docker Desktop abrir.
+# - Nenhuma porta aberta para a rede: a API não é publicada (só o nginx a
+#   alcança, pela rede interna), e o app só atende em 127.0.0.1. O único
+#   caminho de fora é o Tailscale Funnel, que entrega o HTTPS neste PC e
+#   repassa para 127.0.0.1:8090.
+# - Porta 8090, não 8080: a demonstração e o E2E continuam podendo subir na
+#   8080 sem disputar a porta com a produção.
+
+services:
+  api:
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      PHOTO_SHEETS_DEMO: "false"
+    ports: !reset []
+
+  worker:
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      READER_PROVIDER: ollama
+      AUDIO_PROVIDER: whisper
+
+  db:
+    restart: unless-stopped
+
+  redis:
+    restart: unless-stopped
+
+  minio:
+    restart: unless-stopped
+
+  web:
+    restart: unless-stopped
+    ports: !override
+      - "127.0.0.1:8090:80"

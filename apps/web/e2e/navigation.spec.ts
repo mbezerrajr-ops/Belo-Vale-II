@@ -1,6 +1,16 @@
 import { expect, test } from "@playwright/test";
 
-import { createMilkingCow, ensureAdminExists, ensureFarm, loginAsAdmin, logout, openArea, runTag } from "./seed";
+import {
+  E2E_ADMIN_EMAIL,
+  E2E_ADMIN_PASSWORD,
+  createMilkingCow,
+  ensureAdminExists,
+  ensureFarm,
+  loginAsAdmin,
+  logout,
+  openArea,
+  runTag,
+} from "./seed";
 
 // Cada tela tem endereço. Sem isso, recarregar voltava ao Painel, o voltar do
 // Android fechava o app aberto pela tela inicial e não havia link de ficha.
@@ -50,10 +60,22 @@ test("ficha tem link; voltar devolve a busca como estava", async ({ page }) => {
   await page.reload();
   await expect(page.getByRole("heading", { name: cow.name })).toBeVisible();
 
-  // O link aberto em outra aba abre a mesma ficha.
+  // O link aberto em outra aba abre a mesma ficha. Se a aba pedir login
+  // (no Safari, o cookie seguro da sessão não vale em http://localhost; em
+  // produção, é quem recebeu o link e ainda não entrou), entrar leva à ficha
+  // do link, e não ao Painel.
   const other = await page.context().newPage();
   await other.goto(link);
-  await expect(other.getByRole("heading", { name: cow.name })).toBeVisible();
+  const entrar = other.getByRole("button", { name: "Entrar" });
+  const ficha = other.getByRole("heading", { name: cow.name });
+  await expect(entrar.or(ficha)).toBeVisible();
+  if (await entrar.isVisible()) {
+    await other.getByLabel("E-mail").fill(E2E_ADMIN_EMAIL);
+    await other.getByLabel("Senha", { exact: true }).fill(E2E_ADMIN_PASSWORD);
+    await entrar.click();
+  }
+  await expect(ficha).toBeVisible();
+  await expect(other).toHaveURL(link);
   await other.close();
 });
 

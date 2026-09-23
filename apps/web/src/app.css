@@ -4728,3 +4728,24 @@ h2[tabindex="-1"]:focus,
 .area-failed p {
   margin: 0;
 }
+
+/* Como instalar na tela inicial (Minha conta). */
+.install-hint {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.install-hint h3 {
+  margin: 0 0 4px;
+}
+
+.install-hint ol {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding-left: 1.3rem;
+  line-height: 1.45;
+}

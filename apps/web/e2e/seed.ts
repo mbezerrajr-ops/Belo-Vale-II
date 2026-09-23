@@ -115,7 +115,11 @@ export async function loginAsAdmin(page: Page): Promise<void> {
 }
 
 export async function logout(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Sair" }).click();
+  // No celular, Sair fica em Minha conta (no topo era fácil de tocar sem
+  // querer); no computador, no topo.
+  const sair = page.getByRole("button", { name: "Sair" }).filter({ visible: true }).first();
+  if ((await sair.count()) === 0) await page.locator(".who .avatar").click();
+  await page.getByRole("button", { name: "Sair" }).filter({ visible: true }).first().click();
   await expect(page.getByRole("button", { name: "Entrar" })).toBeVisible();
 }
 
@@ -123,9 +127,19 @@ export async function openArea(page: Page, name: RegExp | string): Promise<void>
   // A barra ganha itens depois do primeiro desenho (Fichas, contagem da
   // revisão); um clique no meio desse rearranjo pode cair no vizinho. Clica
   // de novo até a área ficar marcada como atual.
-  const button = page.getByRole("navigation", { name: "Áreas" }).getByRole("button", { name });
+  //
+  // No celular (o perfil iPhone), só quatro áreas ficam na barra: as outras
+  // estão dentro de "Mais". O botão visível é o que vale — os da barra de
+  // computador existem escondidos.
+  const nav = page.getByRole("navigation", { name: "Áreas" });
+  const button = nav.getByRole("button", { name }).filter({ visible: true }).first();
   await expect(async () => {
-    await button.click();
+    if ((await button.count()) > 0) {
+      await button.click();
+    } else {
+      await nav.getByRole("button", { name: /^(Mais|Insumos|Medições|Contas|Minha conta)$/ }).click();
+      await page.getByRole("group", { name: /mais áreas/i }).getByRole("button", { name }).click();
+    }
     await expect(button).toHaveAttribute("aria-current", "true", { timeout: 2_000 });
   }).toPass({ timeout: 15_000 });
 }

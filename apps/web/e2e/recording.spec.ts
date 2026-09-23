@@ -23,7 +23,10 @@ test.beforeAll(() => {
   ensurePhotoSheetAnimal();
 });
 
-test("grava, ouve, envia, e a proposta chega sozinha", async ({ page }) => {
+test("grava, ouve, envia, e a proposta chega sozinha", async ({ page, browserName }) => {
+  // O microfone falso (--use-fake-device-for-media-stream) só existe no
+  // Chromium. No iPhone, o gravador se confere no teste de campo.
+  test.skip(browserName === "webkit", "microfone falso só existe no Chromium");
   await loginAsAdmin(page);
   await openArea(page, /Revisão/);
 

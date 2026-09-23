@@ -73,7 +73,10 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("pelo teclado: o primeiro Tab oferece pular direto para a tela", async ({ page }) => {
+test("pelo teclado: o primeiro Tab oferece pular direto para a tela", async ({ page, browserName }) => {
+  // O WebKit segue o Safari do Mac, em que Tab pula links; e o iPhone não
+  // tem tecla Tab. O teclado vale para o computador, medido no Chrome.
+  test.skip(browserName === "webkit", "Tab do Safari pula links; iPhone não tem teclado físico");
   await login(page, E2E_ADMIN_EMAIL, E2E_ADMIN_PASSWORD);
   await expect(page.getByRole("navigation", { name: "Áreas" })).toBeVisible();
 
