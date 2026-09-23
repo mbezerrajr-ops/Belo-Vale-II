@@ -150,6 +150,9 @@ try {
 } catch {
   Registrar "FALHOU: $($_.Exception.Message)"
 } finally {
+  # O gpg deixa um agente rodando, que guarda a senha em memória por alguns
+  # minutos e prende o terminal que chamou o script. Encerra ao sair.
+  & "C:\Program Files\Git\usr\bin\gpgconf.exe" --kill gpg-agent 2>$null | Out-Null
   # Nada de dado do rebanho sobra na pasta temporária do C:.
   if (Test-Path $Temp) { Remove-Item $Temp -Recurse -Force }
   if ($Pacote -and (Test-Path $Pacote)) { Remove-Item $Pacote -Force }

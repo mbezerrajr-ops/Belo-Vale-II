@@ -14,7 +14,7 @@ produção do dia.
 
 ## Antes do dia
 
-- [ ] O Funnel está ligado e o endereço `https://….ts.net` abre no seu celular.
+- [ ] O endereço **https://desktop-caio.tailf88007.ts.net** abre no seu celular.
 - [ ] Em **Contas**, crie a conta do funcionário (função **Operador**) e anote
       a senha provisória para entregar a ele.
 - [ ] No iPhone dele: iOS atualizado (Ajustes → Geral → Atualização de
