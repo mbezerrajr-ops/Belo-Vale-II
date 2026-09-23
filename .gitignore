@@ -20,3 +20,5 @@ playwright/.cache/
 docs/Treinamento-VC/
 docs/Treinamento_audios/
 docs/Treinamento-Audio/
+# Relatórios com dados reais do rebanho (fechamentos): ficam só nesta máquina.
+relatorios/

@@ -93,6 +93,9 @@ try {
 } catch {
   Write-Host "FALHOU: $($_.Exception.Message)"
 } finally {
+  # O gpg deixa um agente rodando, que guarda a senha em memória por alguns
+  # minutos e prende o terminal que chamou o script. Encerra ao sair.
+  & "C:\Program Files\Git\usr\bin\gpgconf.exe" --kill gpg-agent 2>$null | Out-Null
   & docker rm -f $Container 2>$null | Out-Null
   if (Test-Path $Trabalho) { Remove-Item $Trabalho -Recurse -Force }
 }
