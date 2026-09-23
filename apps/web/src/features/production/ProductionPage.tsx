@@ -28,7 +28,8 @@ import {
 import { brDate, liters, farmToday } from "../../ui/dates";
 // A importação é de escritório: só baixa quando alguém escolhe "Importar".
 const ImportPanel = lazy(() => import("./ImportPanel").then((m) => ({ default: m.ImportPanel })));
-import { Icons, LogoMark } from "../../ui/Brand";
+import { Icons } from "../../ui/Brand";
+import { PrintHeader } from "../../ui/PrintHeader";
 import { PageHeader } from "../../ui/PageHeader";
 import { isTransient, withTimeout, type QueuedReading } from "../../offline/outbox";
 import { useOutbox } from "../../offline/OutboxContext";
@@ -499,22 +500,11 @@ function PrintSheet({
 
   return (
     <div className="print-area ps" aria-hidden="true">
-      <header className="ps-head">
-        <div className="ps-brand">
-          <LogoMark size={42} />
-          <div>
-            <strong>Belo Vale II</strong>
-            <span>{filled ? "Registro da pesagem de leite" : "Folha de coleta de leite"}</span>
-          </div>
-        </div>
-        <div className="ps-when">
-          <span className="ps-lot">{lote}</span>
-          <span className="ps-date">{brDate(day)}</span>
-        </div>
-      </header>
-      <svg className="ps-hills" viewBox="0 0 1200 22" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M0 16 C 110 4, 220 4, 330 13 S 560 22, 680 11 S 900 1, 1020 10 S 1160 18, 1200 12" />
-      </svg>
+      <PrintHeader
+        kind={filled ? "Registro da pesagem de leite" : "Folha de coleta de leite"}
+        tag={lote}
+        date={brDate(day)}
+      />
 
       <dl className="ps-summary">{figures}</dl>
 
@@ -1045,7 +1035,7 @@ export function ProductionPage({
               aria-valuenow={savedRows.length}
               aria-label="Vacas lançadas"
             >
-              <i style={{ width: `${progress * 100}%` }} />
+              <i style={{ clipPath: `inset(0 ${(1 - progress) * 100}% 0 0 round 999px)` }} />
             </div>
           </div>
 

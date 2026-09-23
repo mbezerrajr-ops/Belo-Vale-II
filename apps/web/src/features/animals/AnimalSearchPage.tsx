@@ -5,6 +5,7 @@ import { EXIT_REASON_LABEL, type Animal, type AnimalPage, type AnimalSearch } fr
 import { Icons } from "../../ui/Brand";
 import { brDate, farmToday } from "../../ui/dates";
 import { PageHeader } from "../../ui/PageHeader";
+import { PrintHeader } from "../../ui/PrintHeader";
 
 /**
  * Busca de animais.
@@ -42,6 +43,20 @@ function describeSearch(search: AnimalSearch): string {
   if (search.semBrinco) return "Animais sem brinco";
   if (search.rebanho === "baixados") return "Animais que saíram do rebanho";
   return "Todos os animais do rebanho";
+}
+
+/** Os números do alto da lista impressa: quantos, e quantos em cada situação. */
+function printSummary(items: Animal[]): [string, string][] {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const situacao = item.exited_on ? "Baixa" : (item.situacao ?? "Sem situação");
+    counts.set(situacao, (counts.get(situacao) ?? 0) + 1);
+  }
+  const top = [...counts].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  return [
+    ["Animais", String(items.length)],
+    ...top.map(([situacao, count]): [string, string] => [situacao, String(count)]),
+  ];
 }
 
 function errorMessage(error: unknown): string {
@@ -336,35 +351,44 @@ export function AnimalSearchPage({
       )}
 
       {printItems !== null && (
-        <div className="print-area" aria-hidden="true">
-          <h1>Lista de animais</h1>
-          <p>
-            {describeSearch(lastSearch)} · {printItems.length}{" "}
-            {printItems.length === 1 ? "animal" : "animais"} · impresso em{" "}
-            {brDate(farmToday())}
-          </p>
+        <div className="print-area ps" aria-hidden="true">
+          <PrintHeader kind="Lista de animais" tag={describeSearch(lastSearch)} date={brDate(farmToday())} />
+          <dl className="ps-summary">
+            {printSummary(printItems).map(([label, value]) => (
+              <div className="ps-figure" key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
           <table>
             <thead>
               <tr>
-                <th>Brinco</th>
+                <th className="ps-tag">Brinco</th>
                 <th>Nome</th>
                 <th>Lote ou área</th>
                 <th>Situação</th>
-                <th>Último parto</th>
+                <th className="num">Último parto</th>
               </tr>
             </thead>
             <tbody>
               {printItems.map((item) => (
                 <tr key={item.id}>
-                  <td>{item.brinco ?? "sem brinco"}</td>
+                  <td className="ps-tag">{item.brinco ?? "sem brinco"}</td>
                   <td>{item.name ?? "sem nome"}</td>
                   <td>{item.lote_atual ?? item.grupo_manejo ?? "—"}</td>
                   <td>{item.exited_on ? "baixa" : (item.situacao ?? "—")}</td>
-                  <td>{brDate(item.ultimo_parto)}</td>
+                  <td className="num">{brDate(item.ultimo_parto)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <footer className="ps-foot">
+            <p>
+              Impresso em {brDate(farmToday())} · Belo Vale II · {describeSearch(lastSearch)} ·{" "}
+              {printItems.length} {printItems.length === 1 ? "animal" : "animais"}
+            </p>
+          </footer>
         </div>
       )}
     </section>
