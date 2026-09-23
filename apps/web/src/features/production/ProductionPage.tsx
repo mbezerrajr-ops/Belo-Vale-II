@@ -28,7 +28,7 @@ import {
 import { brDate, liters, farmToday } from "../../ui/dates";
 // A importação é de escritório: só baixa quando alguém escolhe "Importar".
 const ImportPanel = lazy(() => import("./ImportPanel").then((m) => ({ default: m.ImportPanel })));
-import { Icons } from "../../ui/Brand";
+import { Icons, LogoMark } from "../../ui/Brand";
 import { PageHeader } from "../../ui/PageHeader";
 import { isTransient, withTimeout, type QueuedReading } from "../../offline/outbox";
 import { useOutbox } from "../../offline/OutboxContext";
@@ -475,10 +475,28 @@ function shortDay(iso: string): string {
   return brDate(iso).slice(0, 5);
 }
 
+/** Um número da faixa de resumo da folha. */
+function Figure({ label, value, hint }: { label: string; value: string; hint?: string }): JSX.Element {
+  return (
+    <div className="ps-figure">
+      <dt>{label}</dt>
+      <dd>
+        {value}
+        {hint && <small>{hint}</small>}
+      </dd>
+    </div>
+  );
+}
+
 /**
- * A folha para o papel. Com lançamentos no dia, é o registro da pesagem;
- * sem, é a folha para preencher no curral, com a pesagem anterior ao lado de
- * cada vaca — quem anota "3" para a vaca que deu 30 no mês passado vê na hora.
+ * A folha para o papel, com a cara do sistema: marca, lote e data no alto,
+ * um resumo do lote e as assinaturas no pé.
+ *
+ * Com lançamentos no dia, é o registro da pesagem. Manhã e tarde só entram
+ * quando alguma vaca as tem: leituras antigas guardam só o total, e duas
+ * colunas vazias só ocupariam lugar. Sem lançamentos, é a folha para
+ * preencher no curral, com a pesagem anterior ao lado de cada vaca — quem
+ * anota "3" para a vaca que deu 30 no mês passado vê na hora.
  */
 function PrintSheet({
   items,
@@ -491,82 +509,112 @@ function PrintSheet({
   lote: string | null;
   day: string;
 }): JSX.Element {
-  const filled = items.some((item) => rows[item.animal_id]?.saved);
-  const header = (
-    <>
-      <h1>Folha de coleta de leite</h1>
-      <p>
-        {lote} · {brDate(day)} · {items.length} vacas
-      </p>
-    </>
-  );
+  const saved = items.filter((item) => rows[item.animal_id]?.saved);
+  const filled = saved.length > 0;
+  const reference = previousDate(items);
 
+  let figures: JSX.Element;
   if (filled) {
-    const saved = items.filter((item) => rows[item.animal_id]?.saved);
     const total = saved.reduce((sum, item) => sum + (rows[item.animal_id].saved?.producao ?? 0), 0);
-    return (
-      <div className="print-area" aria-hidden="true">
-        {header}
-        <table>
-          <thead>
+    figures = (
+      <>
+        <Figure label="Total do lote" value={`${liters(total)} L`} />
+        <Figure label="Vacas lançadas" value={`${saved.length} de ${items.length}`} />
+        <Figure label="Média por vaca" value={`${liters(Math.round((total / saved.length) * 10) / 10)} L`} />
+      </>
+    );
+  } else {
+    const before = items.filter((item) => item.anterior && item.anterior.measured_on === reference);
+    const total = before.reduce((sum, item) => sum + (item.anterior?.producao ?? 0), 0);
+    figures = (
+      <>
+        <Figure label="Vacas no lote" value={String(items.length)} />
+        {reference && (
+          <Figure
+            label="Pesagem anterior"
+            value={`${liters(total)} L`}
+            hint={`${brDate(reference)} · ${before.length} vacas`}
+          />
+        )}
+        <Figure label="Anotar" value="Manhã e tarde" hint="observação: secar, trocar de lote" />
+      </>
+    );
+  }
+
+  const parts =
+    filled && saved.some((item) => {
+      const reading = rows[item.animal_id].saved;
+      return reading?.manha != null || reading?.tarde != null;
+    });
+
+  return (
+    <div className="print-area ps" aria-hidden="true">
+      <header className="ps-head">
+        <div className="ps-brand">
+          <LogoMark size={42} />
+          <div>
+            <strong>Belo Vale II</strong>
+            <span>{filled ? "Registro da pesagem de leite" : "Folha de coleta de leite"}</span>
+          </div>
+        </div>
+        <div className="ps-when">
+          <span className="ps-lot">{lote}</span>
+          <span className="ps-date">{brDate(day)}</span>
+        </div>
+      </header>
+      <svg className="ps-hills" viewBox="0 0 1200 22" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 16 C 110 4, 220 4, 330 13 S 560 22, 680 11 S 900 1, 1020 10 S 1160 18, 1200 12" />
+      </svg>
+
+      <dl className="ps-summary">{figures}</dl>
+
+      <table>
+        <thead>
+          {filled ? (
             <tr>
-              <th>Brinco</th>
+              <th className="ps-tag">Brinco</th>
               <th>Nome</th>
-              <th className="num">Manhã</th>
-              <th className="num">Tarde</th>
+              {parts && <th className="num">Manhã</th>}
+              {parts && <th className="num">Tarde</th>}
               <th className="num">Total</th>
               <th className="note">Obs.</th>
             </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => {
+          ) : (
+            <tr>
+              <th className="ps-tag">Brinco</th>
+              <th>Nome</th>
+              <th className="num">{reference ? `Última (${shortDay(reference)})` : "Última"}</th>
+              <th className="write-in">Manhã</th>
+              <th className="write-in">Tarde</th>
+              <th className="write-in">Obs.</th>
+            </tr>
+          )}
+        </thead>
+        <tbody>
+          {items.map((item) => {
+            const brinco = <td className="ps-tag">{item.brinco ?? "sem brinco"}</td>;
+            const name = <td>{item.name ?? "sem nome"}</td>;
+            if (filled) {
               const reading = rows[item.animal_id]?.saved;
               return (
-                <tr key={item.animal_id}>
-                  <td>{item.brinco ?? "sem brinco"}</td>
-                  <td>{item.name ?? "sem nome"}</td>
-                  <td className="num">{show(reading?.manha)}</td>
-                  <td className="num">{show(reading?.tarde)}</td>
+                <tr key={item.animal_id} className={reading ? undefined : "ps-missing"}>
+                  {brinco}
+                  {name}
+                  {parts && <td className="num">{show(reading?.manha)}</td>}
+                  {parts && <td className="num">{show(reading?.tarde)}</td>}
                   <td className="num">
-                    <strong>{show(reading?.producao)}</strong>
+                    <strong>{reading ? show(reading.producao) : "—"}</strong>
                   </td>
                   <td className="note">{reading?.observacao ?? ""}</td>
                 </tr>
               );
-            })}
-          </tbody>
-        </table>
-        <p className="print-foot">
-          Total do lote: <strong>{liters(total)} L</strong> · {saved.length} de {items.length}{" "}
-          vacas lançadas
-        </p>
-      </div>
-    );
-  }
-
-  const reference = previousDate(items);
-  return (
-    <div className="print-area" aria-hidden="true">
-      {header}
-      <table>
-        <thead>
-          <tr>
-            <th>Brinco</th>
-            <th>Nome</th>
-            <th className="num">{reference ? `Última (${shortDay(reference)})` : "Última"}</th>
-            <th className="write-in">Manhã</th>
-            <th className="write-in">Tarde</th>
-            <th className="write-in">Obs.</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => {
+            }
             const before = item.anterior;
             const other = before && before.measured_on !== reference ? ` (${shortDay(before.measured_on)})` : "";
             return (
               <tr key={item.animal_id}>
-                <td>{item.brinco ?? "sem brinco"}</td>
-                <td>{item.name ?? "sem nome"}</td>
+                {brinco}
+                {name}
                 <td className="num">{before ? `${show(before.producao)}${other}` : "—"}</td>
                 <td className="write-in" />
                 <td className="write-in" />
@@ -576,7 +624,14 @@ function PrintSheet({
           })}
         </tbody>
       </table>
-      <p className="print-foot">Anotado por: ______________________</p>
+
+      <footer className="ps-foot">
+        <div className="ps-sign">Anotado por</div>
+        <div className="ps-sign">Conferido por</div>
+        <p>
+          Impresso em {brDate(farmToday())} · Belo Vale II · {lote} · {items.length} vacas
+        </p>
+      </footer>
     </div>
   );
 }
