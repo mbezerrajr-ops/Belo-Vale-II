@@ -26,6 +26,7 @@ import {
   type PasswordReset,
   type ProductionSheet,
   type Reading,
+  type ReadingInput,
   type Role,
   type Supply,
   type UserAccount,
@@ -559,16 +560,21 @@ export async function getProductionSheet(
 }
 
 /** 201 cria; 200 é o mesmo valor reenviado (retry); 409 é outro valor. */
+/** Só o número é o total do dia; o objeto traz manhã, tarde e anotação. */
+function readingBody(input: number | ReadingInput): ReadingInput {
+  return typeof input === "number" ? { producao: input } : input;
+}
+
 export async function enterReading(
   token: string,
   animalId: string,
   measuredOn: string,
-  producao: number,
+  input: number | ReadingInput,
 ): Promise<Reading> {
   const response = await fetch(`${API_BASE_URL}/api/production`, {
     method: "POST",
     headers: jsonHeaders(token),
-    body: JSON.stringify({ animal_id: animalId, measured_on: measuredOn, producao }),
+    body: JSON.stringify({ animal_id: animalId, measured_on: measuredOn, ...readingBody(input) }),
   });
   return parseJsonOrThrow<Reading>(response);
 }
@@ -576,7 +582,7 @@ export async function enterReading(
 export async function correctReading(
   token: string,
   measurementId: string,
-  producao: number,
+  input: number | ReadingInput,
   reason: string,
 ): Promise<Reading> {
   const response = await fetch(
@@ -584,7 +590,7 @@ export async function correctReading(
     {
       method: "POST",
       headers: jsonHeaders(token),
-      body: JSON.stringify({ producao, reason }),
+      body: JSON.stringify({ ...readingBody(input), reason }),
     },
   );
   return parseJsonOrThrow<Reading>(response);

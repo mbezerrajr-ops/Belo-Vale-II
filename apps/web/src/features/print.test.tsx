@@ -1,10 +1,11 @@
 /**
  * Impressão: folha de coleta em branco e lista de animais.
  *
- * No curral nem sempre dá para digitar na hora. A folha impressa tem as vacas
- * do lote, na ordem do caderno, com a coluna de litros em branco; depois o
- * funcionário digita ou importa. A lista impressa leva todos os animais do
- * filtro, não só a página que está na tela.
+ * No curral nem sempre dá para digitar na hora. Sem lançamento no dia, a folha
+ * impressa tem as vacas do lote, na ordem do caderno, com a pesagem anterior
+ * de referência e manhã, tarde e observação em branco; depois o funcionário
+ * digita ou importa. Com lançamento, a folha é o registro da pesagem. A lista
+ * impressa leva todos os animais do filtro, não só a página que está na tela.
  */
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -27,7 +28,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function sheet(): ProductionSheet {
+function sheet(launched: boolean): ProductionSheet {
   return {
     measured_on: "2026-09-18",
     lote: "LOTE 1",
@@ -38,9 +39,13 @@ function sheet(): ProductionSheet {
         brinco: "027",
         name: "BORBOREMA",
         situacao: "Em lactação",
-        producao: 35,
-        measurement_id: "m-1",
-        provenance: "manual_entry",
+        producao: launched ? 35 : null,
+        manha: launched ? 20 : null,
+        tarde: launched ? 15 : null,
+        observacao: launched ? "→ 3º Lote" : null,
+        measurement_id: launched ? "m-1" : null,
+        provenance: launched ? "manual_entry" : null,
+        anterior: { measured_on: "2026-08-25", producao: 37.5 },
       },
       {
         animal_id: "a-389",
@@ -50,9 +55,27 @@ function sheet(): ProductionSheet {
         producao: null,
         measurement_id: null,
         provenance: null,
+        anterior: { measured_on: "2026-07-22", producao: 21 },
       },
     ],
   };
+}
+
+function printSheet(launched: boolean, button: RegExp): Promise<HTMLElement> {
+  const { container } = render(
+    <ProductionPage
+      token={TOKEN}
+      canCorrect={false}
+      today="2026-09-18"
+      onLoadSheet={vi.fn().mockResolvedValue(sheet(launched))}
+      onEnter={vi.fn()}
+    />,
+  );
+  return screen.findByRole("button", { name: button }).then((found) => {
+    fireEvent.click(found);
+    expect(print).toHaveBeenCalled();
+    return container.querySelector(".print-area") as HTMLElement;
+  });
 }
 
 function animal(index: number): Animal {
@@ -75,28 +98,39 @@ function animal(index: number): Animal {
   };
 }
 
-describe("Folha de coleta em branco", () => {
-  it("imprime as vacas do lote com a coluna de litros vazia", async () => {
-    const { container } = render(
-      <ProductionPage
-        token={TOKEN}
-        canCorrect={false}
-        today="2026-09-18"
-        onLoadSheet={vi.fn().mockResolvedValue(sheet())}
-        onEnter={vi.fn()}
-      />,
-    );
+describe("Folha de coleta", () => {
+  it("sem lançamento, sai em branco com a pesagem anterior de referência", async () => {
+    const area = await printSheet(false, /imprimir folha em branco/i);
 
-    fireEvent.click(await screen.findByRole("button", { name: /imprimir folha em branco/i }));
-
-    expect(print).toHaveBeenCalled();
-    const area = container.querySelector(".print-area") as HTMLElement;
     expect(area).toHaveTextContent("LOTE 1");
     expect(area).toHaveTextContent("18/09/2026");
-    expect(area).toHaveTextContent("BORBOREMA");
-    expect(area).toHaveTextContent("ÁGATA");
-    // Folha em branco: nem o valor já lançado aparece.
-    expect(area).not.toHaveTextContent("35");
+    const header = Array.from(area.querySelectorAll("th"), (cell) => cell.textContent);
+    expect(header).toEqual(["Brinco", "Nome", "Última (25/08)", "Manhã", "Tarde", "Obs."]);
+    const [borborema, agata] = Array.from(area.querySelectorAll<HTMLElement>("tbody tr"));
+    expect(borborema).toHaveTextContent("BORBOREMA");
+    expect(borborema).toHaveTextContent("37,5");
+    // Pesagem anterior de outra data: a data vai junto do valor.
+    expect(agata).toHaveTextContent("21 (22/07)");
+  });
+
+  it("com lançamento, é o registro da pesagem: manhã, tarde, total e observação", async () => {
+    const area = await printSheet(true, /imprimir folha preenchida/i);
+
+    const header = Array.from(area.querySelectorAll("th"), (cell) => cell.textContent);
+    expect(header).toEqual(["Brinco", "Nome", "Manhã", "Tarde", "Total", "Obs."]);
+    const [borborema, agata] = Array.from(area.querySelectorAll<HTMLElement>("tbody tr"));
+    const cells = Array.from(borborema.querySelectorAll("td"), (cell) => cell.textContent);
+    expect(cells).toEqual(["027", "BORBOREMA", "20", "15", "35", "→ 3º Lote"]);
+    // A vaca ainda sem lançamento fica em branco, para completar.
+    expect(Array.from(agata.querySelectorAll("td"), (cell) => cell.textContent)).toEqual([
+      "389",
+      "ÁGATA",
+      "",
+      "",
+      "",
+      "",
+    ]);
+    expect(area).toHaveTextContent("Total do lote: 35 L · 1 de 2 vacas lançadas");
   });
 });
 

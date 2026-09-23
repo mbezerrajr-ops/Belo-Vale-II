@@ -67,20 +67,27 @@ test("funcionário lança a produção no curral e imprime a folha", async ({ pa
   await expect(page.getByRole("heading", { name: "Produção do dia" })).toBeVisible();
 
   await page.getByRole("group", { name: "Lote de ordenha" }).getByRole("button", { name: "LOTE 3" }).click();
-  const field = page.getByLabel(`Litros de ${milkingCow.name}`);
-  await field.fill("21,5");
+  const field = page.getByLabel(`Manhã de ${milkingCow.name}`);
+  await field.fill("12");
   await field.press("Enter");
+  const afternoon = page.getByLabel(`Tarde de ${milkingCow.name}`);
+  await expect(afternoon).toBeFocused();
+  await afternoon.fill("9,5");
+  // Enter na tarde sai da vaca: é aí que ela é salva.
+  await afternoon.press("Enter");
 
   const row = page.locator("li", { has: field });
   await expect(row.getByLabel("salvo")).toBeVisible();
+  await expect(row.getByLabel(`Total de ${milkingCow.name}`)).toHaveText("= 21,5 L");
 
-  // A folha em branco é montada para a impressora; aqui só conferimos que a
-  // vaca está nela, sem abrir o diálogo de impressão do navegador.
+  // A folha preenchida é montada para a impressora; aqui só conferimos que a
+  // vaca está nela com os litros, sem abrir o diálogo de impressão.
   await page.evaluate(() => {
     window.print = () => undefined;
   });
-  await page.getByRole("button", { name: "Imprimir folha em branco" }).click();
+  await page.getByRole("button", { name: "Imprimir folha preenchida" }).click();
   await expect(page.locator(".print-area")).toContainText(milkingCow.name);
+  await expect(page.locator(".print-area")).toContainText("21,5");
 });
 
 test("revisor corrige a leitura pela ficha do animal", async ({ page }) => {

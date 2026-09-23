@@ -2639,19 +2639,50 @@ form.milk-price .hint {
   font-size: 0.8rem;
 }
 
+/* Manhã e tarde lado a lado, o total do dia embaixo: é a ordem da folha
+   de pesagem. */
 .prod-input {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: end;
+  gap: 2px 6px;
+}
+
+.prod-input .milking {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+}
+
+.prod-input .milking > span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .prod-input input {
-  width: 5.6rem;
+  width: 4.6rem;
   margin: 0;
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 600;
+}
+
+.prod-total {
+  grid-column: 1 / -1;
+  min-height: 1.1em;
+  color: var(--ink-2);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.row-note-input {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 /* Celular: o nome da vaca é o que se procura na lista; brinco e campo
@@ -2668,14 +2699,9 @@ form.milk-price .hint {
   }
 
   .prod-input input {
-    width: 4.8rem;
-    padding-inline: 10px;
+    width: 3.9rem;
+    padding-inline: 8px;
   }
-}
-
-.prod-input .unit {
-  color: var(--muted);
-  font-size: 0.9rem;
 }
 
 .prod-state {
@@ -2742,6 +2768,15 @@ form.milk-price .hint {
 .row-void:hover {
   box-shadow: none;
   color: var(--danger);
+}
+
+/* "Obs." é curto: sem largura mínima, o alvo de toque ficava menor que um dedo. */
+.row-note {
+  min-width: var(--touch, 44px);
+}
+
+.row-note:hover {
+  color: var(--accent, var(--ink));
 }
 
 .row-fix {
@@ -3097,7 +3132,17 @@ form.milk-price .hint {
   }
 
   .print-area .write-in {
-    width: 22%;
+    width: 16%;
+  }
+
+  .print-area .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A anotação do manejo ("→ 3º Lote") precisa de espaço para ser escrita. */
+  .print-area .note {
+    width: 24%;
   }
 
   .print-area td.write-in {

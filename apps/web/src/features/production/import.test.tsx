@@ -24,6 +24,7 @@ function preview(overrides: Partial<ImportPreview> = {}): ImportPreview {
     counts: {
       new: 1,
       same: 1,
+      complete: 0,
       different: 1,
       not_found: 1,
       no_brinco: 0,

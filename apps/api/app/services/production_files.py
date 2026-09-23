@@ -51,11 +51,16 @@ class ParsedRow:
     location: str
     brinco_raw: str
     nome: str | None
+    #: Total do dia. Com manhã e tarde, é a soma delas (conferida com o
+    #: total da planilha, quando ele existe).
     producao: float
     #: A célula do brinco era um número, não texto. Planilhas apagam o zero
     #: à esquerda de números (`027` vira 27), então a associação precisa
     #: saber disso para avisar em vez de adivinhar.
     brinco_from_number: bool = False
+    manha: float | None = None
+    tarde: float | None = None
+    observacao: str | None = None
 
 
 @dataclass(frozen=True)
@@ -106,24 +111,45 @@ def _column_role(header: object) -> str | None:
     folded = _fold(header)
     if not folded:
         return None
+    # As ordenhas antes do total: "Litros manhã" é manhã, não o total.
+    if "manha" in folded:
+        return "manha"
+    if "tarde" in folded:
+        return "tarde"
+    if folded.startswith("obs"):
+        return "observacao"
     if any(key in folded for key in ("produc", "litro", "leite")) or folded.startswith("total"):
         return "producao"
-    if "brinco" in folded or "numero" in folded or folded in {"n", "no", "n.", "nº", "n°", "num", "id"}:
+    # "Nº Vaca": o º vira "o" ao dobrar os acentos.
+    if (
+        "brinco" in folded
+        or "numero" in folded
+        or folded in {"n", "no", "n.", "nº", "n°", "num", "id"}
+        or folded.startswith(("no ", "n° ", "n. ", "num "))
+    ):
         return "brinco"
     if "nome" in folded or folded in {"vaca", "animal"}:
         return "nome"
     return None
 
 
+#: Linhas do topo onde se procura o cabeçalho: a planilha da fazenda tem um
+#: título em cima dele.
+HEADER_SCAN = 5
+
+
 @dataclass(frozen=True)
 class _Columns:
     brinco: int
-    producao: int
+    producao: int | None
     nome: int | None
+    manha: int | None = None
+    tarde: int | None = None
+    observacao: int | None = None
 
 
-def _columns_from_header(cells: list[object]) -> _Columns | None:
-    """Colunas pelo cabeçalho, ou ``None`` se a linha não é um cabeçalho."""
+def _header_roles(cells: list[object]) -> dict[str, int] | None:
+    """Papel de cada coluna, ou ``None`` se a linha não é um cabeçalho."""
     if any(parse_number_br(cell) is not None for cell in cells if str(cell or "").strip()):
         return None
     roles: dict[str, int] = {}
@@ -131,14 +157,37 @@ def _columns_from_header(cells: list[object]) -> _Columns | None:
         role = _column_role(cell)
         if role and role not in roles:
             roles[role] = index
-    if not roles:
-        return None
-    if "brinco" not in roles or "producao" not in roles:
+    return roles or None
+
+
+def _complete(roles: dict[str, int]) -> bool:
+    return "brinco" in roles and any(r in roles for r in ("producao", "manha", "tarde"))
+
+
+def _columns(roles: dict[str, int]) -> _Columns:
+    return _Columns(
+        brinco=roles["brinco"],
+        producao=roles.get("producao"),
+        nome=roles.get("nome"),
+        manha=roles.get("manha"),
+        tarde=roles.get("tarde"),
+        observacao=roles.get("observacao"),
+    )
+
+
+def _find_header(data: list[tuple[str, list[object], list[object] | None]]) -> tuple[_Columns, int] | None:
+    """Cabeçalho completo no topo, e onde os dados começam depois dele."""
+    for position, (_, cells, _) in enumerate(data[:HEADER_SCAN]):
+        roles = _header_roles(cells)
+        if roles and _complete(roles):
+            return _columns(roles), position + 1
+    roles = _header_roles(data[0][1])
+    if roles:
         raise ProductionFileError(
             "O cabeçalho precisa ter uma coluna de brinco (ou número) e uma de "
-            "produção (ou litros)."
+            "produção (ou litros, ou manhã e tarde)."
         )
-    return _Columns(brinco=roles["brinco"], producao=roles["producao"], nome=roles.get("nome"))
+    return None
 
 
 def _positional(width: int) -> _Columns:
@@ -146,6 +195,10 @@ def _positional(width: int) -> _Columns:
     if width >= 3:
         return _Columns(brinco=0, nome=1, producao=2)
     return _Columns(brinco=0, nome=None, producao=1)
+
+
+def _liters_text(value: float) -> str:
+    return f"{value:g}".replace(".", ",")
 
 
 def _cell(cells: list[object], index: int | None) -> object:
@@ -169,30 +222,63 @@ def _rows_from_table(
     data = [entry for entry in table if not all(_blank(c) for c in entry[1])]
     if not data:
         return
-    columns = _columns_from_header(data[0][1])
-    if columns is None:
+    found = _find_header(data)
+    if found is None:
         columns = _positional(max(len(cells) for _, cells, _ in data))
     else:
-        data = data[1:]
+        columns, start = found
+        data = data[start:]
+    liter_columns = [c for c in (columns.producao, columns.manha, columns.tarde) if c is not None]
 
     for location, cells, formulas in data[:MAX_ROWS]:
         text = " | ".join("" if _blank(c) else str(c) for c in cells)
         brinco_cell = _cell(cells, columns.brinco)
-        producao_cell = _cell(cells, columns.producao)
         if _blank(brinco_cell):
-            parsed.problems.append(FileProblem(location, text, "sem brinco"))
+            # Sem brinco e sem litro nenhum é título ou separador ("1º Lote").
+            if any(not _blank(_cell(cells, c)) for c in liter_columns):
+                parsed.problems.append(FileProblem(location, text, "sem brinco"))
             continue
-        if _blank(producao_cell):
+
+        parts: dict[str, float | None] = {}
+        unreadable = None
+        for name, index, label in (
+            ("manha", columns.manha, "manhã ilegível"),
+            ("tarde", columns.tarde, "tarde ilegível"),
+            ("producao", columns.producao, "produção ilegível"),
+        ):
+            cell = _cell(cells, index)
+            if _blank(cell):
+                parts[name] = None
+                continue
+            parts[name] = parse_number_br(cell)
+            if parts[name] is None:
+                unreadable = label
+        if unreadable:
+            parsed.problems.append(FileProblem(location, text, unreadable))
+            continue
+
+        milkings = [v for v in (parts["manha"], parts["tarde"]) if v is not None]
+        producao = parts["producao"]
+        if not milkings and producao is None:
             formula = _cell(formulas, columns.producao) if formulas else None
             if isinstance(formula, str) and formula.startswith("="):
                 parsed.problems.append(FileProblem(location, text, "fórmula sem valor calculado"))
             else:
                 parsed.problems.append(FileProblem(location, text, "sem produção"))
             continue
-        producao = parse_number_br(producao_cell)
-        if producao is None:
-            parsed.problems.append(FileProblem(location, text, "produção ilegível"))
-            continue
+        if milkings:
+            soma = round(sum(milkings), 2)
+            if producao is not None and abs(producao - soma) > 0.05:
+                parsed.problems.append(
+                    FileProblem(
+                        location,
+                        text,
+                        f"manhã + tarde ({_liters_text(soma)} L) não bate com o total "
+                        f"({_liters_text(producao)} L)",
+                    )
+                )
+                continue
+            producao = soma
 
         from_number = isinstance(brinco_cell, (int, float)) and not isinstance(brinco_cell, bool)
         if from_number and float(brinco_cell).is_integer():
@@ -200,6 +286,7 @@ def _rows_from_table(
         else:
             brinco_raw = str(brinco_cell).strip()
         nome_cell = _cell(cells, columns.nome)
+        nota_cell = _cell(cells, columns.observacao)
         parsed.rows.append(
             ParsedRow(
                 location=location,
@@ -207,6 +294,9 @@ def _rows_from_table(
                 nome=None if _blank(nome_cell) else str(nome_cell).strip(),
                 producao=producao,
                 brinco_from_number=from_number,
+                manha=parts["manha"],
+                tarde=parts["tarde"],
+                observacao=None if _blank(nota_cell) else " ".join(str(nota_cell).split())[:200],
             )
         )
     if len(data) > MAX_ROWS:
