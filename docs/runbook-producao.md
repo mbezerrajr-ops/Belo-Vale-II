@@ -38,7 +38,8 @@ Decisões (22/09/2026):
 | PC sem suspender na tomada; Docker Desktop abrindo com o Windows | já estava |
 | Criar a conta do administrador | feito |
 | Instalar a Tailscale e ligar o Funnel (`https://desktop-caio.tailf88007.ts.net`) | feito |
-| Anotar no papel a senha do backup | **pendente: você** |
+| Guardar a senha do backup fora do PC | feito (24/09/2026) |
+| **Conectar o OneDrive neste PC.** Sem ele e sem o HD, nenhuma cópia sai daqui (ver "Backup") | **pendente: você** |
 | Conectar o HD externo e indicar a pasta | **pendente: você** |
 
 ### Criar a conta do administrador
@@ -123,10 +124,26 @@ migrações do banco e confere que o app voltou.
 
 - **OneDrive, pasta `BeloVale-backup`:** a cópia criptografada com AES-256;
   ficam as últimas 14. Depois de subir, ela deixa de ocupar o disco C:.
+  **Só sobe se o OneDrive estiver conectado com uma conta** neste PC. Entre
+  com a mesma conta do notebook: cada cópia chega lá sozinha, e o notebook
+  vira o segundo lugar.
 - **Senha da criptografia:** fica em `%USERPROFILE%\.belo-vale\senha-backup.txt`,
-  legível só pela sua conta do Windows. **Anote-a no papel e guarde longe do
-  PC.** Se o PC se perder, é a única forma de abrir a cópia da nuvem.
+  legível só pela sua conta do Windows. **Guarde-a também longe do PC.** Se o
+  PC se perder, é a única forma de abrir a cópia da nuvem.
 - **Registro:** `%USERPROFILE%\.belo-vale\backup.log`.
+
+**Só conta o que sai do PC.** Uma cópia no mesmo disco não sobrevive a ele.
+Se o OneDrive não estiver conectado e o HD não estiver ligado (ou a pasta do
+HD estiver no C:), a cópia fica gravada aqui mesmo, mas o backup termina como
+**FALHOU**, com o motivo no registro, e o `producao.ps1 estado` mostra:
+
+```
+Último backup: belo-vale-2026-09-23_0330 (80,1 MB)
+A ÚLTIMA TENTATIVA DE BACKUP FALHOU: ... nenhuma cópia saiu deste PC ...
+```
+
+Até 24/09/2026 era diferente, e foi assim que o desktop foi para o conserto
+sem nenhuma cópia fora dele (ver `known-issues.md`).
 
 ### Verificação semanal
 
