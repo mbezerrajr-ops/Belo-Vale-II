@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
  * A paisagem do login: vacas pastando numa janela de papel recortado.
  *
  * É só decoração. O vídeo (`public/login/`) é o trecho do vídeo de referência
- * com o pasto e a moldura de papel já desenhada nele, sem áudio, indo e
- * voltando para o laço não dar pulo. No computador aparece inteiro, como no
+ * com o pasto e a moldura de papel já desenhada nele (428×444 a partir de
+ * 430,141), ampliado 2× com o Real-ESRGAN (`realesr-animevideov3`, feito para
+ * vídeo: não pisca entre quadros), sem áudio, indo e voltando para o laço não
+ * dar pulo. No computador aparece inteiro, como no
  * mockup; na faixa do celular, ampliado sobre as vacas, com a borda de papel
  * ondulada desenhada aqui.
  *
