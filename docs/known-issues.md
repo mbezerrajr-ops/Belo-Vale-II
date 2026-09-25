@@ -159,7 +159,9 @@ automática de dado.
 - **O matching por nome existe em dois lugares, não um.** Além do fallback em
   `apps/api/app/services/animal_matching.py`, o importador legado faz matching
   **primário** por nome em `import_relatorio_animais.py` (`by_name` antes de
-  `by_number`). A Fase 6 precisa tratar os dois.
+  `by_number`). A Fase 6 precisa tratar os dois. *(O fallback do sistema
+  saiu junto com o caminho antigo das Fichas, em 24/09/2026; resta o do
+  importador legado.)*
 
 ## Scripts Playwright históricos não são uma suíte `unittest`
 
@@ -202,7 +204,8 @@ Deixar a área "Fichas" visível faria uma leitura inventada chegar à revisão
 parecendo verdadeira. A área só aparece com `VISION_PROVIDER=http` ou com
 `PHOTO_SHEETS_DEMO=true` (demonstração e E2E), e a API se recusa a subir em
 produção com o modo de demonstração ligado. O código do fluxo continua
-inteiro e coberto pelo E2E.
+inteiro e coberto pelo E2E. *(A área e o código foram removidos em
+24/09/2026 — ver "Caminho antigo das Fichas removido".)*
 
 ## `HttpVisionProvider` sem integração externa real comprovada
 
@@ -210,7 +213,9 @@ Ver `docs/vision-provider-status.md` para a classificação completa.
 Estruturalmente revisado e testado (construção de requisição, ausência de
 credenciais no frontend, timeout, parsing do formato esperado); nunca
 executado contra um provedor de visão/OCR real, por não haver credencial
-disponível ou autorizada neste ambiente.
+disponível ou autorizada neste ambiente. *(Removido em 24/09/2026: mandaria a
+foto para qualquer endereço, sem a guarda de endereço local que o leitor
+oficial tem.)*
 
 ## CI — resolvido
 
@@ -529,6 +534,7 @@ O caminho antigo (`POST /api/imports` → `run_extraction` →
 `provenance=ocr_review`) continua no banco e no código, servindo as fichas já
 importadas. O envio de foto novo mora dentro da Revisão. Apagar as telas, as
 rotas e o `approval.py` é assunto de outro PR — nada foi removido agora.
+*(Removido em 24/09/2026 — ver "Caminho antigo das Fichas removido".)*
 
 ### A caixa não se atualiza sozinha
 
@@ -1105,3 +1111,29 @@ subir arquivo de teste para a conta.
 
 **Pendente com o titular:** conectar o OneDrive no desktop (com a mesma conta
 do notebook, a cópia chega a ele) e o HD externo.
+
+## Caminho antigo das Fichas removido (24/09/2026)
+
+A área "Fichas" saiu do menu em 20/09, quando a foto da folha passou a ser
+enviada pela Revisão, mas o código ficou. Conferido antes de apagar: **nada
+dele rodava mais** — o worker só chama a leitura nova; `run_extraction` era
+chamado apenas por testes; nenhuma tela chamava `GET /api/features`, então o
+`PHOTO_SHEETS_DEMO=true` do CI não tinha efeito; e nenhum teste E2E passava
+por ele.
+
+**Saiu:** as telas (envio e revisão linha a linha), as rotas
+`GET /api/imports/{id}/review`, `POST /api/extracted-lines/{id}/decision` e
+`GET /api/features`, os serviços de revisão, aprovação, validação,
+normalização e casamento por nome, o `VisionProvider` (com o
+`HttpVisionProvider`, que mandaria a foto para qualquer endereço), o
+`run_extraction`, as configurações `VISION_*` e `PHOTO_SHEETS_DEMO`, e o campo
+`declared_period` do envio, que só a tela antiga mandava.
+
+**Ficou, de propósito:** as tabelas `extracted_lines`, `validation_alerts` e
+`review_decisions`, as migrações e as regras do banco para a origem
+`ocr_review`. As medições que vieram por esse caminho continuam no histórico
+("Ficha por foto"). O que deixa de existir é a tela que mostrava a leitura
+crua dessas fichas antigas, que já não era alcançável pelo menu.
+
+Uma instalação com `PHOTO_SHEETS_DEMO` ou `VISION_*` sobrando no `.env` sobe
+normalmente: a configuração ignora variáveis que não conhece.

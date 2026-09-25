@@ -3,6 +3,12 @@
 Esta é uma classificação explícita, para não confundir "implementação
 estruturalmente pronta" com "integração externa validada".
 
+> **Removido em 24/09/2026:** as três primeiras seções (`FakeVisionProvider`,
+> `HttpVisionProvider` e provedor externo) descrevem o leitor do caminho
+> antigo das Fichas, que saiu do código. O leitor em uso começa em "Leitor
+> local de folhas (Ollama)", abaixo. Ver `known-issues.md`, "Caminho antigo
+> das Fichas removido".
+
 ## FakeVisionProvider
 
 **Comprovado em uso real.** É o provedor padrão (`VISION_PROVIDER=fake`,
@@ -247,7 +253,9 @@ Existem dois caminhos de leitura no repositório. **O oficial é o novo.**
 | Situação | congelado, serve o que já foi importado | em uso |
 
 O legado continua no lugar porque as fichas já importadas dependem dele.
-Nada novo deve ser construído sobre ele.
+Nada novo deve ser construído sobre ele. *(Em 24/09/2026 o código do legado
+saiu; as medições que ele gerou continuam no banco, com a origem
+`ocr_review`.)*
 
 ### O que o app sabe sobre o modelo
 
