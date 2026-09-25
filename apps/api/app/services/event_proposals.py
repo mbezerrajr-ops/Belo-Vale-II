@@ -716,8 +716,9 @@ async def approve_proposal(
         )
         return result
 
-    # note: vira uma linha datada nas observações do animal.
-    day = source.reference_date if source and source.reference_date else farm_today()
+    # note: vira uma linha datada nas observações do animal. A data é a do
+    # arquivo depois da correção de quem revisa, não a que o leitor leu.
+    day = (source.effective_reference_date if source else None) or farm_today()
     line = f"{day:%d/%m/%Y}: {validated.text.strip()}"
     observacoes = f"{animal.observacoes}\n{line}" if animal.observacoes else line
     result = {"animal_id": str(animal.id), "observacao": line}

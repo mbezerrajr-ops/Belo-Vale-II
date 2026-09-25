@@ -493,6 +493,30 @@ class TestApproveOtherEvents:
             ("mansa\n25/08/2026: mancando",)
         ]
 
+    def test_note_approved_after_the_file_was_redated_takes_the_corrected_date(
+        self, api, farm
+    ) -> None:
+        """O leitor erra o ano do cabeçalho e o revisor corrige o arquivo
+        inteiro: a observação aprovada depois leva a data corrigida."""
+        _, reviewer = make_user("reviewer")
+        cow = make_animal(farm, brinco="389", name="ÁGATA", lote="LOTE 1")
+        [proposal] = _load(
+            farm,
+            "reviewer@belovale",
+            _event("note", "389", None, texto="mancando"),
+            reference=date(2024, 8, 25),
+        )
+        source = one("SELECT id::text FROM event_proposal_sources")[0][0]
+        assert _redate(api, reviewer, source, "2026-08-25").status_code == 200
+        version = one("SELECT version FROM event_proposals WHERE id = :p", p=proposal)[0][0]
+
+        response = _approve(api, reviewer, proposal, cow, {"text": "mancando"}, version=version)
+
+        assert response.status_code == 200
+        assert one("SELECT observacoes FROM animals WHERE id = :a", a=cow) == [
+            ("25/08/2026: mancando",)
+        ]
+
 
 class TestReject:
     def test_reviewer_rejects_with_a_reason(self, api, farm) -> None:
