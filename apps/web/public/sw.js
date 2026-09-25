@@ -124,7 +124,9 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(page(event));
   } else if (url.pathname.startsWith("/assets/")) {
     event.respondWith(asset(request));
-  } else if (/\.(svg|png|json|webmanifest)$/.test(url.pathname) && url.pathname !== "/asset-manifest.json") {
+  } else if (/\.(svg|png|webp|json|webmanifest)$/.test(url.pathname) && url.pathname !== "/asset-manifest.json") {
+    // A imagem parada do login entra aqui (sem sinal, o pasto ainda aparece);
+    // o vídeo não: o Safari o pede em pedaços, e guardado inteiro não toca.
     event.respondWith(other(request));
   }
 });
