@@ -1046,6 +1046,34 @@ README os cita em grupo ("`v1_*.html`... mantida como histórico/referência")
 reversível pelo Git (o histórico guarda tudo), e tira do HEAD cópias antigas
 dos dados reais do rebanho embutidas nesses HTMLs; a decisão é do titular.
 
+## Correções da análise geral (24/09/2026)
+
+Quatro defeitos achados lendo o código, cada um com teste que falhava antes:
+
+- **Observação aprovada depois de corrigir a data do arquivo saía com a data
+  lida.** `approve_proposal` usava `reference_date` em vez de
+  `effective_reference_date` — justo no caso comum em que o leitor erra o ano
+  do cabeçalho e o revisor corrige o arquivo inteiro.
+- **Leitura interrompida ficava "processando" para sempre.** Queda de energia
+  ou worker que cai no meio: a tarefa já tinha saído da fila e não volta, e o
+  "tentar de novo" era recusado por "ainda lendo". Agora a leitura ativa há
+  mais de **uma hora** (a mais longa medida levou uns 11 minutos) aparece como
+  falha para quem enviou, e tentar de novo a fecha como `failed`/`internal` e
+  começa outra. *Limite:* uma leitura de verdade mais longa que uma hora, se
+  alguém tentar de novo, termina depois e a caixa recebe as propostas duas
+  vezes — nada é aprovado sozinho, e quem revisa rejeita as repetidas.
+- **Envio pendurado travava a fila do celular** até recarregar a página. A
+  fila usa agora os mesmos prazos do envio direto (15 s produção, 90 s foto
+  ou áudio).
+- **Valor guardado sem sinal e corrigido depois, com sinal, voltava como
+  erro.** O lançamento direto agora tira da fila a produção daquela vaca e dia.
+
+**Achado, não corrigido:** a imagem `api-tests` do compose (runbook local,
+seção 7) não coleta os testes. Dentro dela eles ficam em `/app/tests`, e o
+`conftest.py` sobe três níveis (`parents[3]`) procurando a raiz do
+repositório, que ali não existe. O CI não usa essa imagem: roda o pytest no
+repositório. Enquanto isso, rode a suíte como o CI, ou monte o repositório no
+contêiner de teste.
 ## Backup sem cópia fora do PC (24/09/2026) — resolvido no script
 
 O desktop da produção foi para o conserto e, ao procurar a cópia da nuvem

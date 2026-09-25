@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
 from sqlalchemy import select
@@ -16,6 +16,21 @@ from app.services.storage import ObjectStorage
 logger = logging.getLogger(__name__)
 
 _ACTIVE_RUN_STATUSES = ("pending", "processing")
+
+#: Uma leitura ainda "pendente" ou "processando" depois disto foi interrompida:
+#: o PC reiniciou (queda de energia) ou o worker caiu, e a tarefa, que já tinha
+#: saído da fila, não volta. A mais longa medida levou uns 11 minutos. Antes,
+#: ela ficava assim para sempre, e o "tentar de novo" era recusado.
+ABANDONED_AFTER = timedelta(hours=1)
+
+
+def is_abandoned(run: ExtractionRun, now: datetime) -> bool:
+    """Leitura ativa que passou do prazo, contado de quando começou (ou,
+    se nem começou, de quando entrou na fila)."""
+    if run.status not in _ACTIVE_RUN_STATUSES:
+        return False
+    since = run.started_at or run.created_at
+    return since is not None and now - since > ABANDONED_AFTER
 
 
 class IngestionError(Exception):
@@ -157,7 +172,18 @@ async def reprocess_import(
         )
     )
     if active_run is not None:
-        raise ImportAlreadyProcessingError(str(import_id))
+        now = datetime.now(timezone.utc)
+        if not is_abandoned(active_run, now):
+            raise ImportAlreadyProcessingError(str(import_id))
+        # Fica registrada como falha, e a leitura nova começa.
+        active_run.status = "failed"
+        active_run.failure_code = "internal"
+        active_run.completed_at = now
+        logger.warning(
+            "abandoned reading closed import_id=%s extraction_run_id=%s",
+            import_id,
+            active_run.id,
+        )
     if only_if_failed:
         latest = await session.scalar(
             select(ExtractionRun)

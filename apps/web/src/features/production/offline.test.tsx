@@ -10,7 +10,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ProductionPage } from "./ProductionPage";
-import type { ProductionSheet, Reading } from "../../api/types";
+import { ApiError, type ProductionSheet, type Reading } from "../../api/types";
 import { Outbox, memoryStore, type Senders } from "../../offline/outbox";
 import { OutboxProvider } from "../../offline/OutboxContext";
 
@@ -146,6 +146,40 @@ describe("Produção sem sinal", () => {
     expect(await outbox.list(USER)).toEqual([
       expect.objectContaining({ animalId: "a-027", producao: 7, observacao: "→ Seca" }),
     ]);
+  });
+
+  it("lançado direto depois de guardado: o valor antigo sai da fila e não volta como erro", async () => {
+    const outbox = new Outbox(memoryStore());
+    await outbox.addReading({ userId: USER, animalId: "a-027", label: "BORBOREMA", measuredOn: DAY, producao: 19 });
+    let online = false;
+    // O servidor, depois do lançamento direto, já tem 23 L: os 19 da fila
+    // seriam "valor diferente já lançado".
+    const enterReading = vi.fn(async (_t: string, _a: string, _d: string, input: unknown) => {
+      if (!online) throw new TypeError("Failed to fetch");
+      if (input === 19) {
+        throw new ApiError(409, { code: "conflict", detail: { message: "outro valor", existing: reading(23) } });
+      }
+      return reading(23);
+    });
+    const send: Senders = { enterReading, uploadImport: vi.fn() };
+    page(outbox, send);
+    await screen.findByLabelText("guardado no celular");
+
+    online = true;
+    const field = screen.getByLabelText("Litros de BORBOREMA");
+    fireEvent.change(field, { target: { value: "23" } });
+    fireEvent.blur(field);
+    await screen.findByLabelText("salvo");
+
+    enterReading.mockClear();
+    await act(async () => {
+      await outbox.flush({ userId: USER, token: TOKEN, send });
+    });
+
+    expect(enterReading).not.toHaveBeenCalled();
+    expect(await outbox.list(USER)).toEqual([]);
+    expect(screen.getByLabelText("salvo")).toBeInTheDocument();
+    expect(screen.queryByText(/não enviado/i)).not.toBeInTheDocument();
   });
 
   it("valor que o servidor recusa aparece na linha, com o motivo", async () => {

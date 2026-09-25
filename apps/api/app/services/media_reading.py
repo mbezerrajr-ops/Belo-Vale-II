@@ -39,6 +39,7 @@ from app.services.event_extraction import (
     UnreadableContentError,
 )
 from app.services.event_proposals import create_proposals
+from app.services.ingestion import is_abandoned
 from app.services.media_sniffing import reading_kind
 from app.services.storage import ObjectStorage
 
@@ -110,12 +111,15 @@ async def reading_status(
     if run.status == "extracted":
         events = (run.raw_response or {}).get("events")
         proposals = len(events) if isinstance(events, list) else None
+    # Interrompida no meio (o PC reiniciou): para quem enviou, é uma falha que
+    # dá para tentar de novo, não uma leitura que nunca termina.
+    status = "failed" if is_abandoned(run, datetime.now(timezone.utc)) else run.status
     # Leitura que falhou antes de existir o motivo: sem ele, "internal".
-    failure = (run.failure_code or "internal") if run.status == "failed" else None
+    failure = (run.failure_code or "internal") if status == "failed" else None
     return ReadingStatus(
         import_id=import_id,
         kind=reading_kind(media.media_type),
-        status=run.status,
+        status=status,
         proposals=proposals,
         failure=failure,
     )
