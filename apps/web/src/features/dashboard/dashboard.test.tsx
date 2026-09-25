@@ -161,6 +161,21 @@ describe("HerdDashboard", () => {
     expect(screen.queryByText("ÁGATA")).not.toBeInTheDocument();
   });
 
+  it("depois de uma falha, tentar de novo mostra o painel", async () => {
+    // Um carregamento que falhou (sinal que caiu) prendia a tela no erro até
+    // recarregar a página: nem trocar o filtro nem o sinal voltar limpavam.
+    const load = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValue(summary());
+
+    render(<HerdDashboard token={TOKEN} onLoad={load} />);
+    fireEvent.click(await screen.findByRole("button", { name: /tentar de novo/i }));
+
+    expect(await screen.findAllByText("LOTE 1")).not.toHaveLength(0);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("filtra por lote", async () => {
     const load = vi.fn().mockResolvedValue(summary());
 

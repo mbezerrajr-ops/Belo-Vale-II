@@ -56,6 +56,8 @@ export function HerdDashboard({
   // Trocar um filtro relê o painel: enquanto isso os números antigos ficam
   // esmaecidos, para ninguém ler o lote anterior como se fosse o escolhido.
   const [loading, setLoading] = useState(true);
+  // Muda no "Tentar de novo", para carregar outra vez com os mesmos filtros.
+  const [attempt, setAttempt] = useState(0);
   // Maiores e menores produções dividem um cartão: medem a mesma coisa.
   const [ranking, setRanking] = useState<"maiores" | "menores">("maiores");
   // As opções dos filtros não podem vir só do painel filtrado: com LOTE 2
@@ -73,6 +75,9 @@ export function HerdDashboard({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    // Cada carregamento começa limpo: um erro de antes (o sinal que caiu)
+    // não pode prender a tela depois que o sinal volta.
+    setError(null);
     onLoad(token, filters)
       .then((loaded) => {
         if (!cancelled) setPanel(loaded);
@@ -89,9 +94,18 @@ export function HerdDashboard({
     return () => {
       cancelled = true;
     };
-  }, [token, filters, onLoad]);
+  }, [token, filters, onLoad, attempt]);
 
-  if (error) return <p role="alert">{error}</p>;
+  if (error) {
+    return (
+      <section className="dashboard">
+        <p role="alert">{error}</p>
+        <button type="button" onClick={() => setAttempt((count) => count + 1)}>
+          Tentar de novo
+        </button>
+      </section>
+    );
+  }
   if (panel === null) {
     return (
       <section className="dashboard">
