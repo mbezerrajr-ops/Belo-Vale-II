@@ -1074,3 +1074,34 @@ seção 7) não coleta os testes. Dentro dela eles ficam em `/app/tests`, e o
 repositório, que ali não existe. O CI não usa essa imagem: roda o pytest no
 repositório. Enquanto isso, rode a suíte como o CI, ou monte o repositório no
 contêiner de teste.
+## Backup sem cópia fora do PC (24/09/2026) — resolvido no script
+
+O desktop da produção foi para o conserto e, ao procurar a cópia da nuvem
+pelo notebook, ela não existia. O desktop **nunca teve conta do OneDrive
+conectada**. O `backup.ps1` gravava a cópia criptografada em
+`%OneDrive%\BeloVale-backup` e a contava como destino só por a pasta
+existir: sem conta, nada subia, e o registro dizia "Backup concluído". Com o
+HD externo também pendente, **nenhuma cópia saiu da máquina** — todos os
+dados da fazenda ficaram num único disco.
+
+Corrigido (`tools/backup/regras.ps1`, testes em `testar-regras.ps1`, no CI):
+
+- **Só conta o que sai do PC.** A pasta do OneDrive precisa estar dentro da
+  pasta de uma conta conectada (lida do registro do Windows); a do HD, fora
+  do disco do sistema.
+- **A cópia local continua sendo gravada** — ainda protege contra um erro nos
+  dados —, mas o backup termina como `FALHOU`, com o motivo, sai com código
+  1 (a tarefa agendada registra a falha) e o "Último backup" não avança.
+- **`producao.ps1 estado` mostra a última tentativa que falhou**, logo abaixo
+  do último backup que deu certo. Antes, uma falha diária ficava escondida
+  atrás da data do último que funcionou.
+
+Conferido no notebook, com o `backup.ps1` real no PowerShell 5.1 contra um
+banco descartável: pasta de nuvem sem conta → `FALHOU`; HD numa letra de
+unidade separada → concluído, e o `verificar-backup.ps1` restaurou a cópia;
+pasta do "HD" no C: → `FALHOU`. O caminho da nuvem conectada foi coberto
+pelos testes das regras e pela leitura real do registro do notebook, sem
+subir arquivo de teste para a conta.
+
+**Pendente com o titular:** conectar o OneDrive no desktop (com a mesma conta
+do notebook, a cópia chega a ele) e o HD externo.

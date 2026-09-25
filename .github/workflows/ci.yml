@@ -38,6 +38,10 @@ jobs:
       - name: Testes do scanner
         working-directory: tools
         run: python -m unittest test_credential_scan -v
+      # O backup roda no Windows; as regras dele são só funções, e o pwsh
+      # do runner as testa.
+      - name: Regras do backup
+        run: pwsh -NoProfile -File tools/backup/testar-regras.ps1
       - name: Dependências de leitura do PDF legado
         run: pip install -r belo-vale-ii-projeto-completo/plataforma/requirements-import.txt
       - name: Contrato do estado canônico
