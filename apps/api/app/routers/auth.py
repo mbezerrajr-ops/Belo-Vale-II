@@ -171,11 +171,14 @@ async def refresh(
         )
     except RefreshTokenError as error:
         # Cookie inútil só atrapalha: some com ele para o usuário poder
-        # simplesmente entrar de novo.
-        _clear_refresh_cookie(response)
+        # simplesmente entrar de novo. Vai no próprio erro: o cabeçalho posto
+        # em `response` se perde quando a rota levanta HTTPException.
+        cleared = Response()
+        _clear_refresh_cookie(cleared)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Sessão expirada. Entre novamente.",
+            headers={"set-cookie": cleared.headers["set-cookie"]},
         ) from error
 
     try:
