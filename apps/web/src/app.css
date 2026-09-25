@@ -899,43 +899,66 @@ form h3 {
 /* ---------- login ---------- */
 
 /*
- * Um cartão: a entrada de um lado, o pasto do outro — as vacas do vídeo atrás
- * de camadas de papel recortado (auth/LoginLandscape.tsx). No celular o pasto
- * vira a faixa de cima e a folha branca da entrada ocupa o resto da tela.
- *
- * As camadas pintam com estas cores; a da frente é a do próprio cartão, e é
- * ela que funde a moldura nele.
+ * A entrada é um cartão claro sobre o pasto desfocado: a marca e o formulário
+ * de um lado, as vacas na janela de papel recortado do outro — a moldura vem
+ * do próprio vídeo (auth/LoginLandscape.tsx). No celular o pasto vira a faixa
+ * de cima, com a borda de papel ondulada.
  */
 .login {
-  --login-card: #ffffff;
-  --paper-1: #f2eee4;
-  --paper-2: #e4dccb;
+  --login-card: #f3f3ef;
+  --paper-1: #e6e6df;
   --leaf-1: #4b8664;
   --leaf-2: #336a4f;
-  --leaf-3: #1d4a38;
   /* dvh: no celular, 100vh conta a barra de endereço e sobrava rolagem. */
   min-height: 100vh;
   min-height: 100dvh;
   display: grid;
-  background: var(--bg);
+  background:
+    linear-gradient(rgba(244, 244, 236, 0.18), rgba(244, 244, 236, 0.18)),
+    #dfe3d3 url("/login/login-backdrop.webp") center / cover no-repeat;
 }
 
-/* No escuro, o cartão e o papel seguem a superfície do tema; o pasto e os
-   verdes continuam os mesmos. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .login {
-    --login-card: var(--surface);
-    --paper-1: #262c28;
-    --paper-2: #323a35;
+    background:
+      linear-gradient(rgba(12, 16, 14, 0.62), rgba(12, 16, 14, 0.62)),
+      #1c211d url("/login/login-backdrop.webp") center / cover no-repeat;
   }
 }
 
+/*
+ * O cartão é claro em qualquer tema: a moldura de papel do vídeo é clara, e
+ * o cartão repete o degradê dela (medido no vídeo) para as duas emendarem.
+ * Por dentro, os cinzas neutros do mockup no lugar do creme do app, e as
+ * cores de texto e de ação do tema claro.
+ */
 .login-card {
+  color-scheme: light;
+  --surface: #fbfbf9;
+  --surface-2: #f0f0ec;
+  --ink: #1c2a24;
+  --ink-2: #4a5a52;
+  --muted: #5b645e;
+  --line: #e0e0da;
+  --line-strong: #cdcdc5;
+  --brand: #285e4a;
+  --brand-2: #3f8a5f;
+  --brand-soft: #dcebe1;
+  --brand-ink: #1f4d3c;
+  --on-brand: #ffffff;
+  --danger: #9c382e;
+  --danger-soft: #f7e0dc;
+  --warn: #b8860b;
+  --warn-soft: #fbeed3;
+  --warn-ink: #8a6100;
+  --good: #2a7043;
+  --good-soft: #dcebe1;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--login-card);
+  color: var(--ink);
+  background: linear-gradient(180deg, #f6f6f3 0%, #ebebe5 100%);
 }
 
 /* O pasto vem antes no desenho, mas depois na leitura: é decoração. */
@@ -958,30 +981,19 @@ form h3 {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* As vacas ficam na parte de baixo da cena. Na faixa do celular a cena
-     amplia a partir do canto delas, e o canto de cima à esquerda — onde o
-     recorte ainda traz o papel do vídeo original — fica de fora. */
-  object-position: 50% 72%;
-  transform: scale(1.2);
-  transform-origin: 78% 80%;
+  object-position: 50% 70%;
+  /* Na faixa do celular, só o pasto: ampliado sobre as vacas, com a moldura
+     de papel do vídeo de fora (quem faz a borda aqui é a onda abaixo). */
+  transform: scale(1.77);
+  transform-origin: 66% 77%;
 }
 
-.login-landscape .paper {
+/* 1px a mais evita o fio de vídeo que o arredondamento deixava aparecer. */
+.login-landscape .paper-wave {
   position: absolute;
-  inset: 0;
+  inset: auto 0 -1px;
   display: block;
   width: 100%;
-  height: 100%;
-}
-
-.login-landscape .paper-window {
-  display: none;
-}
-
-/* A borda ondulada cobre o pé da faixa; 1px a mais evita o fio de vídeo
-   que o arredondamento deixava aparecer. */
-.login-landscape .paper-wave {
-  inset: auto 0 -1px;
   height: 44px;
 }
 
@@ -990,6 +1002,8 @@ form h3 {
 }
 
 .login-panel {
+  display: flex;
+  flex-direction: column;
   flex: 1 0 auto;
   width: 100%;
   max-width: 440px;
@@ -1005,16 +1019,17 @@ h1.wordmark {
 }
 
 .login-panel .wordmark {
-  margin-bottom: 26px;
+  margin-bottom: 24px;
 }
 
 .login-panel .wordmark svg {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
 }
 
 /* O formulário é a folha do cartão, não um cartão dentro dele. */
 .login-panel form {
+  width: 100%;
   margin: 0;
   padding: 0;
   border: 0;
@@ -1033,17 +1048,17 @@ h1.wordmark {
 }
 
 .login-panel .sub {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   color: var(--muted);
-  font-size: 0.93rem;
+  font-size: 0.92rem;
 }
 
 .login-panel form button[type="submit"] {
   width: 100%;
-  min-height: 52px;
-  margin-top: 22px;
-  border-radius: 12px;
-  font-size: 1.02rem;
+  min-height: 50px;
+  margin-top: 20px;
+  border-radius: 10px;
+  font-size: 1rem;
 }
 
 /* Tablet: o cartão flutua no meio da tela, com o pasto no alto. */
@@ -1058,11 +1073,19 @@ h1.wordmark {
     min-height: 0;
     overflow: hidden;
     border-radius: 28px;
-    box-shadow: 0 1px 2px rgba(28, 42, 36, 0.04), 0 30px 70px -32px rgba(28, 42, 36, 0.26);
+    box-shadow: 0 1px 2px rgba(28, 42, 36, 0.05), 0 30px 70px -30px rgba(28, 42, 36, 0.35);
   }
 
   .login-landscape {
     height: 250px;
+  }
+
+  /* A faixa é mais larga que alta: ampliar menos basta para a moldura do
+     vídeo sair pelos lados, e a cerca continua no quadro. */
+  .login-landscape-media {
+    object-position: 50% 80%;
+    transform: scale(1.55);
+    transform-origin: 76% 68%;
   }
 
   .login-panel {
@@ -1071,43 +1094,59 @@ h1.wordmark {
   }
 }
 
-/* Computador (e celular deitado): formulário à esquerda, pasto à direita,
-   atrás da moldura de papel. */
+/* Computador (e celular deitado): o formulário à esquerda, a janela de papel
+   inteira à direita, como no mockup. */
 @media (min-width: 880px), (min-width: 560px) and (max-height: 500px) {
   .login-card {
     display: grid;
-    grid-template-columns: minmax(0, 46fr) minmax(0, 54fr);
+    grid-template-columns: minmax(0, 44fr) minmax(0, 56fr);
     width: min(1080px, 100%);
-    /* Mais alto que isto, o painel ficava mais estreito que a cena no
-       tablet deitado, e o pasto encostava na borda sem moldura. */
     min-height: min(620px, calc(100dvh - 56px));
   }
 
   .login-landscape {
     order: 0;
     height: auto;
+    background: transparent;
   }
 
-  /* Presa à esquerda, como a moldura (`xMinYMid slice`): os dois cortam do
-     mesmo jeito e ficam alinhados em qualquer largura. */
+  /* Presa à direita, a borda do cartão, que corta o papel como no mockup;
+     se sobrar corte, ele cai na margem de cartão da esquerda, que some num
+     degradê para o formulário. */
   .login-landscape-media {
-    object-position: 0% 50%;
+    object-position: 100% 50%;
     transform: none;
-  }
-
-  .login-landscape .paper-window {
-    display: block;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 8%);
+    mask-image: linear-gradient(to right, transparent 0, #000 8%);
   }
 
   .login-landscape .paper-wave {
     display: none;
   }
 
+  /* A marca no canto de cima; o formulário no meio da altura que sobra. */
   .login-panel {
-    align-self: center;
-    justify-self: center;
-    max-width: 460px;
-    padding: 48px clamp(32px, 5vw, 64px);
+    align-self: stretch;
+    max-width: none;
+    margin: 0;
+    padding: 36px clamp(32px, 5vw, 64px) 40px;
+  }
+
+  .login-panel form {
+    max-width: 340px;
+    margin-block: auto;
+  }
+
+  .login-panel .wordmark {
+    margin-bottom: 20px;
+  }
+
+  .login-panel form input {
+    min-height: 46px;
+  }
+
+  .login-panel form button[type="submit"] {
+    min-height: 48px;
   }
 }
 
@@ -1156,7 +1195,7 @@ h1.wordmark {
    imagem ao ler esta mesma preferência; isto é a reserva, se ele não puder. */
 @media (prefers-reduced-motion: reduce) {
   .login-landscape {
-    background: #c9d4b0 url("/login/login-cattle-poster.webp") 0% 50% / cover no-repeat;
+    background: #c9d4b0 url("/login/login-cattle-poster.webp") 100% 50% / cover no-repeat;
   }
 
   .login-landscape video {
