@@ -521,6 +521,21 @@ class TestSessionLifecycle:
     def test_refresh_without_cookie_is_unauthorized(self, api, db) -> None:
         assert api.post("/api/auth/refresh").status_code == 401
 
+    def test_a_session_cookie_that_no_longer_renews_is_erased(self, api, db) -> None:
+        """Cookie que não renova mais só atrapalha: a resposta o apaga, e o
+        navegador para de reapresentá-lo. A rota tentava, mas o cabeçalho se
+        perdia no erro."""
+        api.cookies.set("bv_refresh", "nao-e-uma-sessao")
+
+        response = api.post("/api/auth/refresh")
+
+        assert response.status_code == 401
+        assert response.json() == {"detail": "Sessão expirada. Entre novamente."}
+        cookie = response.headers.get("set-cookie", "")
+        assert "bv_refresh=" in cookie
+        assert "Max-Age=0" in cookie
+        assert "Path=/api/auth" in cookie
+
     def test_logout_ends_the_session(self, api, db) -> None:
         _account(db, "sai@belovale", "operator")
         api.post("/api/auth/login", json={"email": "sai@belovale", "password": STRONG})

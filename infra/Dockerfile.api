@@ -54,7 +54,8 @@ COPY apps/api/app ./app
 COPY apps/api/alembic ./alembic
 COPY apps/api/alembic.ini ./alembic.ini
 COPY apps/api/tests ./tests
-COPY infra/docker-compose.yml ./infra/docker-compose.yml
+# Os testes de configuração conferem estes arquivos do repositório.
+COPY infra/docker-compose.yml infra/nginx.web.conf infra/Dockerfile.api ./infra/
 COPY .gitignore ./.gitignore
 
 CMD ["sh", "-c", "uv run --no-sync alembic upgrade head && uv run --no-sync pytest -q"]
