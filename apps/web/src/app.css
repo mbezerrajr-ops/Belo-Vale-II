@@ -901,14 +901,10 @@ form h3 {
 /*
  * A entrada é um cartão claro sobre o pasto desfocado: a marca e o formulário
  * de um lado, as vacas na janela de papel recortado do outro — a moldura vem
- * do próprio vídeo (auth/LoginLandscape.tsx). No celular o pasto vira a faixa
- * de cima, com a borda de papel ondulada.
+ * do próprio vídeo (auth/LoginLandscape.tsx). No celular, como no mockup, o
+ * formulário vem em cima, com o galho no canto, e o pasto fica no pé.
  */
 .login {
-  --login-card: #f3f3ef;
-  --paper-1: #e6e6df;
-  --leaf-1: #4b8664;
-  --leaf-2: #336a4f;
   /* dvh: no celular, 100vh conta a barra de endereço e sobrava rolagem. */
   min-height: 100vh;
   min-height: 100dvh;
@@ -953,23 +949,50 @@ form h3 {
   --warn-ink: #8a6100;
   --good: #2a7043;
   --good-soft: #dcebe1;
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   min-height: 100dvh;
+  overflow: hidden;
   color: var(--ink);
   background: linear-gradient(180deg, #f6f6f3 0%, #ebebe5 100%);
 }
 
-/* O pasto vem antes no desenho, mas depois na leitura: é decoração. */
+/* O galho do canto, como no mockup do celular. Atrás do texto, balançando
+   devagar; as bordas de dentro somem no papel do cartão. */
+.login-branch {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 0;
+  /* Cresce até a borda do nome da fazenda, sem encostar nele. */
+  width: clamp(116px, calc(100vw - 240px), 180px);
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-mask-image: radial-gradient(ellipse 115% 120% at 100% 0%, #000 62%, transparent 100%);
+  mask-image: radial-gradient(ellipse 115% 120% at 100% 0%, #000 62%, transparent 100%);
+  transform-origin: 100% 0%;
+  animation: branch-sway 7s ease-in-out infinite alternate;
+}
+
+@keyframes branch-sway {
+  from {
+    transform: rotate(-1.4deg);
+  }
+  to {
+    transform: rotate(1.2deg);
+  }
+}
+
+/* O pasto no pé da tela: depois do formulário no desenho e na leitura. */
 .login-landscape {
-  order: -1;
   position: relative;
   flex: 0 0 auto;
-  height: clamp(168px, 34vh, 300px);
+  margin-top: auto;
+  height: clamp(140px, 27vh, 240px);
   overflow: hidden;
-  /* O tom do pasto enquanto a imagem parada (o pôster do vídeo) não chega. */
-  background: #c9d4b0;
   pointer-events: none;
   user-select: none;
 }
@@ -981,34 +1004,27 @@ form h3 {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 70%;
-  /* Na faixa do celular, só o pasto: ampliado sobre as vacas, com a moldura
-     de papel do vídeo de fora (quem faz a borda aqui é a onda abaixo). */
-  transform: scale(1.77);
-  transform-origin: 66% 77%;
-}
-
-/* 1px a mais evita o fio de vídeo que o arredondamento deixava aparecer. */
-.login-landscape .paper-wave {
-  position: absolute;
-  inset: auto 0 -1px;
-  display: block;
-  width: 100%;
-  height: 44px;
-}
-
-.paper-layer {
-  filter: drop-shadow(0 1px 1.5px rgba(20, 38, 30, 0.3));
+  object-position: 50% 55%;
+  /* A arte traz, no canto de baixo à direita, a quina do cartão do mockup;
+     o zoom preso à esquerda a deixa de fora sem cortar os anéis. */
+  transform: scale(1.025);
+  transform-origin: 0 0;
+  /* O céu da arte já se desfaz no papel; o degradê termina de fundir a
+     borda de cima no cartão. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 14%);
 }
 
 .login-panel {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   flex: 1 0 auto;
   width: 100%;
   max-width: 440px;
   margin: 0 auto;
-  padding: 10px 20px calc(28px + env(safe-area-inset-bottom, 0px));
+  padding: calc(24px + env(safe-area-inset-top, 0px)) 20px 20px;
   animation: rise 0.6s var(--ease-out) both;
 }
 
@@ -1019,7 +1035,7 @@ h1.wordmark {
 }
 
 .login-panel .wordmark {
-  margin-bottom: 24px;
+  margin-bottom: 30px;
 }
 
 .login-panel .wordmark svg {
@@ -1027,10 +1043,11 @@ h1.wordmark {
   height: 40px;
 }
 
-/* O formulário é a folha do cartão, não um cartão dentro dele. */
+/* O formulário é a folha do cartão, não um cartão dentro dele. A marca
+   fica no alto; o formulário, no meio da altura que sobra. */
 .login-panel form {
   width: 100%;
-  margin: 0;
+  margin: auto 0;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1061,7 +1078,7 @@ h1.wordmark {
   font-size: 1rem;
 }
 
-/* Tablet: o cartão flutua no meio da tela, com o pasto no alto. */
+/* Tablet em pé: o cartão flutua no meio da tela, como o celular do mockup. */
 @media (min-width: 560px) {
   .login {
     place-items: center;
@@ -1071,26 +1088,18 @@ h1.wordmark {
   .login-card {
     width: min(520px, 100%);
     min-height: 0;
-    overflow: hidden;
     border-radius: 28px;
     box-shadow: 0 1px 2px rgba(28, 42, 36, 0.05), 0 30px 70px -30px rgba(28, 42, 36, 0.35);
   }
 
   .login-landscape {
     height: 250px;
-  }
-
-  /* A faixa é mais larga que alta: ampliar menos basta para a moldura do
-     vídeo sair pelos lados, e a cerca continua no quadro. */
-  .login-landscape-media {
-    object-position: 50% 80%;
-    transform: scale(1.55);
-    transform-origin: 76% 68%;
+    margin-top: 12px;
   }
 
   .login-panel {
     max-width: none;
-    padding: 12px 44px 40px;
+    padding: 36px 44px 8px;
   }
 }
 
@@ -1104,10 +1113,13 @@ h1.wordmark {
     min-height: min(620px, calc(100dvh - 56px));
   }
 
+  .login-branch {
+    display: none;
+  }
+
   .login-landscape {
-    order: 0;
     height: auto;
-    background: transparent;
+    margin-top: 0;
   }
 
   /* Presa à direita, a borda do cartão, que corta o papel como no mockup;
@@ -1120,10 +1132,6 @@ h1.wordmark {
     mask-image: linear-gradient(to right, transparent 0, #000 8%);
   }
 
-  .login-landscape .paper-wave {
-    display: none;
-  }
-
   /* A marca no canto de cima; o formulário no meio da altura que sobra. */
   .login-panel {
     align-self: stretch;
@@ -1134,7 +1142,6 @@ h1.wordmark {
 
   .login-panel form {
     max-width: 340px;
-    margin-block: auto;
   }
 
   .login-panel .wordmark {
@@ -1179,27 +1186,47 @@ h1.wordmark {
   }
 }
 
-/* Celular baixo (568 px, teclado aberto): a faixa encolhe para o formulário
-   caber. */
-@media (max-width: 559px) and (max-height: 640px) {
-  .login-landscape {
-    height: clamp(120px, 24vh, 170px);
-  }
-
-  .login-panel .wordmark {
-    margin-bottom: 16px;
+/* Celular estreito (320 px): o nome da fazenda chega à borda e o galho
+   ficaria por trás dele. */
+@media (max-width: 359px) {
+  .login-branch {
+    display: none;
   }
 }
 
-/* Sem movimento: fica a imagem parada. O componente já troca o vídeo pela
-   imagem ao ler esta mesma preferência; isto é a reserva, se ele não puder. */
+/* Celular baixo (568 px, teclado aberto): o pasto encolhe para o formulário
+   caber. */
+@media (max-width: 559px) and (max-height: 640px) {
+  .login-landscape {
+    height: clamp(110px, 20vh, 140px);
+  }
+
+  .login-panel .wordmark {
+    margin-bottom: 18px;
+  }
+}
+
+/* Sem movimento: fica a imagem parada, e o galho para de balançar. O
+   componente já troca o vídeo pela imagem ao ler esta mesma preferência;
+   isto é a reserva, se ele não puder. */
 @media (prefers-reduced-motion: reduce) {
   .login-landscape {
-    background: #c9d4b0 url("/login/login-cattle-poster.webp") 100% 50% / cover no-repeat;
+    background: url("/login/login-cattle-mobile-poster.webp") 50% 55% / cover no-repeat;
   }
 
   .login-landscape video {
     display: none;
+  }
+
+  .login-branch {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) and (min-width: 880px),
+  (prefers-reduced-motion: reduce) and (min-width: 560px) and (max-height: 500px) {
+  .login-landscape {
+    background: url("/login/login-cattle-poster.webp") 100% 50% / cover no-repeat;
   }
 }
 

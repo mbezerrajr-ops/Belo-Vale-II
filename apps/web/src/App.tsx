@@ -13,7 +13,7 @@ import {
 import type { AnimalDetail, CurrentUser, Farm } from "./api/types";
 import { ApiError } from "./api/types";
 import { LoginForm } from "./auth/LoginForm";
-import { LoginLandscape } from "./auth/LoginLandscape";
+import { LoginBranch, LoginLandscape } from "./auth/LoginLandscape";
 import {
   clearStoredToken,
   loadStoredToken,
@@ -255,9 +255,10 @@ export function App(): JSX.Element {
     return (
       <main className="login">
         {/* Um cartão: a entrada de um lado, o pasto do outro. No celular o
-            pasto vira a faixa de cima (ordem do CSS; a leitura segue a marca
-            e o formulário, e o pasto é decoração). */}
+            pasto vai para o pé da tela e o galho aparece no canto de cima;
+            os dois são decoração. */}
         <div className="login-card">
+          <LoginBranch />
           <section className="login-panel">
             {/* O nome da fazenda é o título da página. */}
             <h1 className="wordmark">
