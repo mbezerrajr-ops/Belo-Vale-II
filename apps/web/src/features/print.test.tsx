@@ -115,6 +115,16 @@ describe("Folha de coleta", () => {
     expect(agata).toHaveTextContent("21 (22/07)");
   });
 
+  it("sem o aviso de fim da impressão, imprimir de novo ainda imprime", async () => {
+    // No app instalado no iPhone o navegador pode não avisar que a impressão
+    // acabou (afterprint); o segundo toque em Imprimir não fazia nada.
+    await printSheet(false, /imprimir folha em branco/i);
+
+    fireEvent.click(screen.getByRole("button", { name: /imprimir folha em branco/i }));
+
+    expect(print).toHaveBeenCalledTimes(2);
+  });
+
   it("com lançamento, é o registro da pesagem: manhã, tarde, total e observação", async () => {
     const area = await printSheet(true, /imprimir folha preenchida/i);
 
