@@ -48,6 +48,61 @@ afterEach(() => {
   clearStoredToken();
 });
 
+describe("Sessão depois de o celular dormir", () => {
+  // Com a tela apagada o navegador segura o relógio de renovação (10 min), e
+  // o token de acesso vence em 15: ao voltar, cada tela dava erro de acesso.
+  const TOKEN_NOVO = { access_token: "token-novo", token_type: "bearer", expires_in: 900 };
+
+  function voltaParaOApp(minutosDepois: number): void {
+    const agora = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(agora + minutosDepois * 60 * 1000);
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("ao voltar depois de meia hora, renova a sessão na hora", async () => {
+    signedIn({ role: "operator" });
+    render(<App />);
+    await screen.findByRole("heading", { name: /produção do dia/i });
+    api.refreshSession.mockClear();
+    api.refreshSession.mockResolvedValue(TOKEN_NOVO);
+
+    voltaParaOApp(30);
+
+    await waitFor(() => expect(api.refreshSession).toHaveBeenCalledTimes(1));
+  });
+
+  it("quando o sinal volta depois de muito tempo, renova", async () => {
+    signedIn({ role: "operator" });
+    render(<App />);
+    await screen.findByRole("heading", { name: /produção do dia/i });
+    api.refreshSession.mockClear();
+    api.refreshSession.mockResolvedValue(TOKEN_NOVO);
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 40 * 60 * 1000);
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+
+    window.dispatchEvent(new Event("online"));
+
+    await waitFor(() => expect(api.refreshSession).toHaveBeenCalledTimes(1));
+  });
+
+  it("numa troca rápida de aplicativo, não renova", async () => {
+    signedIn({ role: "operator" });
+    render(<App />);
+    await screen.findByRole("heading", { name: /produção do dia/i });
+    api.refreshSession.mockClear();
+
+    voltaParaOApp(1);
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(api.refreshSession).not.toHaveBeenCalled();
+  });
+});
+
 describe("App", () => {
   it("funcionário abre direto no lançamento de produção", async () => {
     signedIn({ role: "operator" });

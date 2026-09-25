@@ -142,30 +142,45 @@ export function App(): JSX.Element {
   useEffect(() => {
     if (session.status !== "signed-in") return;
 
-    const interval = window.setInterval(
-      () => {
-        void refreshSession()
-          .then((renewed) => {
-            if (renewed === null) {
-              clearStoredToken();
-              setSession({ status: "signed-out" });
-              return;
-            }
-            storeToken(renewed.access_token);
-            setSession((current) =>
-              current.status === "signed-in"
-                ? { ...current, token: renewed.access_token }
-                : current,
-            );
-          })
-          .catch(() => {
-            // Falha de rede não desloga: a próxima tentativa resolve.
-          });
-      },
-      10 * 60 * 1000,
-    );
+    let lastRenewal = Date.now();
+    const renew = (): void => {
+      lastRenewal = Date.now();
+      void refreshSession()
+        .then((renewed) => {
+          if (renewed === null) {
+            clearStoredToken();
+            setSession({ status: "signed-out" });
+            return;
+          }
+          storeToken(renewed.access_token);
+          setSession((current) =>
+            current.status === "signed-in"
+              ? { ...current, token: renewed.access_token }
+              : current,
+          );
+        })
+        .catch(() => {
+          // Falha de rede não desloga: a próxima tentativa resolve.
+        });
+    };
 
-    return () => window.clearInterval(interval);
+    const interval = window.setInterval(renew, 10 * 60 * 1000);
+
+    // Com a tela apagada o navegador segura o relógio acima, e o token vence
+    // enquanto o celular dorme. Ao voltar para o app (ou o sinal voltar),
+    // renova na hora se já faz tempo; numa troca rápida de app, não.
+    const renewIfStale = (): void => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastRenewal > 5 * 60 * 1000) renew();
+    };
+    document.addEventListener("visibilitychange", renewIfStale);
+    window.addEventListener("online", renewIfStale);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", renewIfStale);
+      window.removeEventListener("online", renewIfStale);
+    };
   }, [session.status]);
 
   const handleLoggedIn = async (loginResult: { access_token: string }): Promise<void> => {
