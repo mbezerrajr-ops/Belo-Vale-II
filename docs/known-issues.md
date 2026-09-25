@@ -224,13 +224,33 @@ O E2E entrou no CI porque, fora dele, apodreceu: de 27/08 a 18/09 ninguém o
 rodou, e ele deixou de funcionar por quatro motivos diferentes (seed sem
 brinco, senha fora da política, tela antiga, `.env.e2e` inexistente).
 
-## Imagem da MinIO fora do Docker Hub
+## MinIO arquivado: compilado do código-fonte (24/09/2026)
 
-A MinIO deixou de publicar as imagens gratuitas no Docker Hub; o compose não
-subia em máquina que ainda não tivesse a imagem em cache. A imagem passou a
-vir do espelho oficial `quay.io/minio/minio`, mesma versão de antes, fixada
-por digest. É um remendo: para produção, o armazenamento de arquivos deve ir
-para um serviço gerenciado compatível com S3 (decisão da fase de deploy).
+Primeiro a MinIO tirou as imagens gratuitas do Docker Hub, e o compose passou
+a usar o espelho `quay.io/minio/minio`. Em 24/09/2026 esse espelho também
+fechou (o download anônimo recebe 401), e `dl.min.io` responde **410 Gone**:
+*o servidor de código aberto foi arquivado, sem manutenção nem correções de
+segurança*. O E2E do CI parou no download da imagem, e nenhuma máquina nova
+subia o sistema.
+
+**Ponte, decidida pelo titular:** `infra/minio/Dockerfile` compila a **mesma
+versão** da produção (RELEASE.2025-04-22T22-12-26Z) a partir do código no
+GitHub, com o commit conferido e as flags do build oficial. Mesma versão,
+mesmo formato dos dados no volume: a produção não migra nada.
+
+- **A primeira `atualizar` na produção compila o MinIO**: alguns minutos e
+  alguns GB de cache de build. Com o disco C: apertado, libere espaço antes e
+  rode `docker builder prune` depois.
+- **Plano B, sem GitHub:** a imagem oficial, idêntica à da produção, está
+  guardada no OneDrive (`BeloVale-infra`, com LEIA-ME).
+- **O risco que fica:** um MinIO sem correções de segurança. É menor aqui
+  porque ele só existe na rede interna do Docker, sem porta publicada; só a
+  API fala com ele.
+
+**Próximo passo, separado:** trocar por um servidor compatível com S3 que
+ainda receba manutenção, e migrar as fotos e gravações. O app usa só o básico
+do S3 (criar o bucket, gravar, ler, link temporário), então a troca é de
+infraestrutura, não de código.
 
 ## Segurança para exposição pública: o que falta
 
