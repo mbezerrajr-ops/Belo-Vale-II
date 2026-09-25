@@ -292,6 +292,60 @@ class TestTryingAgain:
         assert api.post(f"/api/imports/{import_id}/reprocess", headers=auth(dono)).status_code == 202
 
 
+def _interrompida(*, status: str, ha_minutos: int) -> None:
+    """A leitura parou no meio: o PC reiniciou (queda de energia) ou o worker
+    caiu. A tarefa já tinha saído da fila, então ninguém a termina."""
+    coluna = "started_at" if status == "processing" else "created_at"
+    one(
+        f"UPDATE extraction_runs SET status = :st, {coluna} = now() - make_interval(mins => :m) "
+        "RETURNING id",
+        st=status,
+        m=ha_minutos,
+    )
+
+
+class TestAReadingCutInTheMiddle:
+    """Antes, a leitura interrompida ficava "processando" para sempre, e o
+    "tentar de novo" era recusado por "ainda lendo". A mais longa medida levou
+    uns 11 minutos; uma hora depois de começar, ela foi abandonada."""
+
+    @pytest.mark.parametrize("status", ["processing", "pending"])
+    def test_an_hour_later_it_shows_as_failed(self, envio, status) -> None:
+        enviar, _, como_esta = envio
+        import_id = enviar()
+        _interrompida(status=status, ha_minutos=61)
+
+        estado = como_esta(import_id).json()
+
+        assert (estado["status"], estado["failure"]) == ("failed", "internal")
+
+    def test_the_sender_may_try_it_again(self, envio, api) -> None:  # noqa: F811
+        enviar, _, como_esta = envio
+        import_id = enviar()
+        _interrompida(status="processing", ha_minutos=61)
+        _, vaqueiro = make_user("operator", "outro.vaqueiro@belovale")
+
+        resposta = api.post(f"/api/imports/{import_id}/reprocess", headers=auth(vaqueiro))
+
+        assert resposta.status_code == 202
+        assert como_esta(import_id).json()["status"] == "pending"
+        # A interrompida fica registrada como falha, não é apagada.
+        assert one(
+            "SELECT status, failure_code FROM extraction_runs ORDER BY created_at"
+        ) == [("failed", "internal"), ("pending", None)]
+
+    def test_a_reading_still_within_the_hour_is_still_being_read(self, envio, api) -> None:  # noqa: F811
+        enviar, _, como_esta = envio
+        import_id = enviar()
+        _interrompida(status="processing", ha_minutos=20)
+        _, vaqueiro = make_user("operator", "outro.vaqueiro@belovale")
+
+        assert como_esta(import_id).json()["status"] == "processing"
+        resposta = api.post(f"/api/imports/{import_id}/reprocess", headers=auth(vaqueiro))
+        assert resposta.status_code == 409
+        assert resposta.json()["code"] == "import_already_processing"
+
+
 class TestTheFarmOfTheSending:
     """A fazenda é a do servidor, como em toda a aplicação monofazenda. O
     envio recebia o `farm_id` do navegador e confiava nele."""
