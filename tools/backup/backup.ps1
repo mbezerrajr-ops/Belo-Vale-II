@@ -12,6 +12,12 @@
     Depois de subir, o arquivo deixa de ocupar o disco C: (Arquivos Sob
     Demanda do OneDrive).
 
+  Só conta como backup feito quando ao menos uma cópia sai deste PC: a pasta
+  do OneDrive precisa estar numa conta conectada, e a do HD fora do disco do
+  sistema. Sem isso, a cópia fica gravada aqui mesmo (ainda serve contra um
+  erro nos dados), mas o backup termina como FALHOU no registro, com o
+  motivo, e o "Último backup" do producao.ps1 não avança.
+
   A senha da criptografia é gerada na primeira execução e fica em
   %USERPROFILE%\.belo-vale\senha-backup.txt, legível só pela conta do Windows
   que roda o backup. ANOTE-A NO PAPEL: se este PC se perder, é a única forma
@@ -33,6 +39,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "regras.ps1")
 $Repo = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $Pasta = Join-Path $env:USERPROFILE ".belo-vale"
 $Log = Join-Path $Pasta "backup.log"
@@ -119,13 +126,17 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "não consegui empacotar o backup" }
   $tamanho = "{0:N1} MB" -f ((Get-Item $Pacote).Length / 1MB)
 
+  # Uma cópia no mesmo disco não sobrevive a ele: só conta o que sai do PC.
   $saidas = 0
-  if ($HdDestino -and (Test-Path (Split-Path $HdDestino -Qualifier))) {
+  $foraDoPc = 0
+  if ($HdDestino -and (Test-Path ([IO.Path]::GetPathRoot($HdDestino)))) {
     New-Item -ItemType Directory -Force $HdDestino | Out-Null
     Copy-Item $Pacote (Join-Path $HdDestino "$Nome.tar") -Force
     Limpar $HdDestino "belo-vale-*.tar" $ManterHd
     Registrar "HD externo: $HdDestino\$Nome.tar ($tamanho)"
     $saidas++
+    $motivo = MotivoHdNoPc $HdDestino $env:SystemDrive
+    if ($motivo) { Registrar "AVISO: $motivo" } else { $foraDoPc++ }
   } else {
     Registrar "AVISO: HD externo não encontrado ($HdDestino). Conecte o HD para a cópia local."
   }
@@ -136,14 +147,23 @@ try {
     & $Gpg --batch --yes --quiet --pinentry-mode loopback --passphrase-file (SenhaDoBackup) `
       --symmetric --cipher-algo AES256 --output $cifrado $Pacote
     if ($LASTEXITCODE -ne 0) { throw "não consegui criptografar a cópia da nuvem" }
-    # Sobe para a nuvem e deixa de ocupar o C: (fica só o atalho do OneDrive).
-    & attrib +U -P $cifrado | Out-Null
     Limpar $NuvemDestino "belo-vale-*.tar.gpg" $ManterNuvem
     Registrar "Nuvem (criptografada): $cifrado"
     $saidas++
+    $motivo = MotivoNuvemNoPc $NuvemDestino @(PastasDoOneDriveConectadas)
+    if ($motivo) {
+      Registrar "AVISO: $motivo"
+    } else {
+      # Sobe para a nuvem e deixa de ocupar o C: (fica só o atalho do OneDrive).
+      & attrib +U -P $cifrado | Out-Null
+      $foraDoPc++
+    }
   }
 
   if ($saidas -eq 0) { throw "nenhum destino disponível: nem HD externo nem pasta da nuvem" }
+  if ($foraDoPc -eq 0) {
+    throw "nenhuma cópia saiu deste PC. Conecte o OneDrive ou o HD externo; a de hoje ficou só neste disco."
+  }
   Set-Content -Path (Join-Path $Pasta "ultimo-backup.txt") -Value "$Nome ($tamanho)" -Encoding UTF8
   Registrar "Backup concluído: $Nome ($tamanho), $saidas destino(s)."
   $Codigo = 0

@@ -25,6 +25,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "backup\regras.ps1")
 $Repo = Resolve-Path (Join-Path $PSScriptRoot "..")
 $Env = Join-Path $Repo "infra\.env.production"
 $Base = @("compose", "-p", "belo-vale", "--env-file", $Env,
@@ -51,6 +52,13 @@ switch ($Comando) {
     if (Test-Path $ts) { "Acesso pela internet (Funnel):"; & $ts funnel status } else { "Tailscale não instalado: o app não está na internet." }
     $ultimo = Join-Path $env:USERPROFILE ".belo-vale\ultimo-backup.txt"
     "Último backup: " + $(if (Test-Path $ultimo) { Get-Content $ultimo } else { "nenhum" })
+    # O "Último backup" só avança quando dá certo: sem isto, uma falha
+    # diária ficaria escondida atrás da data do último que funcionou.
+    $registro = Join-Path $env:USERPROFILE ".belo-vale\backup.log"
+    if (Test-Path $registro) {
+      $falha = UltimaFalhaDoBackup @(Get-Content $registro -Tail 50 -Encoding UTF8)
+      if ($falha) { "A ÚLTIMA TENTATIVA DE BACKUP FALHOU: $falha" }
+    }
   }
   "subir" { Compose @("up", "-d", "--wait") }
   "atualizar" {
