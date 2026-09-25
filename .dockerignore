@@ -1,0 +1,32 @@
+# O contexto de build da api e do web é a raiz do repositório. Sem este
+# arquivo, tudo ia para o builder: infra/.env.production (as senhas da
+# produção), os dados reais da fazenda, o .git e as dependências instaladas no
+# Windows. Os Dockerfiles só copiam apps/api, apps/web, infra/docker-compose.yml,
+# infra/nginx.web.conf e .gitignore.
+
+.git
+.worktrees
+.superpowers
+
+# Segredos. O app web também não deve levar um .env de desenvolvimento para
+# o build de produção: ele fala com a API pelo nginx.
+**/.env
+**/.env.*
+!**/.env.example
+
+# Dados reais e documentação: nenhuma imagem precisa deles.
+belo-vale-ii-projeto-completo
+docs
+relatorios
+tools
+
+# Instalado ou gerado na máquina: cada imagem instala o seu.
+**/node_modules
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+apps/web/dist
+apps/web/test-results
+apps/web/playwright-report
+apps/web/blob-report
