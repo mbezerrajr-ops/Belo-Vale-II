@@ -38,7 +38,8 @@ python plataforma/build_platform_state.py generate --canonical plataforma/state_
 ```
 
 Esses comandos validam antes da escrita e substituem os derivados atomicamente. Essa
-baseline ainda não foi migrada para o PostgreSQL da aplicação nova.
+baseline foi importada no PostgreSQL da aplicação nova em 22/09/2026, quando a
+produção subiu; desde então, esta pasta é histórico e fonte da importação.
 
 ## Estrutura das pastas
 

@@ -62,7 +62,9 @@ contrato `VisionExtraction`/`VisionLine`.
 
 ## Leitor local de folhas (Ollama) — fase 2, passo 1
 
-**Comprovado em uma folha real; ainda não ligado ao app.** Roda só na
+**Comprovado em uma folha real.** *(Na data desta seção ainda não estava
+ligado ao app; foi ligado em 20/09/2026, na fase 2c: a foto enviada pela
+Revisão é lida por ele. Ver "Qual caminho é o oficial", abaixo.)* Roda só na
 máquina da fazenda (decisão do titular: nenhuma foto sai para provedor
 externo). `ensure_local_url` recusa qualquer endereço que não seja loopback,
 rede privada ou nome de serviço interno.
