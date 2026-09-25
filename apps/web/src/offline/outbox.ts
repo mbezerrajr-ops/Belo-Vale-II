@@ -167,6 +167,14 @@ export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+/**
+ * Os mesmos prazos do envio direto (Produção e Enviar foto/áudio). Sem eles,
+ * um envio pendurado segurava a fila inteira: todo disparo seguinte esperava
+ * o mesmo envio, até recarregar a página.
+ */
+const READING_TIMEOUT_MS = 15_000;
+const UPLOAD_TIMEOUT_MS = 90_000;
+
 function refusal(item: OutboxItem, error: unknown): string {
   if (error instanceof ApiError) {
     const detail = (error.body as { detail?: unknown }).detail;
@@ -212,16 +220,7 @@ export class Outbox {
 
   async addReading(item: Omit<QueuedReading, "id" | "kind" | "createdAt">): Promise<QueuedReading> {
     // Uma produção por vaca e dia: a nova digitação substitui a guardada.
-    for (const other of await this.store.all()) {
-      if (
-        other.kind === "reading" &&
-        other.userId === item.userId &&
-        other.animalId === item.animalId &&
-        other.measuredOn === item.measuredOn
-      ) {
-        await this.store.remove(other.id);
-      }
-    }
+    await this.removeReadings(item.userId, item.animalId, item.measuredOn);
     const queued: QueuedReading = { ...item, kind: "reading", id: newId(), createdAt: new Date().toISOString() };
     keepStorage();
     await this.store.put(queued);
@@ -240,6 +239,31 @@ export class Outbox {
   async discard(id: string): Promise<void> {
     await this.store.remove(id);
     this.emit({ type: "changed" });
+  }
+
+  /**
+   * A produção daquela vaca e dia foi lançada direto: a guardada perdeu a
+   * vez. Enviada depois, ela seria "valor diferente já lançado" e marcaria
+   * como erro uma linha que está certa.
+   */
+  async dropReading(userId: string, animalId: string, measuredOn: string): Promise<void> {
+    if (await this.removeReadings(userId, animalId, measuredOn)) this.emit({ type: "changed" });
+  }
+
+  private async removeReadings(userId: string, animalId: string, measuredOn: string): Promise<boolean> {
+    let removed = false;
+    for (const other of await this.store.all()) {
+      if (
+        other.kind === "reading" &&
+        other.userId === userId &&
+        other.animalId === animalId &&
+        other.measuredOn === measuredOn
+      ) {
+        await this.store.remove(other.id);
+        removed = true;
+      }
+    }
+    return removed;
   }
 
   /** Envia o que der, em ordem. Para no primeiro sinal de rede ruim. */
@@ -282,7 +306,10 @@ export class Outbox {
 
   private async sendOne(item: OutboxItem, token: string, send: Senders): Promise<void> {
     if (item.kind === "reading") {
-      const result = await send.enterReading(token, item.animalId, item.measuredOn, queuedInput(item));
+      const result = await withTimeout(
+        send.enterReading(token, item.animalId, item.measuredOn, queuedInput(item)),
+        READING_TIMEOUT_MS,
+      );
       await this.store.remove(item.id);
       this.emit({ type: "sent", item, result });
       this.emit({ type: "changed" });
@@ -290,9 +317,9 @@ export class Outbox {
     }
     const file = new File([item.blob], item.fileName, { type: item.blob.type });
     try {
-      const result = await send.uploadImport(
-        { farmId: item.farmId, file, declaredLot: item.declaredLot },
-        token,
+      const result = await withTimeout(
+        send.uploadImport({ farmId: item.farmId, file, declaredLot: item.declaredLot }, token),
+        UPLOAD_TIMEOUT_MS,
       );
       await this.store.remove(item.id);
       this.emit({ type: "sent", item, result });

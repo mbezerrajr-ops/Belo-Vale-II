@@ -718,6 +718,8 @@ export function ProductionPage({
         saved,
         measurementId: result.id,
       });
+      // O valor já foi salvo: falhar ao limpar a fila não vira erro na linha.
+      if (queue) await queue.outbox.dropReading(queue.userId, animalId, day).catch(() => undefined);
     } catch (error) {
       // No app, sem sinal (ou servidor fora do ar) vai para a fila do
       // celular: recarregar ou sair da tela não perde mais o valor. Se o

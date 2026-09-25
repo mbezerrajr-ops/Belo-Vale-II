@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError, type Reading } from "../api/types";
 import { Outbox, memoryStore, type OutboxEvent, type Senders } from "./outbox";
@@ -141,6 +141,20 @@ describe("fila do celular", () => {
     expect(items[0]).toMatchObject({ producao: 19.5 });
   });
 
+  it("lançado direto: sai da fila só a produção daquela vaca, dia e conta", async () => {
+    const outbox = new Outbox(memoryStore());
+    await withReading(outbox, USER, "a-1");
+    await withReading(outbox, USER, "a-2");
+    await withReading(outbox, "u-outra", "a-1");
+    await outbox.addReading({ userId: USER, animalId: "a-1", label: "BORBOREMA", measuredOn: "2026-09-21", producao: 17 });
+
+    await outbox.dropReading(USER, "a-1", "2026-09-22");
+
+    const sobram = (await outbox.list(USER)).map((item) => item.kind === "reading" && `${item.animalId} ${item.measuredOn}`);
+    expect(sobram.sort()).toEqual(["a-1 2026-09-21", "a-2 2026-09-22"]);
+    expect(await outbox.list("u-outra")).toHaveLength(1);
+  });
+
   it("a gravação guardada sobe inteira; se já tinha chegado, sai da fila", async () => {
     const outbox = new Outbox(memoryStore());
     const blob = new Blob(["áudio da ordenha"], { type: "audio/webm" });
@@ -153,6 +167,54 @@ describe("fila do celular", () => {
     expect(sent.name).toBe("ordenha.webm");
     expect(sent.size).toBe(blob.size);
     expect(await outbox.list(USER)).toEqual([]);
+  });
+
+  describe("envio pendurado (sinal fraco, sem erro nem resposta)", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const nunca = () => new Promise<never>(() => {});
+
+    it("a produção desiste no prazo, fica guardada e vai no disparo seguinte", async () => {
+      vi.useFakeTimers();
+      const outbox = new Outbox(memoryStore());
+      await withReading(outbox);
+      const enterReading = vi.fn().mockImplementationOnce(nunca).mockResolvedValue(reading());
+      const send = senders({ enterReading });
+
+      let terminou = false;
+      void outbox.flush({ userId: USER, token: "t", send }).then(() => {
+        terminou = true;
+      });
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+
+      expect(terminou).toBe(true);
+      const [guardado] = await outbox.list(USER);
+      expect(guardado.error).toBeUndefined();
+
+      await outbox.flush({ userId: USER, token: "t", send });
+      expect(enterReading).toHaveBeenCalledTimes(2);
+      expect(await outbox.list(USER)).toEqual([]);
+    });
+
+    it("a foto ou gravação desiste no prazo e fica guardada", async () => {
+      vi.useFakeTimers();
+      const outbox = new Outbox(memoryStore());
+      const blob = new Blob(["foto da folha"], { type: "image/jpeg" });
+      await outbox.addUpload({ userId: USER, arquivo: "foto", farmId: "f-1", blob, fileName: "folha.jpg" });
+      const uploadImport = vi.fn().mockImplementationOnce(nunca);
+
+      let terminou = false;
+      void outbox.flush({ userId: USER, token: "t", send: senders({ uploadImport }) }).then(() => {
+        terminou = true;
+      });
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+
+      expect(terminou).toBe(true);
+      const [guardado] = await outbox.list(USER);
+      expect(guardado.error).toBeUndefined();
+    });
   });
 
   it("dois disparos juntos não enviam o mesmo item duas vezes", async () => {
