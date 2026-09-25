@@ -1,8 +1,46 @@
 # Dívida técnica e lacunas conhecidas
 
-Registradas explicitamente para não ficarem escondidas. As pendências do legado não
-bloqueiam sua validação ou geração, mas devem ser resolvidas antes de declarar a migração
-para PostgreSQL como reconciliada.
+Registradas explicitamente para não ficarem escondidas. Este arquivo é um
+registro em ordem de data: as seções abaixo guardam cada decisão como foi
+tomada. O que **ainda está aberto** fica resumido aqui, com a seção de
+origem.
+
+## Pendências abertas (atualizado em 24/09/2026)
+
+**Com o titular (fora do código):**
+
+- **Backup fora do PC da produção:** conectar o OneDrive (a mesma conta do
+  notebook) e o HD externo. Sem isso o backup termina como FALHOU. *(Backup
+  sem cópia fora do PC)*
+- **Espaço no C: da produção** (6 GB livres em 22/09), antes da primeira
+  atualização, que compila o MinIO. *(MinIO arquivado)*
+- **Teste de campo no iPhone** — roteiro em `teste-de-campo-iphone.md`.
+- **Gravações reais no curral**, com a ordenhadeira ligada: os números do
+  áudio são de desenvolvimento. *(Fase 3)*
+- **Credenciais legadas:** rotacionar onde a senha foi reutilizada, a do
+  segundo usuário, e restringir o Artifact antigo — sem registro de que foi
+  feito. *(Contenção de credenciais legadas)*
+- **Cadastro:** ler no curral o brinco da REDONDA; decidir a identidade da
+  SERRANA (`B2-XXX` não é brinco). *(Nomes repetidos; Achados de integridade)*
+- **Limpeza do legado** (`v1_*.html` e afins): aguarda decisão. *(Juntar
+  fichas, reforços e análise visual)*
+
+**Técnicas:**
+
+- **Trocar o MinIO** por um servidor compatível com S3 que ainda receba
+  manutenção; hoje ele é compilado do código-fonte, como ponte. *(MinIO
+  arquivado)*
+- **Caminho antigo das "Fichas"** (`VisionProvider`, `approval.py`, telas fora
+  do menu) continua no código. *(Foto do celular vira proposta)*
+- **Imagem `api-tests`** do compose não coleta os testes. *(Correções da
+  análise geral)*
+- **Leitor de folhas:** a margem do formulário impresso acerta 6 de 16
+  anotações (próximo passo: achar a borda da tabela); o brinco da folha
+  manuscrita fica na casa dos 63%; os litros da manuscrita estão ~5 pontos
+  abaixo da v7, sem explicação. *(vision-provider-status.md)*
+- **Leitor de áudio:** brinco de menos de três dígitos só depois de "vaca";
+  "meia" sozinha não é lida; parto, baixa e DEL falados viram observação.
+  *(Fase 3)*
 
 ## Contenção de credenciais legadas (Fase 1)
 
@@ -260,9 +298,10 @@ login, gestão de contas com RBAC, sessão renovável em cookie `HttpOnly` e os
 cabeçalhos de segurança do navegador. Continuam em aberto, e **todos importam
 antes de expor a aplicação**:
 
-- **HTTPS não é obrigatório em lugar nenhum.** Sem TLS, senha e token viajam
-  em texto puro. Precisa de certificado, redirecionamento e HSTS. Fica para a
-  fase de deploy, que só será planejada com a estruturação completa.
+- ~~**HTTPS não é obrigatório em lugar nenhum.**~~ **Resolvido em
+  22/09/2026:** o único caminho de fora é o Tailscale Funnel, com certificado
+  válido; o HTTPS termina no PC da produção, com HSTS de um ano e nenhuma
+  porta aberta na rede local (ver `runbook-producao.md`).
 
 Resolvidos nesta etapa:
 
@@ -380,8 +419,9 @@ cinco (016 em BORBOLETA e BELMONTE, 544 em XENA e PITUDA, 649 em BRANQUINHA e
 REDONDA, 652 em ASA BRANCA duas vezes, 732 em PRAUNA e PACIÊNCIA). Por isso o
 brinco lido nunca associa sozinho quando o nome desmente.
 
-Ainda falta um jeito de juntar duas fichas no sistema (histórico e auditoria);
-hoje a correção é anular e relançar, uma medição por vez.
+Faltava um jeito de juntar duas fichas no sistema (histórico e auditoria); a
+correção era anular e relançar, uma medição por vez. **Resolvido em
+22/09/2026** — ver "Juntar fichas, reforços e análise visual".
 
 ## Revisão por arquivo — decisões registradas
 
@@ -452,9 +492,10 @@ Decisões do titular em 19/09/2026, a partir da primeira folha real:
   gera, porque o brinco pode ter sido mal lido e cair noutra vaca.
 - **Data com mais de 6 meses** gera `old_date`: o modelo leu o ano do
   cabeçalho errado na primeira folha.
-- **Ainda não feito:** envio da foto pelo app (hoje a leitura entra por
-  comando), corrigir a data de uma folha inteira de uma vez na revisão, e
-  mostrar a imagem ao lado das propostas.
+- **Ainda não feito, na época:** envio da foto pelo app (a leitura entrava
+  por comando), corrigir a data de uma folha inteira de uma vez na revisão, e
+  mostrar a imagem ao lado das propostas. **Os três foram feitos entre 19 e
+  20/09/2026** (revisão por arquivo e fase 2c).
 
 ## Caixa de revisão (fase 1, sem leitura automática) — decisões registradas
 
