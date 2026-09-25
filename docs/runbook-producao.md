@@ -109,6 +109,12 @@ powershell -ExecutionPolicy Bypass -File tools\producao.ps1 atualizar
 O `atualizar` oferece um backup antes, reconstrói com o código novo, aplica as
 migrações do banco e confere que o app voltou.
 
+**A primeira atualização depois de 24/09/2026 compila o MinIO** a partir do
+código-fonte, porque a imagem pronta saiu do ar (ver `known-issues.md`). A
+versão é a mesma, e os dados não mudam. Leva alguns minutos e ocupa alguns GB
+de cache: libere espaço no C: antes e, depois que o app voltar, rode
+`docker builder prune -f`.
+
 ## Backup
 
 - **Diário, 3h30** (tarefa `BeloVale-Backup`). Se o PC estiver desligado nesse
@@ -165,7 +171,10 @@ Num PC novo, com Docker Desktop e o repositório clonado:
 
 1. `python tools/gerar_env_producao.py` (segredos novos; as sessões antigas
    caem, e todos entram de novo com a própria senha).
-2. Suba só o armazenamento:
+2. Suba só o armazenamento. O MinIO é compilado do código no GitHub; sem
+   acesso a ele, carregue a imagem guardada no OneDrive (`BeloVale-infra`,
+   siga o LEIA-ME) e troque, no compose, o `build` do `minio` pela imagem
+   carregada:
 
    ```powershell
    $P = "compose -p belo-vale --env-file infra/.env.production -f infra/docker-compose.yml -f infra/docker-compose.prod.yml"
