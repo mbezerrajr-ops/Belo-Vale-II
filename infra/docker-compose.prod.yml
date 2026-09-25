@@ -24,7 +24,6 @@ services:
     restart: unless-stopped
     environment:
       ENVIRONMENT: production
-      PHOTO_SHEETS_DEMO: "false"
     ports: !reset []
 
   worker:

@@ -16,7 +16,6 @@ import {
   type ExitReason,
   type Proposal,
   type ProposalStatus,
-  type Features,
   type ProductionHistoryEntry,
   type SupplyPrice,
   type ImportMode,
@@ -31,9 +30,6 @@ import {
   type Supply,
   type UserAccount,
   type UserPage,
-  type DecisionRequest,
-  type DecisionResult,
-  type ImportReview,
   type LoginResult,
   type MeasurementRecord,
   type UploadResult,
@@ -115,7 +111,6 @@ export interface UploadImportInput {
   farmId: string;
   file: File;
   declaredLot?: string;
-  declaredPeriod?: string;
 }
 
 export async function uploadImport(
@@ -127,9 +122,6 @@ export async function uploadImport(
   formData.set("file", input.file);
   if (input.declaredLot) {
     formData.set("declared_lot", input.declaredLot);
-  }
-  if (input.declaredPeriod) {
-    formData.set("declared_period", input.declaredPeriod);
   }
 
   const response = await fetch(`${API_BASE_URL}/api/imports`, {
@@ -172,17 +164,6 @@ export async function reprocessImport(
   return parseJsonOrThrow<UploadResult>(response);
 }
 
-export async function getImportReview(
-  importId: string,
-  token: string,
-): Promise<ImportReview> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/imports/${importId}/review`,
-    { headers: authHeaders(token) },
-  );
-  return parseJsonOrThrow<ImportReview>(response);
-}
-
 export interface MeasurementFilter {
   farmId: string;
   from?: string;
@@ -205,25 +186,6 @@ export async function getMeasurements(
     headers: authHeaders(token),
   });
   return parseJsonOrThrow<MeasurementRecord[]>(response);
-}
-
-export async function decideLine(
-  lineId: string,
-  payload: DecisionRequest,
-  token: string,
-): Promise<DecisionResult> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/extracted-lines/${lineId}/decision`,
-    {
-      method: "POST",
-      headers: {
-        ...authHeaders(token),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    },
-  );
-  return parseJsonOrThrow<DecisionResult>(response);
 }
 
 
@@ -681,13 +643,6 @@ export async function getSupplyPrices(
     headers: authHeaders(token),
   });
   return parseJsonOrThrow<SupplyPrice[]>(response);
-}
-
-export async function getFeatures(token: string): Promise<Features> {
-  const response = await fetch(`${API_BASE_URL}/api/features`, {
-    headers: authHeaders(token),
-  });
-  return parseJsonOrThrow<Features>(response);
 }
 
 // --- Propostas de eventos (caixa de revisão) ---

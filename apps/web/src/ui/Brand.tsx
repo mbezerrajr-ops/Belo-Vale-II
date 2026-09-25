@@ -92,12 +92,6 @@ export const Icons = {
       <path d="M9.5 15.5h5" />
     </svg>
   ),
-  fichas: (): JSX.Element => (
-    <svg {...ICON_PROPS}>
-      <path d="M4 8a2 2 0 0 1 2-2h2l1.5-2h5L16 6h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
-      <circle cx="12" cy="12.5" r="3.2" />
-    </svg>
-  ),
   insumos: (): JSX.Element => (
     <svg {...ICON_PROPS}>
       <path d="M12 21c-5 0-8-3-8-8 0-4 3-7 8-10 5 3 8 6 8 10 0 5-3 8-8 8z" />

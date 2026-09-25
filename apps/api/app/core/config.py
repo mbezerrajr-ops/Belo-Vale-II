@@ -19,10 +19,6 @@ class Settings(BaseSettings):
     minio_secret_key: str | None = None
     minio_bucket: str = "sheets"
     max_upload_bytes: int = Field(default=15_000_000, ge=1)
-    vision_provider: Literal["fake", "http"] = "fake"
-    vision_api_url: str | None = None
-    vision_api_key: SecretStr | None = None
-    vision_model_name: str = "unconfigured"
     #: Leitor local de folhas (Ollama). Só aceita endereço da própria máquina
     #: ou da rede interna — ver `app.core.local_url.ensure_local_url`.
     #: Leitor de eventos do worker. "fake" inventa leitura (CI e demonstração);
@@ -52,10 +48,6 @@ class Settings(BaseSettings):
     #: cookie viaja em texto puro. Só desligue para desenvolvimento local em
     #: http://localhost, onde o navegador não enviaria um cookie `Secure`.
     auth_cookie_secure: bool = True
-    #: Mostra a área "Fichas" mesmo com o provedor de OCR falso. Existe para
-    #: demonstração e para o teste E2E do fluxo de foto; em produção é
-    #: recusado, porque o provedor falso inventa leituras.
-    photo_sheets_demo: bool = False
 
     @field_validator("auth_secret")
     @classmethod
@@ -82,8 +74,6 @@ class Settings(BaseSettings):
         ]
         if self.runtime_role == "api":
             required.append("auth_secret")
-        if self.runtime_role == "worker" and self.vision_provider == "http":
-            required += ["vision_api_url", "vision_api_key"]
         if self.runtime_role == "worker" and self.reader_provider == "ollama":
             required.append("reader_url")
         if self.runtime_role == "worker" and self.audio_provider == "whisper":
@@ -92,16 +82,6 @@ class Settings(BaseSettings):
         if missing:
             raise ValueError(
                 "Missing required production settings: " + ", ".join(missing)
-            )
-
-        # Um cookie de sessão sem `Secure` viaja em texto puro. Desligar isso
-        # é legítimo em desenvolvimento local, onde não há TLS; em produção é
-        # um erro de configuração que entregaria a sessão de qualquer usuário,
-        # e falhar na inicialização é melhor do que descobrir depois.
-        if self.photo_sheets_demo:
-            raise ValueError(
-                "photo_sheets_demo must stay disabled in production: the fake OCR "
-                "provider invents readings"
             )
 
         # O leitor falso devolve sempre o mesmo caderno. Em produção isso
@@ -121,6 +101,10 @@ class Settings(BaseSettings):
                 "transcriber invents speech instead of listening to the recording"
             )
 
+        # Um cookie de sessão sem `Secure` viaja em texto puro. Desligar isso
+        # é legítimo em desenvolvimento local, onde não há TLS; em produção é
+        # um erro de configuração que entregaria a sessão de qualquer usuário,
+        # e falhar na inicialização é melhor do que descobrir depois.
         if self.runtime_role == "api" and not self.auth_cookie_secure:
             raise ValueError(
                 "auth_cookie_secure must stay enabled in production: without it "
@@ -132,8 +116,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
-
-def photo_sheets_enabled(settings: Settings) -> bool:
-    """Se a área de fichas por foto deve aparecer nesta instalação."""
-    return settings.vision_provider == "http" or settings.photo_sheets_demo

@@ -823,7 +823,6 @@ form,
 .kpi,
 .chart-card,
 .supply-list > li,
-.review-line,
 .prod-summary,
 .forced-password-card,
 .import-preview,
@@ -2362,97 +2361,6 @@ form.milk-price .hint {
   border-radius: 0;
   box-shadow: none;
   background: transparent;
-}
-
-/* revisão de fichas */
-
-.review-line {
-  margin: 12px 0;
-  padding: 14px;
-  animation: rise var(--dur) var(--ease-out) both;
-}
-
-.review-line img {
-  max-width: 100%;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line);
-}
-
-.review-line dl {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 8px;
-  margin: 10px 0;
-}
-
-.review-line dl > div {
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-}
-
-.review-line dt {
-  color: var(--muted);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.review-line dd {
-  margin: 2px 0 0;
-  font-weight: 700;
-}
-
-.review-line ul {
-  list-style: none;
-  margin: 8px 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-}
-
-.review-line li[data-severity] {
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 0.88rem;
-  border: 1px solid var(--line);
-  background: var(--surface-2);
-}
-
-.review-line li[data-severity="error"] {
-  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
-  background: var(--danger-soft);
-}
-
-.review-line li[data-severity="warning"] {
-  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
-  background: var(--warn-soft);
-}
-
-.review-line .row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-}
-
-.review-line .row button {
-  flex: 1 1 140px;
-}
-
-.replacement-warning {
-  display: block;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  background: var(--warn-soft);
-  color: var(--ink);
-  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
-  font-weight: 400;
-}
-
-.replacement-warning::before {
-  display: none;
 }
 
 /* ---------- esqueleto de carregamento ---------- */

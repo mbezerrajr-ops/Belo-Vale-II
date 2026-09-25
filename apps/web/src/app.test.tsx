@@ -39,7 +39,6 @@ beforeEach(() => {
   });
   api.getDashboard.mockReturnValue(new Promise(() => {}));
   api.refreshSession.mockResolvedValue(null);
-  api.getFeatures.mockResolvedValue({ photo_sheets: false });
   api.listProposals.mockResolvedValue([]);
 });
 

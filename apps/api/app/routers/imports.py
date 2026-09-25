@@ -18,7 +18,6 @@ from app.services.ingestion import (
     reprocess_import,
 )
 from app.services.media_reading import reading_status
-from app.services.normalization import normalize_date
 from app.services.storage import ObjectStorage, get_object_storage
 from app.workers.tasks import ExtractionDispatcher, get_extraction_dispatcher
 
@@ -40,7 +39,6 @@ async def upload_import(
     file: Annotated[UploadFile, File()],
     farm_id: Annotated[UUID | None, Form()] = None,
     declared_lot: Annotated[str | None, Form()] = None,
-    declared_period: Annotated[str | None, Form()] = None,
 ) -> dict[str, str]:
     # A fazenda é a do servidor. O campo que o navegador manda só é aceito se
     # for ela: antes o envio confiava nele.
@@ -54,7 +52,6 @@ async def upload_import(
         content=content,
         max_bytes=settings.max_upload_bytes,
         declared_lot=declared_lot,
-        declared_measured_on=normalize_date(declared_period),
         initiated_by=user.email,
     )
     dispatcher.dispatch(created.extraction_run_id)

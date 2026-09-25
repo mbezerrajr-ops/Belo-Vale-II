@@ -15,8 +15,8 @@ const ENV_FILE = path.join(REPO_ROOT, "infra", ".env.e2e");
 export const E2E_ADMIN_EMAIL = "e2e@belovale.test";
 export const E2E_ADMIN_PASSWORD = "curral de teste ponta a ponta";
 export const E2E_FARM_NAME = "Fazenda E2E Playwright";
-// O provedor de OCR falso devolve sempre este animal, e a associação é só
-// pelo brinco: o animal precisa ter exatamente este brinco.
+// O leitor falso de fotos e o transcritor falso devolvem sempre este animal,
+// e a associação é só pelo brinco: o animal precisa ter exatamente este brinco.
 export const E2E_ANIMAL_BRINCO = "497";
 export const E2E_ANIMAL_NAME = "PONTA CURTA";
 
@@ -59,7 +59,7 @@ export function ensureFarm(): string {
   return farmId;
 }
 
-/** O animal que o OCR falso "lê" nas fichas por foto. */
+/** O animal que o leitor falso "lê" na foto e na gravação. */
 export function ensurePhotoSheetAnimal(): { farmId: string } {
   const farmId = ensureFarm();
   const existing = psql(
@@ -124,8 +124,8 @@ export async function logout(page: Page): Promise<void> {
 }
 
 export async function openArea(page: Page, name: RegExp | string): Promise<void> {
-  // A barra ganha itens depois do primeiro desenho (Fichas, contagem da
-  // revisão); um clique no meio desse rearranjo pode cair no vizinho. Clica
+  // A barra muda depois do primeiro desenho (a contagem da revisão chega
+  // depois); um clique no meio desse rearranjo pode cair no vizinho. Clica
   // de novo até a área ficar marcada como atual.
   //
   // No celular (o perfil iPhone), só quatro áreas ficam na barra: as outras

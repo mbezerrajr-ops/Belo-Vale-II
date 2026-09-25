@@ -6,18 +6,11 @@ import {
   getAnimal,
   getCurrentFarm,
   getCurrentUser,
-  getImportReview,
   listProposals,
   logout as endSession,
   refreshSession,
 } from "./api/client";
-import type {
-  AnimalDetail,
-  CurrentUser,
-  Farm,
-  ImportReview,
-  UploadResult,
-} from "./api/types";
+import type { AnimalDetail, CurrentUser, Farm } from "./api/types";
 import { ApiError } from "./api/types";
 import { LoginForm } from "./auth/LoginForm";
 import {
@@ -64,12 +57,6 @@ const OfficialMeasurements = lazy(() =>
   })),
 );
 const UsersPage = lazy(() => import("./features/users/UsersPage").then((m) => ({ default: m.UsersPage })));
-const UploadForm = lazy(() =>
-  import("./features/imports/UploadForm").then((m) => ({ default: m.UploadForm })),
-);
-const ReviewWorkspace = lazy(() =>
-  import("./features/imports/ReviewWorkspace").then((m) => ({ default: m.ReviewWorkspace })),
-);
 
 type SessionState =
   | { status: "checking" }
@@ -321,7 +308,6 @@ type Area =
   | "producao"
   | "revisao"
   | "animais"
-  | "fichas"
   | "insumos"
   | "medicoes"
   | "contas"
@@ -332,7 +318,6 @@ const AREA_LABEL: Record<Area, string> = {
   producao: "Produção",
   revisao: "Revisão",
   animais: "Animais",
-  fichas: "Fichas",
   insumos: "Insumos",
   medicoes: "Medições",
   contas: "Contas",
@@ -400,9 +385,6 @@ function AppShell({
   const [animal, setAnimal] = useState<AnimalDetail | null>(null);
   const [animalError, setAnimalError] = useState<string | null>(null);
   const [animalReload, setAnimalReload] = useState(0);
-  const [importId, setImportId] = useState<string | null>(null);
-  const [review, setReview] = useState<ImportReview | null>(null);
-
 
   // Quantas propostas esperam revisão: aparece na navegação para ninguém
   // precisar abrir a caixa para saber se há algo nela.
@@ -470,24 +452,6 @@ function AppShell({
   const openAnimal = (animalId: string): void =>
     navigate({ area: "animais", animalId });
 
-  const refreshReview = async (id: string): Promise<void> => {
-    setReview(await getImportReview(id, token));
-  };
-
-  const handleUploaded = async (result: UploadResult): Promise<void> => {
-    setImportId(result.id);
-    await refreshReview(result.id);
-  };
-
-  const handleDecided = async (): Promise<void> => {
-    // Aprovar/rejeitar não remenda o estado local: relê a mesma fonte que o
-    // GET /review usa, então substituições, versão da linha e alertas novos
-    // aparecem exatamente como o backend passou a enxergar.
-    if (importId !== null) {
-      await refreshReview(importId);
-    }
-  };
-
   // No celular, cabem quatro áreas na barra de baixo e um "Mais" com o
   // resto; no computador, a barra mostra todas.
   const [moreOpen, setMoreOpen] = useState(false);
@@ -500,10 +464,6 @@ function AppShell({
     "producao",
     "revisao",
     "animais",
-    // A foto da folha passou a ser enviada pela própria Revisão. As fichas
-    // antigas continuam no banco; a área saiu do menu para não haver duas
-    // telas fazendo a mesma coisa.
-
     "insumos",
     "medicoes",
     ...(isAdmin ? (["contas"] as Area[]) : []),
@@ -734,29 +694,6 @@ function AppShell({
                     />
                   )}
                 </>
-              )}
-            </>
-          )}
-
-          {area === "fichas" && farm !== null && (
-            <>
-              <h2>Fichas de medição</h2>
-              <p className="muted">
-                Envie a foto da ficha. O sistema lê as linhas e deixa cada uma para
-                conferência antes de virar medição oficial.
-              </p>
-              <UploadForm token={token} farmId={farm.id} onUploaded={handleUploaded} />
-              {review !== null && (
-                <div>
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => refreshReview(review.import_id)}
-                  >
-                    Atualizar revisão
-                  </button>
-                  <ReviewWorkspace review={review} token={token} onDecided={handleDecided} />
-                </div>
               )}
             </>
           )}

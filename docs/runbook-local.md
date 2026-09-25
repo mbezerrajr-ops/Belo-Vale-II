@@ -568,9 +568,9 @@ ambiente local) e roda no navegador real contra ela. O CI faz exatamente
 isto em todo push e PR (job `e2e`).
 
 1. Crie `infra/.env.e2e` a partir de `infra/.env.example`, com valores
-   descartáveis, `COMPOSE_PROJECT_NAME=belo-vale-e2e` e
-   `PHOTO_SHEETS_DEMO=true` (mostra a área "Fichas" com o OCR falso, que o
-   teste de foto usa). O arquivo é ignorado pelo git.
+   descartáveis e `COMPOSE_PROJECT_NAME=belo-vale-e2e`. Os leitores de foto e
+   de voz ficam no padrão falso, que é o que os testes de envio usam. O
+   arquivo é ignorado pelo git.
 2. Suba a pilha e aplique as migrations:
 
 ```bash
@@ -587,8 +587,8 @@ npx playwright install chromium               # só na primeira vez
 E2E_BASE_URL=http://localhost:8080 npx playwright test
 ```
 
-O `e2e/seed.ts` cria o administrador, a fazenda e o animal do OCR falso de
-forma idempotente, e cada execução cria contas e vacas próprias: rodar de
+O `e2e/seed.ts` cria o administrador, a fazenda e o animal que o leitor falso
+"lê" de forma idempotente, e cada execução cria contas e vacas próprias: rodar de
 novo não esbarra na rodada anterior.
 
 Para derrubar e apagar os dados do E2E:
@@ -615,7 +615,7 @@ Adicione `-v` para também apagar os volumes (`postgres_data`, `minio_data`)
 | Banco está aceitando conexões | `docker compose ... exec db pg_isready -U ingestion -d ingestion` |
 | Fila/worker está processando | `docker compose ... logs worker --tail=50` — procure `Task ingestion.process_extraction_run[...] succeeded` |
 | Логs da API | `docker compose ... logs api --tail=100` |
-| Estado de uma importação específica | `GET /api/imports/{id}/review` com um token válido — o campo `status` reflete o `ExtractionRun` mais recente (pending/processing/extracted/failed), não fica travado em "queued" |
+| Estado da leitura de um envio | `GET /api/imports/{id}` com um token válido — `status` é o da leitura mais recente (pending/processing/extracted/failed), `failure` diz o motivo quando falhou, e uma leitura interrompida há mais de uma hora aparece como falha |
 
 ## Notas de rede (Docker)
 

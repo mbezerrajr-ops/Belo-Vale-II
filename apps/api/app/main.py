@@ -15,16 +15,7 @@ from app.routers.registry import router as registry_router
 from app.routers.users import router as users_router
 from app.routers.production import router as production_router
 from app.routers.production_import import router as production_import_router
-from app.routers.features import router as features_router
 from app.routers.proposals import router as proposals_router
-from app.routers.reviews import router as reviews_router
-from app.services.approval import (
-    ConcurrentReviewError,
-    LineNotFoundError,
-    MissingMeasurementDateError,
-    ReplacementReasonRequiredError,
-    UnmatchedAnimalError,
-)
 from app.services.ingestion import (
     DuplicateImageError,
     FarmNotFoundError,
@@ -69,14 +60,12 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Belo Vale Ingestion API", lifespan=_lifespan)
     app.include_router(auth_router)
     app.include_router(imports_router)
-    app.include_router(reviews_router)
     app.include_router(measurements_router)
     app.include_router(registry_router)
     app.include_router(users_router)
     app.include_router(dashboard_router)
     app.include_router(production_router)
     app.include_router(production_import_router)
-    app.include_router(features_router)
     app.include_router(proposals_router)
 
     @app.get("/healthz")
@@ -134,45 +123,6 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             content={"code": "image_too_large", "detail": str(exc)},
-        )
-
-    @app.exception_handler(LineNotFoundError)
-    async def handle_line_not_found(request: Request, exc: LineNotFoundError) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"code": "line_not_found"},
-        )
-
-    @app.exception_handler(ConcurrentReviewError)
-    async def handle_concurrent_review(request: Request, exc: ConcurrentReviewError) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_409_CONFLICT,
-            content={"code": "stale_decision"},
-        )
-
-    @app.exception_handler(UnmatchedAnimalError)
-    async def handle_unmatched_animal(request: Request, exc: UnmatchedAnimalError) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={"code": "unmatched_animal"},
-        )
-
-    @app.exception_handler(MissingMeasurementDateError)
-    async def handle_missing_measurement_date(
-        request: Request, exc: MissingMeasurementDateError
-    ) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={"code": "missing_measurement_date"},
-        )
-
-    @app.exception_handler(ReplacementReasonRequiredError)
-    async def handle_replacement_reason_required(
-        request: Request, exc: ReplacementReasonRequiredError
-    ) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_409_CONFLICT,
-            content={"code": "replacement_reason_required"},
         )
 
     return app

@@ -1,39 +1,3 @@
-export type AlertSeverity = "info" | "warning" | "error";
-
-export interface ReviewAlert {
-  code: string;
-  severity: AlertSeverity;
-  message: string;
-  details: Record<string, unknown>;
-}
-
-export interface ExistingMeasurement {
-  id: string;
-  measured_on: string;
-  values: Record<string, unknown>;
-}
-
-export interface ReviewLine {
-  id: string;
-  line_number: number;
-  version: number;
-  raw_values: Record<string, unknown>;
-  normalized_values: Record<string, unknown> | null;
-  confidence: number | null;
-  candidate_animal_id: string | null;
-  crop_url: string | null;
-  alerts: ReviewAlert[];
-  existing_measurement: ExistingMeasurement | null;
-}
-
-export interface ImportReview {
-  import_id: string;
-  status: string;
-  declared_lot: string | null;
-  declared_measured_on: string | null;
-  lines: ReviewLine[];
-}
-
 export interface UploadResult {
   id: string;
   status: string;
@@ -54,22 +18,6 @@ export interface ImportReading {
   /** Quantas propostas saíram — só quando a leitura terminou bem. */
   proposals: number | null;
   failure: ReadingFailure | null;
-}
-
-export type DecisionAction = "approve" | "reject";
-
-export interface DecisionRequest {
-  action: DecisionAction;
-  corrected_values?: Record<string, unknown> | null;
-  reason?: string | null;
-  expected_version: number;
-}
-
-export interface DecisionResult {
-  line_id: string;
-  version: number;
-  measurement_id: string | null;
-  measurement_status: string | null;
 }
 
 export interface LoginResult {
@@ -523,11 +471,6 @@ export interface SupplyPrice {
   price_per_kg: number;
   source: string;
   recorded_by: string | null;
-}
-
-export interface Features {
-  /** Leitura de fichas por foto: só com OCR real (ou demonstração). */
-  photo_sheets: boolean;
 }
 
 // --- Propostas de eventos (caixa de revisão) ---
