@@ -13,9 +13,6 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY in the server environment}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY in the server environment}
       AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in the server environment}
-      # Mostra a área "Fichas" com o OCR falso. Só para demonstração e para o
-      # E2E do fluxo de foto; a API recusa subir com isto em produção.
-      PHOTO_SHEETS_DEMO: ${PHOTO_SHEETS_DEMO:-false}
     depends_on:
       db:
         condition: service_healthy

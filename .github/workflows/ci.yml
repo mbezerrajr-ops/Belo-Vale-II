@@ -138,7 +138,6 @@ jobs:
             echo "MINIO_ACCESS_KEY=e2e$(openssl rand -hex 6)"
             echo "MINIO_SECRET_KEY=$(openssl rand -hex 24)"
             echo "AUTH_SECRET=$(openssl rand -hex 32)"
-            echo "PHOTO_SHEETS_DEMO=true"
           } > infra/.env.e2e
       # O worker não tem verificação de saúde (é um processo Celery, sem porta
       # HTTP), e algumas versões do Compose recusam `--wait` nesse caso. Por

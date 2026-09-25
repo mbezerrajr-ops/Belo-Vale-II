@@ -4,9 +4,9 @@ import { defineConfig, devices } from "@playwright/test";
 // web) is already up — see docs/runbook-local.md. This test does not start
 // or manage that stack itself, and it does not mock the API: every request
 // goes through nginx to the real FastAPI service, real PostgreSQL, real
-// Celery worker over real Redis. The only fake in the whole path is
-// VISION_PROVIDER=fake (the substitutable adapter the architecture already
-// provides for exactly this situation).
+// Celery worker over real Redis. The only fakes in the whole path are the
+// photo reader and the transcriber (READER_PROVIDER / AUDIO_PROVIDER=fake,
+// the defaults outside production).
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,

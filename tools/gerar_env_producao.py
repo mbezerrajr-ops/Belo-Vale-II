@@ -45,7 +45,6 @@ def main() -> int:
             f"MINIO_ACCESS_KEY=bv{aleatorio(18)}",
             f"MINIO_SECRET_KEY={aleatorio(48)}",
             f"AUTH_SECRET={aleatorio(64)}",
-            "PHOTO_SHEETS_DEMO=false",
             "",
         ]
     )
