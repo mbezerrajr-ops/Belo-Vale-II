@@ -1068,12 +1068,27 @@ Quatro defeitos achados lendo o código, cada um com teste que falhava antes:
 - **Valor guardado sem sinal e corrigido depois, com sinal, voltava como
   erro.** O lançamento direto agora tira da fila a produção daquela vaca e dia.
 
-**Achado, não corrigido:** a imagem `api-tests` do compose (runbook local,
-seção 7) não coleta os testes. Dentro dela eles ficam em `/app/tests`, e o
-`conftest.py` sobe três níveis (`parents[3]`) procurando a raiz do
-repositório, que ali não existe. O CI não usa essa imagem: roda o pytest no
-repositório. Enquanto isso, rode a suíte como o CI, ou monte o repositório no
-contêiner de teste.
+**Achado e corrigido depois:** a imagem `api-tests` do compose (runbook
+local, seção 7) não coletava os testes. Dentro dela eles ficam em
+`/app/tests`, e o `conftest.py` subia três níveis fixos (`parents[3]`)
+procurando a raiz do repositório, que ali não existe. Agora ele sobe até achar
+a base antiga e, sem ela (caso da imagem), pula só os testes que dependem
+dela. Com a coleta de volta apareceram seis testes de configuração falhando
+na imagem, que não copiava `nginx.web.conf` nem `Dockerfile.api`; agora copia.
+O CI continua rodando o pytest direto no repositório.
+
+## Consertos rápidos (24/09/2026)
+
+- **`.dockerignore`.** O contexto de build da api e do web é a raiz do
+  repositório, e sem ele tudo ia para o builder: `infra/.env.production` (as
+  senhas da produção), os dados reais da fazenda, o `.git` e o `node_modules`
+  instalado no Windows, que o `COPY apps/web/` levava por cima do instalado
+  na imagem. O contexto caiu de ~150 MB para ~1 MB. Um `apps/web/.env` de
+  desenvolvimento também deixa de entrar no build de produção.
+- **Cookie de sessão inválido não era apagado.** A renovação que falhava
+  tentava apagá-lo, mas o cabeçalho se perdia ao levantar o erro; o navegador
+  continuava reapresentando um cookie morto. Agora ele vai na própria
+  resposta 401.
 ## Backup sem cópia fora do PC (24/09/2026) — resolvido no script
 
 O desktop da produção foi para o conserto e, ao procurar a cópia da nuvem
