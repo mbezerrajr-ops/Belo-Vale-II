@@ -13,6 +13,7 @@ import {
 import type { AnimalDetail, CurrentUser, Farm } from "./api/types";
 import { ApiError } from "./api/types";
 import { LoginForm } from "./auth/LoginForm";
+import { LoginBranch, LoginLandscape } from "./auth/LoginLandscape";
 import {
   clearStoredToken,
   loadStoredToken,
@@ -22,7 +23,7 @@ import {
 } from "./auth/session";
 import { ProductionPage } from "./features/production/ProductionPage";
 import { ChangePasswordForm } from "./features/users/ChangePasswordForm";
-import { Cows, Hills, Icons, LogoMark, type IconName } from "./ui/Brand";
+import { Icons, LogoMark, type IconName } from "./ui/Brand";
 import { PageHeader } from "./ui/PageHeader";
 import { AreaBoundary } from "./ui/AreaBoundary";
 import { InstallHint } from "./ui/InstallHint";
@@ -268,34 +269,24 @@ export function App(): JSX.Element {
   if (session.status === "signed-out") {
     return (
       <main className="login">
-        <section className="login-hero">
-          <div className="sky" aria-hidden="true">
-            <div className="sun" />
-            <div className="hills">
-              <Hills />
-            </div>
-            <div className="cows">
-              <Cows />
-            </div>
-          </div>
-          <div className="login-brand">
-            {/* O nome da fazenda é o título da página (antes não havia h1). */}
+        {/* Um cartão: a entrada de um lado, o pasto do outro. No celular o
+            pasto vai para o pé da tela e o galho aparece no canto de cima;
+            os dois são decoração. */}
+        <div className="login-card">
+          <LoginBranch />
+          <section className="login-panel">
+            {/* O nome da fazenda é o título da página. */}
             <h1 className="wordmark">
-              <LogoMark size={52} />
+              <LogoMark size={44} />
               <span>
                 <strong>Belo Vale II</strong>
                 <small>Gestão do rebanho leiteiro</small>
               </span>
             </h1>
-            <p>
-              Produção, cadastro e custos da fazenda no seu bolso — do curral ao
-              escritório.
-            </p>
-          </div>
-        </section>
-        <section className="login-panel">
-          <LoginForm onLoggedIn={handleLoggedIn} />
-        </section>
+            <LoginForm onLoggedIn={handleLoggedIn} />
+          </section>
+          <LoginLandscape />
+        </div>
       </main>
     );
   }
