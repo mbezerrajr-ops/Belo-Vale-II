@@ -598,16 +598,20 @@ export function ProductionPage({
   // Muda depois de uma importação, para a folha reler o que foi gravado.
   const [reloadKey, setReloadKey] = useState(0);
   // A folha para imprimir só existe enquanto se imprime: fora disso, os
-  // nomes das vacas apareceriam duas vezes na página.
-  const [printing, setPrinting] = useState(false);
+  // nomes das vacas apareceriam duas vezes na página. Cada toque em Imprimir
+  // é um pedido novo (0 = nenhum): no app instalado no iPhone o navegador
+  // pode não avisar o fim da impressão, e com um sim/não o segundo toque não
+  // imprimia nada.
+  const [printRequest, setPrintRequest] = useState(0);
+  const printing = printRequest > 0;
 
   useEffect(() => {
-    if (!printing) return;
-    const done = (): void => setPrinting(false);
+    if (printRequest === 0) return;
+    const done = (): void => setPrintRequest(0);
     window.addEventListener("afterprint", done);
     window.print();
     return () => window.removeEventListener("afterprint", done);
-  }, [printing]);
+  }, [printRequest]);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
@@ -1026,7 +1030,7 @@ export function ProductionPage({
               type="button"
               className="link-btn prod-print"
               aria-label={savedRows.length > 0 ? "Imprimir folha preenchida" : "Imprimir folha em branco"}
-              onClick={() => setPrinting(true)}
+              onClick={() => setPrintRequest((count) => count + 1)}
             >
               <Icons.imprimir /> <span className="wide-only">Imprimir folha</span>
             </button>
