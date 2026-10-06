@@ -22,6 +22,8 @@ origem.
   feito. *(Contenção de credenciais legadas)*
 - **Cadastro:** ler no curral o brinco da REDONDA; decidir a identidade da
   SERRANA (`B2-XXX` não é brinco). *(Nomes repetidos; Achados de integridade)*
+- **Confirmar com o cliente: BORBOLETA e BELMONTE com o mesmo brinco (016)**
+  na folha de 25/08. *(Correções de 25/08, revistas em 06/10/2026)*
 - **Limpeza do legado** (`v1_*.html` e afins): aguarda decisão. *(Juntar
   fichas, reforços e análise visual)*
 
@@ -1193,3 +1195,38 @@ crua dessas fichas antigas, que já não era alcançável pelo menu.
 
 Uma instalação com `PHOTO_SHEETS_DEMO` ou `VISION_*` sobrando no `.env` sobe
 normalmente: a configuração ignora variáveis que não conhece.
+
+## Correções de 25/08, revistas em 06/10/2026
+
+O titular reviu, linha a linha, a planilha conferida de 25/08 contra o que foi
+aplicado em 22/09 (`tools/manutencao/conciliar_agosto_2026.py`,
+`complemento_agosto_2026.py`, `identificacao_e_cadastro_2026_09.py`). Quase
+tudo bateu; três decisões de 22/09 mudaram, aplicadas por
+`tools/manutencao/correcoes_2508_outubro_2026.py`:
+
+- **"541 BANIA/BAIANA" é a BAHIA, brinco 591**, não a BAIANA. A leitura de
+  25/08 foi anulada na BAIANA (com motivo) e lançada na BAHIA com os mesmos
+  valores; o 541, que a BAIANA tinha ganhado só por essa linha, saiu da ficha
+  dela, que volta a ficar sem brinco.
+- **O brinco da PRINCESA é 518**, como está na folha. Em 22/09 o 518 tinha sido
+  tratado como dígito trocado do 548 do cadastro ("Dígito ambíguo", acima);
+  o titular corrigiu.
+- **Nomes:** o 1013 é a CODORNA (o cadastro dizia Boemia; era uma das 13
+  divergências de nome da reconciliação) e o 733 é a PRAUNA (o cadastro dizia
+  Pauna).
+
+Confirmado sem mudança: DUNOFINO é a OURO FINO 498 (outra vaca além da 598);
+DUDU não existe, a linha é da JUDITE 042; MOÇA BRANCA é 015 e MADONA é 023;
+QUARTINHA é a 406 e conta uma vez; ASA BRANCA aparece duas vezes com valores
+idênticos e conta uma vez.
+
+**Regra para linhas repetidas** (decisão do titular, 06/10/2026): a mesma vaca
+duas vezes na folha conta uma vez quando os valores são idênticos; quando
+diferem, quem revisa confirma qual vale.
+
+**Pendente, para confirmar com o cliente:** BORBOLETA e BELMONTE aparecem com o
+mesmo brinco, 016, na folha de 25/08 (BORBOLETA 12,5 + 12 no 1º lote,
+BELMONTE 5,5 + 4 no 3º). No cadastro, o 016 é da BELMONTE; a BORBOLETA ficou
+com o `B1-016VD` do sistema antigo, que a conciliação de 22/09 deixou de fora
+por ter formato estranho. Não se muda nada até o cliente dizer qual é o brinco
+de cada uma.
