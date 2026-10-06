@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import require_minimum_role
-from app.db.models import Farm, OfficialMeasurement, User
+from app.db.models import AuditEvent, Farm, OfficialMeasurement, User
 from app.db.session import get_db_session
 from app.routers.registry import resolve_current_farm
 from app.schemas.production import (
@@ -28,6 +28,7 @@ from app.schemas.production import (
     VoidIn,
 )
 from app.services import production_entry as entry
+from app.services import production_export as export
 from app.services.production_entry import (
     AnimalNotFound,
     ConflictingReading,
@@ -119,6 +120,56 @@ async def production_sheet(
             )
             for row in rows
         ],
+    )
+
+
+@router.get("/export")
+async def export_production(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    farm: Annotated[Farm, Depends(resolve_current_farm)],
+    user: Annotated[User, Depends(require_minimum_role("reviewer"))],
+    inicio: date,
+    fim: date,
+) -> Response:
+    """A produção do período numa planilha.
+
+    Revisor ou administrador: a planilha leva a produção do rebanho inteiro
+    para fora do sistema. Cada exportação fica na auditoria.
+    """
+    if fim < inicio:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="A data final vem antes da inicial.",
+        )
+    if (fim - inicio).days + 1 > export.MAX_DAYS:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"O período vai até {export.MAX_DAYS} dias. Exporte em partes.",
+        )
+
+    rows = await export.export_rows(session, farm_id=farm.id, start=inicio, end=fim)
+    content = export.build_workbook(rows, start=inicio, end=fim)
+    session.add(
+        AuditEvent(
+            farm_id=farm.id,
+            actor=user.email,
+            action="production_exported",
+            entity_type="farm",
+            entity_id=farm.id,
+            new_value={"inicio": inicio.isoformat(), "fim": fim.isoformat(), "leituras": len(rows)},
+        )
+    )
+    await session.commit()
+    return Response(
+        content=content,
+        media_type=export.MEDIA_TYPE,
+        headers={
+            "Content-Disposition": f'attachment; filename="producao-{inicio}-a-{fim}.xlsx"',
+            # Quantas leituras vieram: com zero, a tela avisa em vez de baixar
+            # uma planilha só com o cabeçalho.
+            "X-Leituras": str(len(rows)),
+            "Cache-Control": "no-store",
+        },
     )
 
 
