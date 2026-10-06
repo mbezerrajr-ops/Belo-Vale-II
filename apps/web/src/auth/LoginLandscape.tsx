@@ -1,33 +1,33 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * A paisagem do login: vacas pastando numa moldura de papel recortado.
+ * A paisagem do login.
  *
- * É só decoração. Os vídeos (`public/login/`) são trechos do vídeo de
- * referência, com a moldura já desenhada neles, ampliados com o Real-ESRGAN
- * (`realesr-animevideov3`, feito para vídeo: não pisca entre quadros), sem
- * áudio, indo e voltando para o laço não dar pulo:
+ * É só decoração. Fica fora de `/assets/`: lá o nginx guarda por um ano (os
+ * nomes levam o conteúdo) e o service worker apaga o que não está na lista
+ * do build.
  *
- * - computador (e celular deitado): a janela de papel inteira, 428×444 a
- *   partir de 430,141, ampliada 2×;
- * - celular e tablet em pé: a paisagem do pé do cartão do celular, 240×170
- *   a partir de 942,440, ampliada 4×.
- *
- * Só um dos dois é carregado, o do layout em uso. Ficam fora de `/assets/`:
- * lá o nginx guarda por um ano (os nomes levam o conteúdo) e o service
- * worker apaga o que não está na lista do build.
+ * - Computador (e celular deitado): vacas pastando na janela de papel
+ *   recortado, em vídeo. É um trecho do vídeo de referência, com a moldura
+ *   já desenhada, 428×444 a partir de 430,141, ampliado 2× com o Real-ESRGAN
+ *   (`realesr-animevideov3`: não pisca entre quadros), sem áudio, indo e
+ *   voltando para o laço não dar pulo.
+ * - Celular e tablet em pé: só a paisagem, parada, no pé do cartão, sem
+ *   vacas nem moldura (pedido do titular, 06/10/2026: as vacas grandes
+ *   ficavam estranhas na tela pequena). É o fundo da mesma arte — árvore,
+ *   morros, celeiro, pasto e cerca —, com as vacas ao longe apagadas; o céu
+ *   se desfaz no papel do cartão.
  */
 
 /** O mesmo corte do CSS em que o cartão vira duas colunas. */
 const WIDE_LAYOUT = "(min-width: 880px), (min-width: 560px) and (max-height: 500px)";
 
-const MEDIA = {
-  wide: { video: "/login/login-cattle-animation.mp4", poster: "/login/login-cattle-poster.webp" },
-  narrow: {
-    video: "/login/login-cattle-mobile.mp4",
-    poster: "/login/login-cattle-mobile-poster.webp",
-  },
+const WIDE = {
+  video: "/login/login-cattle-animation.mp4",
+  poster: "/login/login-cattle-poster.webp",
 };
+
+const NARROW_IMAGE = "/login/login-landscape-mobile.webp";
 
 function matches(query: string): boolean {
   return window.matchMedia?.(query).matches === true;
@@ -86,15 +86,14 @@ function LandscapeVideo({ video, poster }: { video: string; poster: string }): J
 export function LoginLandscape(): JSX.Element {
   const still = useMediaQuery("(prefers-reduced-motion: reduce)", prefersStill);
   const wide = useMediaQuery(WIDE_LAYOUT, readWide);
-  const media = wide ? MEDIA.wide : MEDIA.narrow;
   return (
     <div className="login-landscape" aria-hidden="true">
-      {still ? (
-        <img className="login-landscape-media" src={media.poster} alt="" decoding="async" />
+      {!wide ? (
+        <img className="login-landscape-media" src={NARROW_IMAGE} alt="" decoding="async" />
+      ) : still ? (
+        <img className="login-landscape-media" src={WIDE.poster} alt="" decoding="async" />
       ) : (
-        // A chave troca o vídeo inteiro ao girar o celular: só a fonte nova
-        // não faria o navegador carregar outra.
-        <LandscapeVideo key={media.video} video={media.video} poster={media.poster} />
+        <LandscapeVideo video={WIDE.video} poster={WIDE.poster} />
       )}
     </div>
   );
