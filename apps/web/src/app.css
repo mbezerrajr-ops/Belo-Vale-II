@@ -902,7 +902,8 @@ form h3 {
  * A entrada é um cartão claro sobre o pasto desfocado: a marca e o formulário
  * de um lado, as vacas na janela de papel recortado do outro — a moldura vem
  * do próprio vídeo (auth/LoginLandscape.tsx). No celular, como no mockup, o
- * formulário vem em cima, com o galho no canto, e o pasto fica no pé.
+ * formulário vem em cima, com o galho no canto, e no pé fica só a paisagem,
+ * sem vacas nem moldura, nascendo do papel do cartão.
  */
 .login {
   /* dvh: no celular, 100vh conta a barra de endereço e sobrava rolagem. */
@@ -1004,15 +1005,13 @@ form h3 {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 80%;
-  /* A arte traz, no canto de baixo à direita, a quina do cartão do mockup;
-     o zoom preso à esquerda a deixa de fora sem cortar os anéis. */
-  transform: scale(1.025);
-  transform-origin: 0 0;
-  /* O céu da arte já se desfaz no papel; o degradê termina de fundir a
-     borda de cima no cartão. */
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%);
-  mask-image: linear-gradient(to bottom, transparent 0, #000 14%);
+  /* Presa ao pé: a cerca fica na borda de baixo da tela; se sobrar corte,
+     ele cai no céu, que o degradê já apaga. */
+  object-position: 50% 100%;
+  /* Sem borda de imagem: o céu enevoado vai sumindo no papel do cartão até
+     a linha dos morros. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, rgba(0, 0, 0, 0.55) 22%, #000 42%);
+  mask-image: linear-gradient(to bottom, transparent 0, rgba(0, 0, 0, 0.55) 22%, #000 42%);
 }
 
 .login-panel {
@@ -1095,11 +1094,6 @@ h1.wordmark {
   .login-landscape {
     height: 225px;
     margin-top: 12px;
-  }
-
-  /* Na faixa mais larga que alta, o recorte desce até o anel de baixo. */
-  .login-landscape-media {
-    object-position: 50% 85%;
   }
 
   .login-panel {
@@ -1211,14 +1205,11 @@ h1.wordmark {
   }
 }
 
-/* Sem movimento: fica a imagem parada, e o galho para de balançar. O
-   componente já troca o vídeo pela imagem ao ler esta mesma preferência;
-   isto é a reserva, se ele não puder. */
+/* Sem movimento: o galho para de balançar e, no computador, fica a imagem
+   parada no lugar do vídeo. O componente já faz essa troca ao ler esta mesma
+   preferência; isto é a reserva, se ele não puder. No celular a paisagem já
+   é parada. */
 @media (prefers-reduced-motion: reduce) {
-  .login-landscape {
-    background: url("/login/login-cattle-mobile-poster.webp") 50% 80% / cover no-repeat;
-  }
-
   .login-landscape video {
     display: none;
   }
