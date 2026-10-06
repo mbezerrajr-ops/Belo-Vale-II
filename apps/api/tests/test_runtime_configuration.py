@@ -126,6 +126,18 @@ def test_hsts_is_on_and_limited_to_the_system_address() -> None:
     assert "preload" not in line
 
 
+def test_nginx_makes_the_browser_ask_for_a_new_version_of_the_page() -> None:
+    """Sem isto o celular reusa o index.html antigo por horas depois de uma
+    atualização: o servidor já serve a versão nova, e o app continua velho."""
+    config = _nginx_config()
+    page = config[config.index("location / {") :]
+    page = page[: page.index("}")]
+
+    assert "expires -1;" in page
+    # add_header dentro do bloco apagaria os cabeçalhos de segurança do server.
+    assert "add_header" not in page
+
+
 def test_nginx_does_not_announce_its_version() -> None:
     assert "server_tokens off;" in _nginx_config()
 
