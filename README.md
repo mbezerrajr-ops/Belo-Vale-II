@@ -18,7 +18,8 @@ animais, produção, custos). Trate como confidencial e mantenha-o **privado**.
 
 - **Produção:** lançar os litros do dia, lote por lote, inclusive sem sinal
   (fica guardado no celular e sobe quando o sinal volta); importar a coleta
-  de uma planilha ou PDF; imprimir a folha de coleta, em branco ou preenchida.
+  de uma planilha ou PDF; imprimir a folha de coleta, em branco ou preenchida;
+  exportar a produção de um período para planilha (revisor e administrador).
 - **Revisão:** enviar a foto da folha ou gravar a ordenha pelo próprio app;
   o que for lido chega como proposta, com a foto ou o áudio ao lado, para
   aprovar, corrigir ou rejeitar.

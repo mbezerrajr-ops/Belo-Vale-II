@@ -622,6 +622,36 @@ export async function listImports(token: string): Promise<ImportRecord[]> {
   return parseJsonOrThrow<ImportRecord[]>(response);
 }
 
+export interface ProductionExport {
+  blob: Blob;
+  filename: string;
+  /** Leituras na planilha: com zero, a tela avisa em vez de baixar. */
+  readings: number;
+}
+
+/** A produção do período numa planilha (revisor ou administrador). */
+export async function exportProduction(
+  token: string,
+  inicio: string,
+  fim: string,
+): Promise<ProductionExport> {
+  const query = new URLSearchParams({ inicio, fim });
+  const response = await fetch(`${API_BASE_URL}/api/production/export?${query}`, {
+    headers: authHeaders(token),
+  });
+  if (!response.ok) {
+    // O erro vem em JSON, com o motivo para a tela.
+    await parseJsonOrThrow<never>(response);
+  }
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? `producao-${inicio}-a-${fim}.xlsx`;
+  return {
+    blob: await response.blob(),
+    filename,
+    readings: Number(response.headers.get("X-Leituras") ?? "0"),
+  };
+}
+
 // --- Histórico e consulta ---
 
 /** Todas as leituras do animal, inclusive as substituídas e anuladas. */

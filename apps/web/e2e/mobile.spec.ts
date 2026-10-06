@@ -104,6 +104,9 @@ for (const [width, height] of SIZES) {
     problems.push(...(await measure(page, "produção")));
     await page.getByRole("button", { name: "Importar arquivo" }).click();
     problems.push(...(await measure(page, "produção / importar")));
+    await page.getByRole("button", { name: "Exportar" }).click();
+    await expect(page.getByRole("button", { name: "Baixar planilha" })).toBeVisible();
+    problems.push(...(await measure(page, "produção / exportar")));
 
     await go(page, "Revisão");
     problems.push(...(await measure(page, "revisão")));

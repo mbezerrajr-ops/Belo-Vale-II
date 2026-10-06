@@ -28,6 +28,7 @@ import {
 import { brDate, liters, farmToday } from "../../ui/dates";
 // A importação é de escritório: só baixa quando alguém escolhe "Importar".
 const ImportPanel = lazy(() => import("./ImportPanel").then((m) => ({ default: m.ImportPanel })));
+const ExportPanel = lazy(() => import("./ExportPanel").then((m) => ({ default: m.ExportPanel })));
 import { Icons } from "../../ui/Brand";
 import { PrintHeader } from "../../ui/PrintHeader";
 import { PrintPortal } from "../../ui/PrintPortal";
@@ -594,7 +595,7 @@ export function ProductionPage({
   // Folha guardada em uso, sem sinal: quando foi vista pela última vez.
   const [staleAt, setStaleAt] = useState<number | null>(null);
   const queue = useOutbox();
-  const [how, setHow] = useState<"digitar" | "importar">("digitar");
+  const [how, setHow] = useState<"digitar" | "importar" | "exportar">("digitar");
   // Muda depois de uma importação, para a folha reler o que foi gravado.
   const [reloadKey, setReloadKey] = useState(0);
   // A folha para imprimir só existe enquanto se imprime: fora disso, os
@@ -927,9 +928,9 @@ export function ProductionPage({
   return (
     <section className="production">
       <PageHeader
-        title="Produção do dia"
+        title={how === "exportar" ? "Produção do período" : "Produção do dia"}
         actions={
-          <div className="segmented" role="group" aria-label="Como lançar">
+          <div className="segmented prod-modes" role="group" aria-label="Como lançar">
             <button
               type="button"
               aria-pressed={how === "digitar"}
@@ -942,8 +943,21 @@ export function ProductionPage({
               aria-pressed={how === "importar"}
               onClick={() => setHow("importar")}
             >
-              Importar arquivo
+              {/* No celular estreito o "arquivo" sai da vista, mas o nome
+                  lido continua "Importar arquivo". */}
+              Importar<span className="narrow-hide"> arquivo</span>
             </button>
+            {/* Exportar leva a produção do rebanho para fora do sistema: só
+                revisor e administrador (o servidor confere de novo). */}
+            {canCorrect && (
+              <button
+                type="button"
+                aria-pressed={how === "exportar"}
+                onClick={() => setHow("exportar")}
+              >
+                Exportar
+              </button>
+            )}
           </div>
         }
       >
@@ -951,8 +965,16 @@ export function ProductionPage({
             não diz nada a quem está importando uma planilha. */}
         {how === "digitar"
           ? "Cada valor é salvo ao sair do campo; Enter passa para a próxima vaca."
-          : "Planilha (CSV ou XLSX) ou PDF com o brinco e os litros — total, ou manhã e tarde — e a observação, se houver. Nada é gravado antes da prévia."}
+          : how === "importar"
+            ? "Planilha (CSV ou XLSX) ou PDF com o brinco e os litros — total, ou manhã e tarde — e a observação, se houver. Nada é gravado antes da prévia."
+            : "Planilha (XLSX) com a produção do período: uma linha por vaca por dia, com lote, manhã, tarde, total e observação."}
       </PageHeader>
+
+      {how === "exportar" && (
+        <Suspense fallback={<div className="skeleton" style={{ height: 120 }} aria-label="Carregando" />}>
+          <ExportPanel token={token} today={today} />
+        </Suspense>
+      )}
 
       {how === "importar" && (
         <Suspense fallback={<div className="skeleton" style={{ height: 180 }} aria-label="Carregando" />}>

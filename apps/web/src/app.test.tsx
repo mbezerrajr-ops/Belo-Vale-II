@@ -2,7 +2,7 @@
  * Casca do aplicativo: para onde cada pessoa vai ao entrar.
  */
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
@@ -59,14 +59,24 @@ describe("Sessão depois de o celular dormir", () => {
     document.dispatchEvent(new Event("visibilitychange"));
   }
 
+  /** Abre o app logado e espera o relógio de renovação estar ligado. */
+  async function abreOApp(): Promise<void> {
+    signedIn({ role: "operator" });
+    render(<App />);
+    await screen.findByRole("heading", { name: /produção do dia/i });
+    // A tela aparece antes de o React rodar os efeitos dela — entre eles, o
+    // que liga o relógio de renovação e anota a hora da última renovação. Sem
+    // esperar, o teste às vezes adiantava o relógio antes disso (a hora
+    // anotada já saía adiantada, ou ninguém ouvia a volta) e falhava no CI.
+    await act(async () => {});
+  }
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
   it("ao voltar depois de meia hora, renova a sessão na hora", async () => {
-    signedIn({ role: "operator" });
-    render(<App />);
-    await screen.findByRole("heading", { name: /produção do dia/i });
+    await abreOApp();
     api.refreshSession.mockClear();
     api.refreshSession.mockResolvedValue(TOKEN_NOVO);
 
@@ -76,9 +86,7 @@ describe("Sessão depois de o celular dormir", () => {
   });
 
   it("quando o sinal volta depois de muito tempo, renova", async () => {
-    signedIn({ role: "operator" });
-    render(<App />);
-    await screen.findByRole("heading", { name: /produção do dia/i });
+    await abreOApp();
     api.refreshSession.mockClear();
     api.refreshSession.mockResolvedValue(TOKEN_NOVO);
     vi.spyOn(Date, "now").mockReturnValue(Date.now() + 40 * 60 * 1000);
@@ -90,9 +98,7 @@ describe("Sessão depois de o celular dormir", () => {
   });
 
   it("numa troca rápida de aplicativo, não renova", async () => {
-    signedIn({ role: "operator" });
-    render(<App />);
-    await screen.findByRole("heading", { name: /produção do dia/i });
+    await abreOApp();
     api.refreshSession.mockClear();
 
     voltaParaOApp(1);
