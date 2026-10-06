@@ -2527,6 +2527,24 @@ form.milk-price .hint {
 
 /* ---------- lançamento de produção ---------- */
 
+/* Três modos (Digitar, Importar, Exportar) num celular de 320 px: o "arquivo"
+   sai da vista — o nome lido continua "Importar arquivo" — e os botões ficam
+   mais justos. Com o texto inteiro, o grupo dava 388 px e a tela rolava. */
+@media (max-width: 519px) {
+  .prod-modes button {
+    padding-inline: 12px;
+  }
+
+  .prod-modes .narrow-hide {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 /* No computador, a linha inteira de 1.000 px punha o campo de litros longe
    do nome da vaca: a lista fica na largura de quem lê uma linha. */
 @media (min-width: 900px) {

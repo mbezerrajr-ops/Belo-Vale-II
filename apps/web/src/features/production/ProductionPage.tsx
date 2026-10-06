@@ -930,7 +930,7 @@ export function ProductionPage({
       <PageHeader
         title={how === "exportar" ? "Produção do período" : "Produção do dia"}
         actions={
-          <div className="segmented" role="group" aria-label="Como lançar">
+          <div className="segmented prod-modes" role="group" aria-label="Como lançar">
             <button
               type="button"
               aria-pressed={how === "digitar"}
@@ -943,7 +943,9 @@ export function ProductionPage({
               aria-pressed={how === "importar"}
               onClick={() => setHow("importar")}
             >
-              Importar arquivo
+              {/* No celular estreito o "arquivo" sai da vista, mas o nome
+                  lido continua "Importar arquivo". */}
+              Importar<span className="narrow-hide"> arquivo</span>
             </button>
             {/* Exportar leva a produção do rebanho para fora do sistema: só
                 revisor e administrador (o servidor confere de novo). */}
