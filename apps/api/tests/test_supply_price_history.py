@@ -35,7 +35,10 @@ def _supply(api, token, name="Concentrado", price=2.12):
 class TestPriceHistory:
     def test_lists_prices_newest_first_with_who_recorded(self, api, farm) -> None:
         _, reviewer = make_user("reviewer")
-        supply = _supply(api, reviewer)
+        # O primeiro preço vale a partir de "hoje". Fixado, para que 01/10 seja
+        # sempre o mais novo: sem isto o teste quebrou ao chegar outubro.
+        with patch("app.routers.dashboard.farm_today", return_value=__import__("datetime").date(2026, 9, 18)):
+            supply = _supply(api, reviewer)
         api.patch(
             f"/api/supplies/{supply['id']}",
             headers=auth(reviewer),
