@@ -4,8 +4,11 @@ Roda dentro do contêiner da API (como conciliar_agosto_2026.py), com as
 funções do app — cada mudança vai para a auditoria com o autor. Sem
 --aplicar, só mostra o que faria:
 
-    docker cp tools/manutencao/correcoes_2508_outubro_2026.py <api>:/tmp/c.py
-    docker compose ... exec -T api uv run --no-sync python /tmp/c.py --autor EMAIL [--aplicar]
+    docker cp tools/manutencao/correcoes_2508_outubro_2026.py belo-vale-api-1:/tmp/c.py
+    docker exec -e PYTHONPATH=/app belo-vale-api-1 uv run --no-sync python /tmp/c.py --autor EMAIL [--aplicar]
+    docker exec -u 0 belo-vale-api-1 rm -f /tmp/c.py
+
+(`PYTHONPATH=/app`: rodando de /tmp, o Python não acha o pacote `app`.)
 
 Revendo, linha a linha, a planilha conferida de 25/08 contra o que foi
 aplicado em 22/09, o titular corrigiu três decisões daquela data:
