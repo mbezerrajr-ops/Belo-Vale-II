@@ -1,0 +1,11 @@
+[Unit]
+Description=Belo Vale II: backup diário às 3h30
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 America/Sao_Paulo
+# Servidor desligado no horário: roda assim que voltar.
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

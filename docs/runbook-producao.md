@@ -1,258 +1,212 @@
-# Runbook de produção — Belo Vale II neste PC
+# Runbook de produção — Belo Vale II no servidor
 
 Como o sistema roda de verdade, para a fazenda usar pelo celular. O ambiente de
-desenvolvimento e testes continua no [runbook local](runbook-local.md).
+desenvolvimento e testes continua no [runbook local](runbook-local.md). Até
+07/10/2026 a produção rodava num PC com Windows: ver
+[runbook-producao-windows.md](runbook-producao-windows.md).
 
 ## Como está montado
 
 ```
-iPhone/Android ──HTTPS──> Tailscale Funnel ──> este PC (TLS termina aqui)
-                          (https://…ts.net)       │
-                                                  └─> 127.0.0.1:8090  nginx (app + cabeçalhos de segurança)
-                                                          └─> api (FastAPI, só na rede interna do Docker)
-                                                                ├─ db (PostgreSQL)    ├─ redis
-                                                                ├─ minio (fotos e áudios)
-                                                                └─ worker ──> Ollama :11434 (fotos)
-                                                                          └─> whisper :8081 (áudio)   (RX 7600)
+iPhone/Android ──HTTPS──> Tailscale Funnel ──> servidor belo-vale (TLS termina aqui)
+                          (https://belo-vale.…ts.net)    │
+                                                         └─> 127.0.0.1:8090  nginx (app + cabeçalhos de segurança)
+                                                                 └─> api (FastAPI, só na rede interna do Docker)
+                                                                       ├─ db (PostgreSQL)    ├─ redis
+                                                                       ├─ minio (fotos e áudios)
+                                                                       └─ worker ──HTTPS──> API Gemini (lê foto e voz)
+
+backup diário cifrado ──> Backblaze B2 (Object Lock, conta da fazenda)
 ```
 
-Decisões (22/09/2026):
+Decisões (16/10/2026):
 
-- **Servidor:** este PC, porque a leitura de foto e áudio precisa da RX 7600 e
-  não sai da fazenda.
-- **Acesso:** Tailscale Funnel. Não precisa abrir porta no roteador e funciona
-  com internet rural de IP compartilhado. O HTTPS termina **neste PC**: a
-  Tailscale repassa o tráfego cifrado e não vê senhas, fotos nem áudios.
-- **Nenhuma porta aberta na rede local:** a API não é publicada, e o app só
-  atende em `127.0.0.1:8090`. O único caminho de fora é o Funnel.
-- **Backup:** diário, num HD externo e numa cópia criptografada no OneDrive.
+- **Servidor:** VPS na Hostinger (KVM 2: 2 vCPU, 8 GB, 100 GB), em São Paulo,
+  Ubuntu 24.04, na conta da fazenda.
+- **Leitura de foto e voz:** API Gemini (`gemini-3.5-flash-lite`), na conta
+  paga da fazenda, com créditos pré-pagos e sem recarga automática. Se o
+  crédito acabar, só a leitura para. Ver `known-issues.md`, "Leitura pela API
+  Gemini".
+- **Acesso:** Tailscale Funnel, como antes. Nenhuma porta aberta além do SSH:
+  o app atende só em `127.0.0.1:8090`.
+- **Backup:** diário, cifrado, no Backblaze B2 da fazenda, com Object Lock de
+  30 dias (nem quem invadir o servidor apaga as cópias) e apagadas depois de
+  90 dias. Nada fica em conta pessoal do desenvolvedor.
 
-## Uma vez só (feito ou pendente)
+## O que guarda o quê
 
-| Passo | Estado |
-| --- | --- |
-| Segredos de produção (`python tools/gerar_env_producao.py`) | feito |
-| Subir a produção e aplicar as migrações | feito |
-| Fazenda + baseline (401 animais, 152 medições, insumos, preço do leite) | feito |
-| Backup diário (3h30) e verificação semanal (domingo 4h30) agendados | feito |
-| PC sem suspender na tomada; Docker Desktop abrindo com o Windows | já estava |
-| Criar a conta do administrador | feito |
-| Instalar a Tailscale e ligar o Funnel (`https://desktop-caio.tailf88007.ts.net`) | feito |
-| Guardar a senha do backup fora do PC | feito (24/09/2026) |
-| **Conectar o OneDrive neste PC.** Sem ele e sem o HD, nenhuma cópia sai daqui (ver "Backup") | **pendente: você** |
-| Conectar o HD externo e indicar a pasta | **pendente: você** |
+| Onde | O quê | Se perder |
+| --- | --- | --- |
+| `infra/.env.production` (servidor) | senhas do banco e do MinIO, segredo das sessões, chave do Gemini | gera de novo; as sessões caem |
+| `~/.belo-vale/senha-backup.txt` (servidor) | senha da criptografia do backup | **nenhuma cópia abre.** Fica também com o cliente, fora do servidor |
+| `~/.belo-vale/b2.env` (servidor) | chave do Backblaze, só para o bucket | cria outra chave no painel do B2 |
+| Backblaze B2 | as cópias cifradas | — |
 
-### Criar a conta do administrador
+## Servidor novo, do zero
 
-A senha é digitada por você e nunca aparece na tela nem passa por outra
-pessoa. No terminal, na pasta do projeto:
+Leva cerca de uma hora, a maior parte esperando. Os comandos com `PS>` rodam
+no notebook (PowerShell); os com `$`, no servidor.
 
-```powershell
-docker compose -p belo-vale --env-file infra/.env.production -f infra/docker-compose.yml -f infra/docker-compose.prod.yml exec api uv run --no-sync python -m app.core.bootstrap_admin --email SEU_EMAIL
-```
+### 1. Contratar e entrar
 
-O comando pede a senha duas vezes e recusa senha fraca. Ele só funciona
-enquanto não existir nenhuma conta. Depois disso, as outras contas se criam
-pelo app, em **Contas**.
-
-### Tailscale Funnel
-
-1. Instale a Tailscale para Windows (tailscale.com/download) e entre com a sua
-   conta (Google, Microsoft ou e-mail).
-2. No painel da Tailscale (login.tailscale.com/admin):
-   - **DNS → MagicDNS**: ligado;
-   - **DNS → HTTPS Certificates**: ligar;
-   - **Access controls**: permitir Funnel para este PC. O painel oferece
-     o atalho ao rodar o comando abaixo pela primeira vez.
-3. No terminal:
+1. No notebook, gere a chave SSH (uma vez só):
 
    ```powershell
-   tailscale funnel --bg --https=443 http://127.0.0.1:8090
-   tailscale funnel status
+   PS> ssh-keygen -t ed25519 -C "belo-vale"
+   PS> Get-Content $HOME\.ssh\id_ed25519.pub
    ```
 
-   O `--bg` deixa o Funnel ligado inclusive depois de reiniciar o PC. O
-   endereço aparece no `status`, no formato `https://nome-do-pc.xxxx.ts.net`.
-4. Conferido em 22/09/2026: certificado válido, cabeçalhos de segurança
-   presentes, e a API enxerga o IP de quem acessa (não o do proxy) — o
-   bloqueio de tentativas de login vale por pessoa.
+2. Contrate a VPS na Hostinger (São Paulo, Ubuntu 24.04) e, no painel, cole
+   a chave pública em **SSH keys**. Anote o IP.
+3. Prepare o servidor (atualiza, cria o usuário `belovale`, fecha o root e a
+   senha, firewall, Docker, Tailscale):
 
-Para desligar o acesso pela internet (sem parar o sistema):
-`tailscale funnel --https=443 http://127.0.0.1:8090 off`.
+   ```powershell
+   PS> Get-Content tools\servidor\preparar-servidor.sh -Raw | ssh root@IP "bash -s"
+   ```
+
+   No fim ele mostra `ssh belovale@IP`. Daí em diante o root não entra mais.
+
+### 2. Código
+
+O repositório tem dados reais e é privado: o servidor lê com uma chave só de
+leitura.
+
+```bash
+$ ssh-keygen -t ed25519 -f ~/.ssh/github -N "" -C "servidor belo-vale"
+$ printf 'Host github.com\n  IdentityFile ~/.ssh/github\n' >> ~/.ssh/config
+$ cat ~/.ssh/github.pub
+```
+
+No notebook, cadastre a chave no repositório (só leitura):
+
+```powershell
+PS> Set-Content chave.pub "<a linha do cat>"; gh repo deploy-key add chave.pub --title "servidor belo-vale"; Remove-Item chave.pub
+```
+
+```bash
+$ git clone git@github.com:mbezerrajr-ops/Belo-Vale-II.git ~/Belo-Vale-II
+```
+
+### 3. Segredos
+
+Do notebook para o servidor, a senha do backup e a chave do Gemini (nenhuma
+aparece na tela):
+
+```powershell
+PS> ssh belovale@IP "mkdir -p ~/.belo-vale && chmod 700 ~/.belo-vale"
+PS> scp $HOME\.belo-vale\senha-backup.txt $HOME\.belo-vale\gemini-key.txt belovale@IP:.belo-vale/
+```
+
+No servidor, a chave do Backblaze (o `read -s` não mostra o que é digitado):
+
+```bash
+$ read -p "keyID: " K; read -s -p "applicationKey: " A; echo; read -p "bucket: " B
+$ (umask 077; printf 'B2_KEY_ID=%s\nB2_APP_KEY=%s\nB2_BUCKET=%s\n' "$K" "$A" "$B" > ~/.belo-vale/b2.env); unset K A B
+$ chmod 600 ~/.belo-vale/*
+$ cd ~/Belo-Vale-II && python3 tools/gerar_env_producao.py
+```
+
+O gerador cria senhas novas e põe a chave do Gemini no `.env.production`.
+
+### 4. Dados
+
+Copie a cópia mais recente para o servidor e restaure. Restaurar recusa um
+banco que já tem animais.
+
+```powershell
+PS> scp "$env:OneDrive\BeloVale-backup\belo-vale-AAAA-MM-DD_HHMM.tar.gpg" belovale@IP:
+```
+
+```bash
+$ tools/servidor/restaurar.sh ~/belo-vale-AAAA-MM-DD_HHMM.tar.gpg
+```
+
+A primeira vez **compila o MinIO** do código-fonte (cerca de 10 minutos; ver
+`known-issues.md`, "MinIO arquivado"). No fim, as contagens são conferidas com
+o manifesto do backup. Todos entram de novo com a própria senha.
+
+### 5. Internet
+
+```bash
+$ sudo tailscale up
+```
+
+Abra o link que aparece e entre com a conta Tailscale **da fazenda**. No painel
+(login.tailscale.com/admin): **DNS → MagicDNS** e **HTTPS Certificates**
+ligados, e o Funnel permitido para o servidor (o painel oferece o atalho no
+primeiro uso). Então:
+
+```bash
+$ sudo tailscale funnel --bg --https=443 http://127.0.0.1:8090
+$ sudo tailscale funnel status
+```
+
+O endereço do app é o do `status` (`https://belo-vale.….ts.net`). Quem tinha o
+app instalado no celular abre o endereço novo e instala de novo.
+
+### 6. Backup
+
+```bash
+$ tools/servidor/producao.sh backup       # o primeiro, à mão
+$ tools/servidor/producao.sh verificar    # prova que restaura
+$ sudo tools/servidor/instalar-agendamentos.sh
+```
+
+Daí em diante: backup todo dia às 3h30 e verificação aos domingos às 4h30
+(`systemctl list-timers 'belo-vale-*'`). Servidor desligado no horário: roda
+quando voltar.
+
+Depois da primeira verificação, os backups antigos (feitos no Windows) podem
+ir para o B2 e sair do OneDrive pessoal:
+`rclone copy <pasta> b2:<bucket>` com as variáveis do `b2.env`.
 
 ## Dia a dia
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\producao.ps1 estado      # o que está no ar
-powershell -ExecutionPolicy Bypass -File tools\producao.ps1 registros api
-powershell -ExecutionPolicy Bypass -File tools\producao.ps1 backup      # backup agora
+```bash
+$ cd ~/Belo-Vale-II
+$ tools/servidor/producao.sh estado         # o que está no ar, último backup e verificação
+$ tools/servidor/producao.sh registros worker
+$ tools/servidor/producao.sh backup
 ```
-
-- **Não saia da conta do Windows.** O Docker Desktop só roda com a sessão
-  aberta. Para se afastar, **bloqueie** a tela (Windows + L): o sistema
-  continua no ar.
-- Depois de uma queda de energia, o PC precisa ser ligado e alguém precisa
-  entrar na conta do Windows. Com isso, Docker, whisper e Ollama voltam
-  sozinhos, e os contêineres de produção também (`restart: unless-stopped`).
-  Um nobreak evita a maior parte disso.
-- Nos celulares, o que for lançado enquanto o PC estiver fora do ar fica
-  guardado e é enviado quando ele voltar.
 
 ## Atualizar depois de um merge
 
-```powershell
-git checkout main
-git pull
-powershell -ExecutionPolicy Bypass -File tools\producao.ps1 atualizar
+```bash
+$ tools/servidor/producao.sh atualizar
 ```
 
-O `atualizar` oferece um backup antes, reconstrói com o código novo, aplica as
-migrações do banco e confere que o app voltou.
+Faz o backup, baixa o código (`git pull`), reconstrói, aplica as migrações,
+confere que o app voltou e apaga as imagens antigas.
 
-**A primeira atualização depois de 24/09/2026 compila o MinIO** a partir do
-código-fonte, porque a imagem pronta saiu do ar (ver `known-issues.md`). A
-versão é a mesma, e os dados não mudam. Leva alguns minutos e ocupa alguns GB
-de cache: libere espaço no C: antes e, depois que o app voltar, rode
-`docker builder prune -f`.
+## Restaurar
 
-## Backup
+- **Um backup específico, num servidor novo:** seção "Servidor novo", passo 4.
+  As cópias ficam no B2 (`rclone lsf b2:<bucket>`) e as últimas 7 também em
+  `~/.belo-vale/copias/`.
+- **Só conferir uma cópia**, sem tocar na produção:
+  `tools/servidor/verificar-backup.sh <arquivo.tar.gpg>`. Abre também as
+  cópias feitas no Windows.
 
-- **Diário, 3h30** (tarefa `BeloVale-Backup`). Se o PC estiver desligado nesse
-  horário, roda assim que ligar.
-- **O que vai:** o banco inteiro (pg_dump) e todas as fotos e gravações, com
-  um manifesto de contagens e somas SHA-256.
-- **HD externo:** a cópia como está; ficam as últimas 30. Informe a pasta uma
-  vez:
+## Leitura por IA (Gemini)
 
-  ```powershell
-  Set-Content "$env:USERPROFILE\.belo-vale\hd-destino.txt" "E:\BeloVale-backup"
-  ```
+- O custo medido é de cerca de R$ 0,05 por folha e R$ 0,002 por gravação. O
+  saldo e o consumo ficam no Google AI Studio, em Faturamento.
+- Sem crédito (ou com o Google fora do ar), a leitura falha com o motivo
+  `reader_unavailable`: quem enviou vê que o leitor está fora do ar e que o
+  arquivo está bom, e envia de novo depois. Lançamento, importação, folha e
+  exportação continuam.
+- Trocar o modelo é uma variável no `.env.production` (`READER_MODEL`,
+  `AUDIO_MODEL`) e um `atualizar`. Meça antes: `docs/vision-provider-status.md`.
 
-- **OneDrive, pasta `BeloVale-backup`:** a cópia criptografada com AES-256;
-  ficam as últimas 14. Depois de subir, ela deixa de ocupar o disco C:.
-  **Só sobe se o OneDrive estiver conectado com uma conta** neste PC. Entre
-  com a mesma conta do notebook: cada cópia chega lá sozinha, e o notebook
-  vira o segundo lugar.
-- **Senha da criptografia:** fica em `%USERPROFILE%\.belo-vale\senha-backup.txt`,
-  legível só pela sua conta do Windows. **Guarde-a também longe do PC.** Se o
-  PC se perder, é a única forma de abrir a cópia da nuvem.
-- **Registro:** `%USERPROFILE%\.belo-vale\backup.log`.
+## Segurança — o que vale no servidor
 
-**Só conta o que sai do PC.** Uma cópia no mesmo disco não sobrevive a ele.
-Se o OneDrive não estiver conectado e o HD não estiver ligado (ou a pasta do
-HD estiver no C:), a cópia fica gravada aqui mesmo, mas o backup termina como
-**FALHOU**, com o motivo no registro, e o `producao.ps1 estado` mostra:
-
-```
-Último backup: belo-vale-2026-09-23_0330 (80,1 MB)
-A ÚLTIMA TENTATIVA DE BACKUP FALHOU: ... nenhuma cópia saiu deste PC ...
-```
-
-Até 24/09/2026 era diferente, e foi assim que o desktop foi para o conserto
-sem nenhuma cópia fora dele (ver `known-issues.md`).
-
-### Verificação semanal
-
-Todo domingo às 4h30 (tarefa `BeloVale-VerificaBackup`), a cópia mais recente
-é decifrada e restaurada num banco descartável, sem rede, e as contagens são
-comparadas com o manifesto. Nada na produção é tocado. O resultado fica em
-`%USERPROFILE%\.belo-vale\verificacao.log`. Para rodar à mão:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\backup\verificar-backup.ps1
-```
-
-Uma cópia adulterada ou corrompida é recusada: a criptografia detecta a
-alteração, e as somas conferem cada arquivo.
-
-### Restaurar depois de perder o PC
-
-Num PC novo, com Docker Desktop e o repositório clonado:
-
-1. `python tools/gerar_env_producao.py` (segredos novos; as sessões antigas
-   caem, e todos entram de novo com a própria senha).
-2. Suba só o armazenamento. O MinIO é compilado do código no GitHub; sem
-   acesso a ele, carregue a imagem guardada no OneDrive (`BeloVale-infra`,
-   siga o LEIA-ME) e troque, no compose, o `build` do `minio` pela imagem
-   carregada:
-
-   ```powershell
-   $P = "compose -p belo-vale --env-file infra/.env.production -f infra/docker-compose.yml -f infra/docker-compose.prod.yml"
-   docker $P.Split() up -d --wait db minio redis
-   ```
-
-3. Abra a cópia. Da nuvem, decifre primeiro (pede a senha anotada):
-
-   ```powershell
-   & "C:\Program Files\Git\usr\bin\gpg.exe" --output backup.tar --decrypt belo-vale-AAAA-MM-DD_HHMM.tar.gpg
-   mkdir restaura; tar -xf backup.tar -C restaura
-   ```
-
-4. Banco e mídia:
-
-   ```powershell
-   $db = docker $P.Split() ps -q db
-   docker cp restaura\banco.dump "${db}:/tmp/banco.dump"
-   docker $P.Split() exec -T db pg_restore -U ingestion -d ingestion --no-owner --exit-on-error /tmp/banco.dump
-   docker run --rm -v belo-vale_minio_data:/data -v "${PWD}\restaura:/b:ro" postgres:17-alpine tar xzf /b/midia.tgz -C /data
-   ```
-
-5. Suba o resto e aplique as migrações, caso o código seja mais novo que a
-   cópia:
-
-   ```powershell
-   docker $P.Split() up -d --build --wait
-   docker $P.Split() exec -T api uv run --no-sync alembic upgrade head
-   ```
-
-6. Confira as contagens com as do `manifesto.txt` da cópia.
-
-## Espaço em disco
-
-Em 22/09/2026 o disco C: tinha **6 GB livres de 222 GB**:
-
-- **Docker: 24 GB.** Apaguei 13 GB de cache de build, mas o disco virtual do
-  Docker não encolhe sozinho. O espaço ficou livre para o banco, as fotos e as
-  gravações, dentro do Docker, e não para o Windows.
-- **Downloads: 8 GB. OneDrive: 15 GB guardados no PC.**
-
-Para devolver espaço ao C:, sem risco para os dados:
-
-1. **Compactar o disco do Docker** (`docker_data.vhdx`, 24 GB). Isso **para
-   todos os contêineres, inclusive os de outros projetos**. Feche o Docker
-   Desktop (ícone perto do relógio → Quit) e, num PowerShell **como
-   administrador**:
-
-   ```powershell
-   wsl --shutdown
-   diskpart
-   ```
-
-   Dentro do `diskpart`:
-
-   ```
-   select vdisk file="C:\Users\caiol\AppData\Local\Docker\wsl\disk\docker_data.vhdx"
-   attach vdisk readonly
-   compact vdisk
-   detach vdisk
-   exit
-   ```
-
-   Depois, abra o Docker Desktop de novo; a produção volta sozinha.
-2. No OneDrive: clicar com o botão direito na pasta → **Liberar espaço**.
-3. Revisar a pasta Downloads.
-
-## Segurança — o que já vale
-
+- SSH só por chave, sem root e sem senha; firewall fechado, só com o SSH aberto.
+- Atualizações de segurança do Ubuntu automáticas.
 - A API se recusa a subir em produção sem segredo forte, com o cookie de sessão
-  sem `Secure` ou com leitor ou transcritor falso.
-- Limite de tentativas de login (por conta e por origem), política de senha,
-  sessão curta com renovação em cookie `HttpOnly`/`Secure`.
-- Cabeçalhos: CSP só da própria origem, sem iframe, sem sniffing, microfone
-  só para o app.
-- Compressão só nos arquivos do app, nunca nas respostas da API (BREACH).
-- Nenhuma porta aberta na rede local; o único caminho de fora é o Funnel.
-- HSTS (`max-age` de um ano, só para o endereço do sistema) e o nginx sem
-  anunciar a versão.
-- O IP de origem chega à API pelo Funnel: o limite de login distingue quem
-  tenta.
+  sem `Secure`, com leitor falso ou sem a chave do Gemini.
+- Limite de tentativas de login, política de senha, sessão curta com renovação
+  em cookie `HttpOnly`/`Secure`; CSP só da própria origem; HSTS.
+- Fotos e gravações só saem para a API Gemini, endereço fixo no código.
+- Backup cifrado (AES-256) antes de sair do servidor; a chave do B2 só alcança
+  o bucket e não apaga as cópias dentro dos 30 dias do Object Lock.
