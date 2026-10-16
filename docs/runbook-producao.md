@@ -107,7 +107,10 @@ $ chmod 600 ~/.belo-vale/*
 $ cd ~/Belo-Vale-II && python3 tools/gerar_env_producao.py
 ```
 
-O gerador cria senhas novas e põe a chave do Gemini no `.env.production`.
+O nome do bucket é exatamente o do Backblaze, com maiúsculas e minúsculas
+(`Belo-vale-backup` não é `belo-vale-backup`): errado, o backup falha com
+`401 unauthorized`. O gerador cria senhas novas e põe a chave do Gemini no
+`.env.production`.
 
 ### 4. Dados
 
