@@ -89,6 +89,9 @@ PasswordAuthentication no
 KbdInteractiveAuthentication no
 PubkeyAuthentication yes
 CONF
+# No Ubuntu 24.04 o SSH sobe sob demanda e a pasta de separação de
+# privilégios só existe enquanto ele roda: sem ela, o `sshd -t` falha.
+mkdir -p /run/sshd
 sshd -t
 systemctl reload ssh
 
