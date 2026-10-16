@@ -636,7 +636,7 @@ function AppShell({
 
       <main className="area" id="conteudo" tabIndex={-1} key={area} ref={content}>
         <AreaBoundary>
-          <Suspense fallback={<div className="skeleton skeleton-card" aria-label="Carregando" />}>
+          <Suspense fallback={<div className="skeleton skeleton-card" role="status" aria-label="Carregando" />}>
           {area === "painel" && <HerdDashboard token={token} />}
 
           {area === "producao" && <ProductionPage token={token} canCorrect={canEdit} />}
@@ -687,7 +687,7 @@ function AppShell({
                   </button>
                   {animalError && <p role="alert">{animalError}</p>}
                   {animal === null && !animalError && (
-                    <div className="skeleton skeleton-card" aria-label="Carregando a ficha" />
+                    <div className="skeleton skeleton-card" role="status" aria-label="Carregando a ficha" />
                   )}
                   {animal !== null && (
                     <AnimalDetailPanel
