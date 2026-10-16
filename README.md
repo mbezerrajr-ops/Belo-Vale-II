@@ -4,10 +4,11 @@ Sistema de gestão do rebanho leiteiro da fazenda Belo Vale II: cadastro dos
 animais, produção de leite por vaca e por dia, lotes, insumos e custos. É
 usado pelo celular, no curral, pelo dono e pelos funcionários.
 
-O diferencial é ler, **na própria fazenda**, a foto da folha de pesagem e a
-gravação da ordenha. O que é lido vira **proposta** numa caixa de Revisão:
-nada entra no rebanho sem alguém aprovar, e nenhuma foto ou gravação sai
-para serviço externo.
+O diferencial é ler a foto da folha de pesagem e a gravação da ordenha. O
+que é lido vira **proposta** numa caixa de Revisão: nada entra no rebanho
+sem alguém aprovar. A leitura é feita pela API Gemini, na conta paga da
+fazenda (decisão do titular de 16/10/2026); nenhum outro serviço externo
+recebe foto ou gravação.
 
 **ATENÇÃO — dados reais.** Este repositório contém os dados do rebanho (401
 animais, produção, custos). Trate como confidencial e mantenha-o **privado**.
@@ -39,8 +40,10 @@ animais, produção, custos). Trate como confidencial e mantenha-o **privado**.
 - **Nada se apaga.** Cada medição guarda a origem (base antiga, lançamento,
   arquivo, proposta). Corrigir ou anular cria versão nova, com motivo e autor,
   e o banco garante isso com gatilhos.
-- **Nada sai da fazenda.** Os leitores de foto e voz só aceitam endereço
-  local (`app/core/local_url.py`).
+- **Um único destino externo, fixo no código.** Fotos e gravações só saem
+  para a API Gemini (`app/core/gemini.py`), cujo endereço não é
+  configurável; os leitores locais (Ollama, whisper) continuam aceitando só
+  endereço interno (`app/core/local_url.py`).
 - **O que protege contra erro do modelo fica no código, não na instrução.**
   Prompt deriva; código não. Cada versão do leitor é medida contra gabaritos.
 
@@ -48,16 +51,16 @@ animais, produção, custos). Trate como confidencial e mantenha-o **privado**.
 
 | Pasta | O quê |
 | --- | --- |
-| `apps/api` | API em FastAPI (Python 3.13), PostgreSQL 17 com migrações Alembic, worker Celery que lê fotos (Ollama, `qwen2.5vl`) e áudios (whisper.cpp) |
+| `apps/api` | API em FastAPI (Python 3.13), PostgreSQL 17 com migrações Alembic, worker Celery que lê fotos e áudios pela API Gemini (ou, com GPU, por Ollama e whisper.cpp) |
 | `apps/web` | App em React + Vite, instalável no celular, com fila offline no próprio aparelho |
 | `infra` | Docker Compose (api, worker, PostgreSQL, Redis, MinIO, nginx) e a variante de produção |
 | `tools` | Operação da produção (`producao.ps1`), backup e verificação, varredura de credenciais, scripts de manutenção de dados |
 | `docs` | Runbooks, decisões registradas, pendências, relatórios |
 | `belo-vale-ii-projeto-completo` | A plataforma antiga e a base de dados de origem (ver abaixo) |
 
-A produção roda num PC da fazenda, com placa de vídeo para a leitura, e é
-acessada pela internet pelo Tailscale Funnel, com HTTPS. Os leitores rodam
-fora do Docker, na mesma máquina.
+A produção roda num servidor na nuvem (São Paulo) e é acessada pela internet
+pelo Tailscale Funnel, com HTTPS. A leitura de fotos e gravações é feita pela
+API Gemini.
 
 ## Documentação
 

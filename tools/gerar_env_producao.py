@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import os
 import secrets
 import string
 import sys
@@ -34,6 +35,14 @@ def main() -> int:
         return 1
 
     senha_banco = aleatorio(40)
+    # A chave da API Gemini não é gerada: vem da conta paga da fazenda. Se ela
+    # já estiver guardada neste computador, entra no arquivo sem aparecer na
+    # tela; se não, fica a linha vazia, e o worker se recusa a subir até ela
+    # ser preenchida.
+    chave_gemini = os.environ.get("GEMINI_API_KEY", "")
+    arquivo_chave = Path.home() / ".belo-vale" / "gemini-key.txt"
+    if not chave_gemini and arquivo_chave.exists():
+        chave_gemini = arquivo_chave.read_text(encoding="ascii").strip()
     conteudo = "\n".join(
         [
             "# Produção deste PC. Gerado por tools/gerar_env_producao.py.",
@@ -45,11 +54,17 @@ def main() -> int:
             f"MINIO_ACCESS_KEY=bv{aleatorio(18)}",
             f"MINIO_SECRET_KEY={aleatorio(48)}",
             f"AUTH_SECRET={aleatorio(64)}",
+            f"GEMINI_API_KEY={chave_gemini}",
             "",
         ]
     )
     DESTINO.write_text(conteudo, encoding="utf-8")
     print(f"Criado {DESTINO} com segredos novos (os valores não são exibidos).")
+    if not chave_gemini:
+        print(
+            f"Falta a chave da API Gemini: guarde-a em {arquivo_chave} e gere de novo, "
+            "ou preencha GEMINI_API_KEY no arquivo."
+        )
     return 0
 
 

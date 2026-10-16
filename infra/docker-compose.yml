@@ -160,7 +160,8 @@ networks:
   # api and web sit here too so the host (and Playwright/browsers) can reach
   # them via their published ports; this network is deliberately NOT internal.
   ingestion_edge: {}
-  # Só o worker entra aqui, e só para falar com o leitor de fotos.
+  # Só o worker entra aqui: para falar com o leitor local de fotos e de voz
+  # ou, em produção, com a API Gemini (o único destino externo, fixo no código).
   reader_link: {}
 
 volumes:

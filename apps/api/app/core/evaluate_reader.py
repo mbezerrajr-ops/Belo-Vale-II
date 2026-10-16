@@ -25,6 +25,7 @@ aceita endereço local.
 from __future__ import annotations
 
 import argparse
+import atexit
 import asyncio
 import json
 import sys
@@ -41,6 +42,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
+from app.core.gemini import GeminiClient
 from app.db.models import Animal, OfficialMeasurement
 from app.services.event_normalization import parse_event_date
 from app.services.brinco import normalize_brinco
@@ -52,6 +54,7 @@ from app.services.event_proposals import (
 )
 from app.services.production_files import parse_number_br
 from app.vision.sheet_reader import (
+    GeminiSheetReader,
     OllamaSheetReader,
     ReaderFormatError,
     ReaderUnavailable,
@@ -408,6 +411,10 @@ def _read(sample: Path, transcriber: Transcriber, version: str, reuse: bool) -> 
     return reading
 
 
+def _print_tokens(client: GeminiClient) -> None:
+    print(f"   tokens    {client.total_tokens}")
+
+
 def main(
     argv: list[str] | None = None,
     *,
@@ -419,6 +426,12 @@ def main(
     parser.add_argument("--samples", required=True, type=Path, help="Pasta com as amostras.")
     parser.add_argument("--url", default=None, help="Endereço do Ollama (padrão: READER_URL).")
     parser.add_argument("--model", default=None, help="Modelo (padrão: READER_MODEL).")
+    parser.add_argument(
+        "--provider",
+        choices=("ollama", "gemini"),
+        default=None,
+        help="Quem lê (padrão: READER_PROVIDER; 'gemini' usa GEMINI_API_KEY).",
+    )
     parser.add_argument(
         "--records-date",
         type=date.fromisoformat,
@@ -438,9 +451,20 @@ def main(
     version = "externo"
     if transcriber is None:
         settings = get_settings()
-        reader = OllamaSheetReader(
-            url=args.url or settings.reader_url, model=args.model or settings.reader_model
-        )
+        provider = args.provider or settings.reader_provider
+        reader: OllamaSheetReader
+        if provider == "gemini":
+            key = settings.gemini_api_key.get_secret_value() if settings.gemini_api_key else ""
+            reader = GeminiSheetReader(
+                client=GeminiClient(api_key=key, model=args.model or settings.reader_model)
+            )
+            # O custo vem dos tokens: imprime a soma no fim, qualquer que seja
+            # a saída do comando.
+            atexit.register(_print_tokens, reader.client)
+        else:
+            reader = OllamaSheetReader(
+                url=args.url or settings.reader_url, model=args.model or settings.reader_model
+            )
         transcriber = reader.transcribe
         version = reader.version
 

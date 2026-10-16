@@ -22,8 +22,9 @@ class Settings(BaseSettings):
     #: Leitor local de folhas (Ollama). Só aceita endereço da própria máquina
     #: ou da rede interna — ver `app.core.local_url.ensure_local_url`.
     #: Leitor de eventos do worker. "fake" inventa leitura (CI e demonstração);
-    #: "ollama" lê de verdade, no endereço de `reader_url`.
-    reader_provider: Literal["fake", "ollama"] = "fake"
+    #: "ollama" lê de verdade, no endereço de `reader_url`; "gemini" lê pela
+    #: API Gemini, com `reader_model` (ex.: gemini-3.1-flash-lite).
+    reader_provider: Literal["fake", "ollama", "gemini"] = "fake"
     reader_url: str = "http://127.0.0.1:11434"
     reader_model: str = "qwen2.5vl:7b"
     #: Transcritor da gravação de voz (whisper.cpp). Mesma regra do leitor de
@@ -31,13 +32,17 @@ class Settings(BaseSettings):
     #: de verdade no endereço de `audio_url`, que só pode ser da própria
     #: máquina ou da rede interna. A porta padrão é 8081 porque a 8080 é a do
     #: app.
-    audio_provider: Literal["fake", "whisper"] = "fake"
+    audio_provider: Literal["fake", "whisper", "gemini"] = "fake"
     audio_url: str = "http://127.0.0.1:8081"
     #: Informativo: vai na versão da leitura, para comparar modelos.
     audio_model: str = "ggml-large-v3-turbo-q5_0"
     audio_language: str = "pt"
     #: Gravação mais longa que isto não é transcrita: prenderia a GPU.
     audio_max_seconds: int = Field(default=300, ge=10, le=3_600)
+    #: Chave da API Gemini, na conta paga da fazenda (o Google não treina com
+    #: o que recebe nessa conta). Só o worker precisa dela, e só quando um dos
+    #: leitores é "gemini". Fica no ambiente do servidor, nunca no código.
+    gemini_api_key: SecretStr | None = None
     auth_secret: SecretStr | None = None
     auth_token_ttl_seconds: int = Field(default=900, ge=60, le=86_400)
     #: Validade da sessão renovável, em segundos. Padrão de 30 dias.
@@ -78,6 +83,11 @@ class Settings(BaseSettings):
             required.append("reader_url")
         if self.runtime_role == "worker" and self.audio_provider == "whisper":
             required.append("audio_url")
+        if self.runtime_role == "worker" and "gemini" in (
+            self.reader_provider,
+            self.audio_provider,
+        ):
+            required.append("gemini_api_key")
         missing = [name for name in required if not getattr(self, name)]
         if missing:
             raise ValueError(

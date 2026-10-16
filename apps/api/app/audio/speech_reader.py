@@ -20,10 +20,12 @@ from app.audio.speech_to_lines import AUDIO_ORIGIN, is_phantom, speech_to_lines
 from app.audio.transcriber import (
     AudioTranscriber,
     FakeAudioTranscriber,
+    GeminiTranscriber,
     TranscriberFormatError,
     WhisperCppTranscriber,
 )
 from app.core.config import Settings, get_settings
+from app.core.gemini import GeminiClient
 from app.services.event_extraction import EventExtraction, EventExtractor
 from app.services.reading_to_events import lines_to_events
 
@@ -78,11 +80,18 @@ def build_audio_reader(settings: Settings) -> EventExtractor:
         return SpokenEventReader(
             FakeAudioTranscriber(), decode=lambda content: content, model_name="transcritor-falso"
         )
-    if not settings.audio_url:
-        raise RuntimeError("AUDIO_URL é obrigatório quando AUDIO_PROVIDER=whisper.")
-    transcriber = WhisperCppTranscriber(
-        url=settings.audio_url, model=settings.audio_model, language=settings.audio_language
-    )
+    transcriber: AudioTranscriber
+    if settings.audio_provider == "gemini":
+        key = settings.gemini_api_key.get_secret_value() if settings.gemini_api_key else ""
+        transcriber = GeminiTranscriber(
+            client=GeminiClient(api_key=key, model=settings.audio_model)
+        )
+    else:
+        if not settings.audio_url:
+            raise RuntimeError("AUDIO_URL é obrigatório quando AUDIO_PROVIDER=whisper.")
+        transcriber = WhisperCppTranscriber(
+            url=settings.audio_url, model=settings.audio_model, language=settings.audio_language
+        )
     return SpokenEventReader(
         transcriber,
         decode=partial(to_wav_16k_mono, max_seconds=settings.audio_max_seconds),
