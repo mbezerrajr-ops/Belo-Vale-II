@@ -386,3 +386,36 @@ colada à borda, mas naquela foto nem a segunda acerta. Tentar por geometria
 (projeção de escuridão por coluna) esbarrou no fundo escuro da mesa e do
 espiral do caderno, que dominam as colunas das pontas: seria preciso
 endireitar a folha antes.
+
+## API Gemini (16/10/2026)
+
+O mesmo leitor v9 (`folha-v9`), trocando só quem responde: `GeminiSheetReader`
+manda as mesmas perguntas, com o mesmo esquema, para a API Gemini. As cinco
+fotos de celular de 22/07, contra as medições já lançadas no banco (103
+vacas), restaurado do backup de 07/10:
+
+| leitor | cabeçalho | brinco | total | na revisão | erro certo | tempo (5 folhas) | custo/folha* |
+|---|---|---|---|---|---|---|---|
+| qwen2.5vl:7b local, v9 | 5 de 5 | 81% | 79% | 90%, 4 toques | 9 | — (GPU) | — |
+| gemini-3.1-flash-lite | 5 de 5 | 89% | 94% | 96%, 5 toques | 5 | 92 s | R$ 0,03 |
+| **gemini-3.5-flash-lite** | **5 de 5** | 89% | **95%** | **97%**, 4 toques | **2** | **85 s** | R$ 0,05 |
+| gemini-3.6-flash | 5 de 5 | 91% | 95% | 96%, 3 toques | 3 | 296 s | R$ 0,22 |
+
+\* tokens medidos (33 mil de entrada e 14 a 52 mil de saída nas cinco
+folhas, 25 chamadas) pelos preços da API em outubro de 2026, US$ 1 = R$ 5,10.
+O `gemini-2.5-flash-lite` não está mais disponível para contas novas.
+
+Escolhido o **3.5 Flash-Lite**: menos "erro certo" (a vaca errada com cara
+de certa, o que custa caro) e o mais rápido. O 3.6 Flash custa quatro vezes
+mais, demora três vezes mais e não acerta mais.
+
+**Voz**, com o mesmo modelo, nas três gravações do titular: as 11 vacas com
+brinco, manhã, tarde e total certos e as anotações ("secar", "1º lote")
+reconhecidas, depois de desfazer número escrito como hora ("7:00 pela
+manhã"). Sem gabarito no repositório: conferido ouvindo. 3 a 6 s por
+gravação de 40 a 50 s.
+
+Para repetir:
+
+    python -m app.core.evaluate_reader --samples <fotos> --provider gemini       --model gemini-3.5-flash-lite --records-date 2026-07-22
+

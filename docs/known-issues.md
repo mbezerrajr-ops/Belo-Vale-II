@@ -5,7 +5,7 @@ registro em ordem de data: as seções abaixo guardam cada decisão como foi
 tomada. O que **ainda está aberto** fica resumido aqui, com a seção de
 origem.
 
-## Pendências abertas (atualizado em 24/09/2026)
+## Pendências abertas (atualizado em 16/10/2026)
 
 **Com o titular (fora do código):**
 
@@ -32,14 +32,12 @@ origem.
 - **Trocar o MinIO** por um servidor compatível com S3 que ainda receba
   manutenção; hoje ele é compilado do código-fonte, como ponte. *(MinIO
   arquivado)*
-- **Caminho antigo das "Fichas"** (`VisionProvider`, `approval.py`, telas fora
-  do menu) continua no código. *(Foto do celular vira proposta)*
-- **Imagem `api-tests`** do compose não coleta os testes. *(Correções da
-  análise geral)*
-- **Leitor de folhas:** a margem do formulário impresso acerta 6 de 16
-  anotações (próximo passo: achar a borda da tabela); o brinco da folha
-  manuscrita fica na casa dos 63%; os litros da manuscrita estão ~5 pontos
-  abaixo da v7, sem explicação. *(vision-provider-status.md)*
+- **Leitor de folhas:** a folha manuscrita de 25/08 (63% de brinco com o
+  leitor local) ainda não foi medida com o Gemini — o gabarito ficou no PC
+  antigo. *(Leitura pela API Gemini)*
+- **Leitor de áudio:** os três áudios de teste não têm gabarito neste
+  repositório; a medição de 16/10 foi conferida ouvindo. Falta gravação real
+  do curral, com a ordenhadeira ligada. *(Leitura pela API Gemini)*
 - **Leitor de áudio:** brinco de menos de três dígitos só depois de "vaca";
   "meia" sozinha não é lida; parto, baixa e DEL falados viram observação.
   *(Fase 3)*
@@ -1230,3 +1228,27 @@ BELMONTE 5,5 + 4 no 3º). No cadastro, o 016 é da BELMONTE; a BORBOLETA ficou
 com o `B1-016VD` do sistema antigo, que a conciliação de 22/09 deixou de fora
 por ter formato estranho. Não se muda nada até o cliente dizer qual é o brinco
 de cada uma.
+
+## Leitura pela API Gemini (16/10/2026)
+
+O PC com placa de vídeo, que rodava o leitor de fotos (Ollama, `qwen2.5vl`)
+e o de voz (whisper.cpp), não está mais disponível. O titular decidiu ler
+fotos e gravações pela **API Gemini, na conta paga da fazenda** — nela o
+Google não usa o que recebe para treinar modelos. Com isso caiu a regra
+"nenhuma foto ou gravação sai para serviço externo": o destino externo é um
+só, fixo no código (`app/core/gemini.py`), e a chave fica no servidor
+(`GEMINI_API_KEY`).
+
+O resto do leitor não mudou: recortes, faixas, cantos da folha, guardas e o
+tradutor da fala são os mesmos, e tudo continua virando proposta para
+alguém aprovar. Modelo escolhido: **`gemini-3.5-flash-lite`**, para foto e
+voz (medição em `vision-provider-status.md`).
+
+Achado na medição: o Gemini às vezes escreve como hora o número falado antes
+de "pela manhã" ("7:00 pela manhã"). O ":" partia a frase no tradutor; o
+transcritor desfaz isso no código (`sem_horas`), além de pedir na instrução.
+
+Custo medido: cerca de R$ 0,05 por folha e R$ 0,002 por gravação de 45 s
+(US$ 1 = R$ 5,10). Os créditos são pré-pagos, sem recarga automática: se
+acabarem, só a leitura para; o resto do sistema segue.
+

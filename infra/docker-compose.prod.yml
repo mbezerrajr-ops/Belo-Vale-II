@@ -8,8 +8,9 @@
 #
 # - ENVIRONMENT=production: a API se recusa a subir sem segredo forte, com o
 #   cookie de sessão sem `Secure` ou com leitor/transcritor falso.
-# - Leitura de foto e de áudio de verdade (Ollama e whisper.cpp, fora do
-#   Docker, na RX 7600).
+# - Leitura de foto e de áudio de verdade, pela API Gemini, na conta paga da
+#   fazenda (decisão de 16/10/2026: sem o PC com placa de vídeo). O worker
+#   se recusa a subir sem GEMINI_API_KEY.
 # - Reinício automático: depois de queda de energia ou reinício do Windows,
 #   tudo volta sozinho quando o Docker Desktop abrir.
 # - Nenhuma porta aberta para a rede: a API não é publicada (só o nginx a
@@ -30,8 +31,13 @@ services:
     restart: unless-stopped
     environment:
       ENVIRONMENT: production
-      READER_PROVIDER: ollama
-      AUDIO_PROVIDER: whisper
+      READER_PROVIDER: gemini
+      AUDIO_PROVIDER: gemini
+      # Escolhido pela medição de 16/10/2026 nas cinco folhas de 22/07 e nas
+      # três gravações do titular (docs/vision-provider-status.md).
+      READER_MODEL: ${READER_MODEL:-gemini-3.5-flash-lite}
+      AUDIO_MODEL: ${AUDIO_MODEL:-gemini-3.5-flash-lite}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?Set GEMINI_API_KEY in infra/.env.production}
 
   db:
     restart: unless-stopped

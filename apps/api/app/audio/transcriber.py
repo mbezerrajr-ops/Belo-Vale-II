@@ -15,6 +15,7 @@ import io
 import json
 import logging
 import math
+import re
 import socket
 import sys
 import urllib.error
@@ -26,6 +27,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.audio.speech_to_lines import is_phantom
+from app.core.gemini import GeminiClient
 from app.core.local_url import ensure_local_url
 from app.services.event_extraction import ReaderUnavailableError, UnreadableContentError
 
@@ -75,6 +77,67 @@ class FakeAudioTranscriber:
 
     def transcribe(self, wav: bytes) -> str:  # noqa: ARG002 - não ouve nada
         return FAKE_SPEECH
+
+
+#: Resposta combinada para gravação sem fala: o modelo não deve inventar texto.
+GEMINI_NO_SPEECH = "SEM FALA"
+
+#: A instrução pede só a transcrição, com números em algarismos — o mesmo
+#: formato que o whisper entregava e que o tradutor da fala (código nosso)
+#: sabe ler. Interpretar a fala continua sendo trabalho do tradutor, não do
+#: modelo: assim a regra fica no código, medida contra o gabarito.
+GEMINI_PROMPT = f"""Transcreva literalmente esta gravação, em português do Brasil.
+É a pesagem de leite numa fazenda: alguém fala o brinco ou o nome de cada vaca e os litros.
+
+- Escreva os números com algarismos (389, 12,5, 18), como foram falados.
+- Quantidades são litros, nunca horas: escreva "7 pela manhã", e não "7:00 pela manhã".
+- Não resuma, não corrija, não complete e não acrescente nada que não foi dito.
+- Uma frase por linha, na ordem em que foram faladas.
+- Se não houver fala, responda exatamente: {GEMINI_NO_SPEECH}"""
+
+
+class GeminiTranscriber:
+    """Transcreve pela API Gemini, na conta paga da fazenda.
+
+    Recebe o mesmo WAV 16 kHz mono que o whisper recebia; o tradutor da fala
+    não sabe quem transcreveu.
+    """
+
+    def __init__(self, *, client: GeminiClient, timeout: float = 180.0) -> None:
+        self.client = client
+        self.timeout = timeout
+
+    @property
+    def name(self) -> str:
+        return self.client.model
+
+    def transcribe(self, wav: bytes) -> str:
+        texto = self.client.generate(
+            prompt=GEMINI_PROMPT, media=wav, mime_type="audio/wav", timeout=self.timeout
+        ).strip()
+        if texto.strip(" .").upper() == GEMINI_NO_SPEECH:
+            raise TranscriberFormatError("A gravação não tem fala que se reconheça.")
+        return sem_horas(texto)
+
+
+#: "7:00", "12:30h": o modelo às vezes escreve como hora o número que vem
+#: antes de "pela manhã". Na pesagem não se fala hora, e o ":" partia a frase
+#: no tradutor (medido com a gravação 3 do titular, em 16/10/2026).
+_HORA = re.compile(r"\b(\d{1,2}):(\d{2})(?:\s*h\b)?")
+
+
+def sem_horas(texto: str) -> str:
+    """Desfaz número escrito como hora: "7:00" vira "7" e "6:30" vira "6,5"."""
+
+    def litros(achado: re.Match[str]) -> str:
+        inteiro, minutos = achado.group(1), achado.group(2)
+        if minutos == "00":
+            return inteiro
+        if minutos == "30":
+            return f"{inteiro},5"
+        return achado.group(0)
+
+    return _HORA.sub(litros, texto)
 
 
 #: POST (url, campos, arquivo, prazo) → corpo da resposta.

@@ -64,11 +64,13 @@ from app.audio.decoding import DECODE_TIMEOUT, to_wav_16k_mono
 from app.audio.speech_reader import EXTRACTOR_NAME, GRAMMAR_VERSION
 from app.audio.speech_to_lines import AUDIO_ORIGIN, speech_to_lines
 from app.audio.transcriber import (
+    GeminiTranscriber,
     TranscriberFormatError,
     TranscriberUnavailable,
     WhisperCppTranscriber,
 )
 from app.core.config import get_settings
+from app.core.gemini import GeminiClient
 from app.services.event_proposals import SIMILAR_NAME, name_similarity
 from app.services.portuguese_numbers import fold
 from app.services.production_files import parse_number_br
@@ -370,6 +372,12 @@ def main(
     parser.add_argument("--samples", required=True, type=Path, help="Pasta com as gravações.")
     parser.add_argument("--url", default=None, help="Endereço do whisper (padrão: AUDIO_URL).")
     parser.add_argument("--model", default=None, help="Nome do modelo (padrão: AUDIO_MODEL).")
+    parser.add_argument(
+        "--provider",
+        choices=("whisper", "gemini"),
+        default=None,
+        help="Quem ouve (padrão: AUDIO_PROVIDER; 'gemini' usa GEMINI_API_KEY).",
+    )
     parser.add_argument("--pattern", default="*", help="Só as gravações cujo nome casa com o padrão.")
     parser.add_argument(
         "--reuse",
@@ -385,12 +393,17 @@ def main(
     settings = get_settings()
 
     if transcribe is None:
-        transcriber = WhisperCppTranscriber(
-            url=args.url or settings.audio_url,
-            model=args.model or settings.audio_model,
-            language=settings.audio_language,
-        )
-        transcribe = transcriber.transcribe
+        if (args.provider or settings.audio_provider) == "gemini":
+            key = settings.gemini_api_key.get_secret_value() if settings.gemini_api_key else ""
+            transcribe = GeminiTranscriber(
+                client=GeminiClient(api_key=key, model=args.model or settings.audio_model)
+            ).transcribe
+        else:
+            transcribe = WhisperCppTranscriber(
+                url=args.url or settings.audio_url,
+                model=args.model or settings.audio_model,
+                language=settings.audio_language,
+            ).transcribe
     model = model or args.model or settings.audio_model
     if decode is None:
         decode = lambda content: to_wav_16k_mono(content, max_seconds=settings.audio_max_seconds)  # noqa: E731

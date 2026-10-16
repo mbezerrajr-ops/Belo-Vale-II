@@ -34,6 +34,7 @@ from urllib.parse import urlsplit
 
 from PIL import Image
 
+from app.core.gemini import GeminiClient
 from app.core.local_url import ensure_local_url
 from app.services.event_extraction import (
     EventExtraction,
@@ -579,6 +580,36 @@ class OllamaSheetReader:
         if kind != "photo":
             raise ValueError(f"O leitor de folhas lê fotos e PDFs, não {kind!r}.")
         return sheet_to_events(self.transcribe(content), extractor_version=self.version)
+
+
+class GeminiSheetReader(OllamaSheetReader):
+    """O mesmo leitor de folhas, perguntando à API Gemini em vez do Ollama.
+
+    Só muda a conversa com o modelo (`_chat`): recortes, faixas, cantos da
+    folha, releitura e guardas continuam os mesmos, medidos contra o mesmo
+    gabarito. O esquema vai como `responseJsonSchema`, que aceita o mesmo
+    JSON Schema que o Ollama recebia em `format`.
+    """
+
+    def __init__(self, *, client: GeminiClient, timeout: float = PAGE_TIMEOUT) -> None:
+        self.client = client
+        self.model = client.model
+        self.timeout = timeout
+
+    def _chat(
+        self, *, prompt: str, schema: dict[str, Any], image: bytes, timeout: float | None = None
+    ) -> Any:
+        texto = self.client.generate(
+            prompt=prompt,
+            media=image,
+            mime_type="image/jpeg",
+            schema=schema,
+            timeout=timeout or self.timeout,
+        )
+        try:
+            return json.loads(texto)
+        except json.JSONDecodeError as error:
+            raise ReaderFormatError(f"Resposta do leitor fora do esquema: {error}") from error
 
 
 def _from_model_keys(line: dict[str, Any]) -> dict[str, Any]:
