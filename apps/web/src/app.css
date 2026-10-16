@@ -33,12 +33,19 @@
   --line: #ddd6c6;
   --line-strong: #c9c0ab;
 
-  /* marca */
-  --brand: #285e4a;
-  --brand-2: #3f8a5f;
-  --brand-soft: #dcebe1;
+  /* marca — o verde do logo da Belo Vale nutrição animal (#05A55B, medido
+     do próprio logo). Ele é a marca onde o contraste deixa: símbolo, ícone
+     do app, barra do navegador e, no tema escuro, botões e destaques. No
+     tema claro, letra branca sobre ele dá 3,2:1 (o mínimo é 4,5:1); ação e
+     texto usam o mesmo matiz mais fundo, que passa com folga. */
+  --brand-vivid: #05a55b;
+  --brand: #00783f; /* botão com letra branca: 5,6:1 */
+  --brand-2: #00934e; /* traços e realces: 3,5:1 sobre o creme */
+  --brand-soft: #d8f4df;
   /* Texto verde sobre fundo suave (filtro escolhido, trilho). */
-  --brand-ink: #1f4d3c;
+  --brand-ink: #0b502b;
+  /* Contorno do foco de teclado: 3:1 ou mais contra o fundo. */
+  --focus: #00934e;
   --accent: #b8632f;
   --accent-soft: #f6e3d5;
   --gold: #b8860b;
@@ -50,8 +57,8 @@
   --on-danger: #ffffff;
 
   /* status (fixos, nunca reaproveitados como série) */
-  --good: #2a7043;
-  --good-soft: #dcebe1;
+  --good: #00783f;
+  --good-soft: #d8f4df;
   --warn: #b8860b;
   --warn-soft: #fbeed3;
   /* O dourado serve de marca (borda, ponto); como texto não tem contraste. */
@@ -60,7 +67,7 @@
   --danger-soft: #f7e0dc;
 
   /* séries de gráfico — ordem fixa, validada para daltonismo */
-  --series-1: #2f7d4a;
+  --series-1: #00934e;
   --series-2: #dd7436;
   --series-3: #2f6fb5;
   --series-4: #b8860b;
@@ -100,16 +107,20 @@
     --muted: #8a918b;
     --line: #2f3532;
     --line-strong: #3d4440;
-    --brand: #6fb58a;
-    --brand-2: #8ccaa3;
-    --brand-soft: #21332a;
-    --brand-ink: #a8dcbb;
+    /* No escuro o verde do logo é a própria cor de ação: 5,7:1 sobre o
+       fundo, e a letra escura sobre ele, 5,5:1. */
+    --brand-vivid: #05a55b;
+    --brand: #05a55b;
+    --brand-2: #66d18d;
+    --brand-soft: #102a1a; /* o verde da marca sobre ele: 4,8:1 */
+    --brand-ink: #a2e3b6;
+    --focus: #66d18d;
     --accent: #d98b57;
     --accent-soft: #3a2a1f;
     --gold: #d1a13a;
     --gold-soft: #3a3120;
-    --good: #5fb37e;
-    --good-soft: #21332a;
+    --good: #05a55b;
+    --good-soft: #102a1a;
     --warn: #d1a13a;
     --warn-soft: #3a3120;
     --warn-ink: #e0b75a;
@@ -118,7 +129,7 @@
     --on-brand: #0e1b14;
     --on-accent: #1f140b;
     --on-danger: #230f0c;
-    --series-1: #3d9457;
+    --series-1: #05a55b;
     --series-2: #c96a38;
     --series-3: #4a80c0;
     --series-4: #b3800f;
@@ -217,7 +228,7 @@ body {
   overflow-x: clip;
   background: var(--bg);
   background-image:
-    radial-gradient(1200px 600px at 100% -10%, rgba(63, 138, 95, 0.1), transparent 60%),
+    radial-gradient(1200px 600px at 100% -10%, rgba(5, 165, 91, 0.09), transparent 60%),
     radial-gradient(900px 500px at -10% 100%, rgba(184, 99, 47, 0.08), transparent 60%);
   background-attachment: fixed;
   color: var(--ink);
@@ -282,6 +293,13 @@ p {
 
 a {
   color: var(--brand);
+}
+
+/* O texto selecionado e o cursor também falam a cor da marca, em vez do
+   azul do sistema. */
+::selection {
+  background: var(--brand-soft);
+  color: var(--brand-ink);
 }
 
 /* ---------- shell ---------- */
@@ -585,8 +603,10 @@ button:disabled {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--brand) 45%, transparent);
+textarea:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -938,18 +958,20 @@ form h3 {
   --muted: #5b645e;
   --line: #e0e0da;
   --line-strong: #cdcdc5;
-  --brand: #285e4a;
-  --brand-2: #3f8a5f;
-  --brand-soft: #dcebe1;
-  --brand-ink: #1f4d3c;
+  --brand-vivid: #05a55b;
+  --brand: #00783f;
+  --brand-2: #00934e;
+  --brand-soft: #d8f4df;
+  --brand-ink: #0b502b;
+  --focus: #00934e;
   --on-brand: #ffffff;
   --danger: #9c382e;
   --danger-soft: #f7e0dc;
   --warn: #b8860b;
   --warn-soft: #fbeed3;
   --warn-ink: #8a6100;
-  --good: #2a7043;
-  --good-soft: #dcebe1;
+  --good: #00783f;
+  --good-soft: #d8f4df;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -3183,7 +3205,7 @@ form.milk-price .hint {
 
   .ps-brand strong {
     display: block;
-    color: #1f4d3c;
+    color: #0b502b;
     font-family: var(--font-display);
     font-size: 19pt;
     font-weight: 600;
@@ -3205,9 +3227,9 @@ form.milk-price .hint {
 
   .ps-lot {
     padding: 2px 12px;
-    border: 1.5px solid #285e4a;
+    border: 1.5px solid #00783f;
     border-radius: 999px;
-    color: #1f4d3c;
+    color: #0b502b;
     font-size: 10pt;
     font-weight: 700;
     letter-spacing: 0.06em;
@@ -3229,7 +3251,7 @@ form.milk-price .hint {
 
   .ps-hills path {
     fill: none;
-    stroke: #3f8a5f;
+    stroke: #00934e;
     stroke-width: 2;
     vector-effect: non-scaling-stroke;
   }
@@ -3269,7 +3291,7 @@ form.milk-price .hint {
   }
 
   .ps-figure:first-child dd {
-    color: #285e4a;
+    color: #00783f;
   }
 
   .ps-figure dd small {
@@ -3287,12 +3309,12 @@ form.milk-price .hint {
   }
 
   .print-area.ps th {
-    background: #dcebe1;
-    color: #1f4d3c;
+    background: #d8f4df;
+    color: #0b502b;
     font-size: 7.5pt;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    border-bottom: 1.5px solid #285e4a;
+    border-bottom: 1.5px solid #00783f;
   }
 
   .print-area.ps tbody tr:nth-child(even) td {
@@ -3301,7 +3323,7 @@ form.milk-price .hint {
 
   .print-area.ps .ps-tag {
     width: 12%;
-    color: #1f4d3c;
+    color: #0b502b;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
   }
@@ -3336,7 +3358,7 @@ form.milk-price .hint {
     grid-column: 1 / -1;
     margin: 6px 0 0;
     padding-top: 6px;
-    border-top: 2px solid #285e4a;
+    border-top: 2px solid #00783f;
     color: #5f6a63;
     font-size: 8pt;
   }

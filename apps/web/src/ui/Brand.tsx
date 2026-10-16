@@ -5,6 +5,7 @@
  * ruim, e a CSP só permite recursos da própria origem.
  */
 
+/** O verde do logo da Belo Vale nutrição animal (#05A55B) no círculo. */
 export function LogoMark({ size = 38 }: { size?: number }): JSX.Element {
   return (
     <svg
@@ -16,8 +17,8 @@ export function LogoMark({ size = 38 }: { size?: number }): JSX.Element {
     >
       <defs>
         <linearGradient id="bv-g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#3f8a5f" />
-          <stop offset="1" stopColor="#1f4d3c" />
+          <stop offset="0" stopColor="#05a55b" />
+          <stop offset="1" stopColor="#008c4a" />
         </linearGradient>
         <clipPath id="bv-c">
           <circle cx="32" cy="32" r="31" />
@@ -45,10 +46,10 @@ export function LogoMark({ size = 38 }: { size?: number }): JSX.Element {
         fill="#fbf8f1"
       />
       <ellipse cx="32" cy="38" rx="6.5" ry="4.2" fill="#dd7436" opacity="0.9" />
-      <circle cx="27.5" cy="27" r="1.7" fill="#1f4d3c" />
-      <circle cx="36.5" cy="27" r="1.7" fill="#1f4d3c" />
-      <circle cx="29.5" cy="38" r="1" fill="#1f4d3c" />
-      <circle cx="34.5" cy="38" r="1" fill="#1f4d3c" />
+      <circle cx="27.5" cy="27" r="1.7" fill="#0b502b" />
+      <circle cx="36.5" cy="27" r="1.7" fill="#0b502b" />
+      <circle cx="29.5" cy="38" r="1" fill="#0b502b" />
+      <circle cx="34.5" cy="38" r="1" fill="#0b502b" />
     </svg>
   );
 }
