@@ -9,11 +9,13 @@ origem.
 
 **Com o titular (fora do código):**
 
-- **Backup fora do PC da produção:** conectar o OneDrive (a mesma conta do
-  notebook) e o HD externo. Sem isso o backup termina como FALHOU. *(Backup
-  sem cópia fora do PC)*
-- **Espaço no C: da produção** (6 GB livres em 22/09), antes da primeira
-  atualização, que compila o MinIO. *(MinIO arquivado)*
+- **Senha do backup com o cliente:** entregar uma cópia, fora do servidor.
+  Sem ela, nenhuma cópia do Backblaze abre. *(runbook-producao.md)*
+- **Backups antigos no OneDrive pessoal** (04 a 07/10): passar para o
+  Backblaze da fazenda e apagar do OneDrive, depois da primeira verificação
+  no servidor. *(runbook-producao.md, Backup)*
+- **Dados lançados depois de 07/10 às 14h35** ficaram só no disco do PC
+  antigo, inacessível. *(Leitura pela API Gemini)*
 - **Teste de campo no iPhone** — roteiro em `teste-de-campo-iphone.md`.
 - **Gravações reais no curral**, com a ordenhadeira ligada: os números do
   áudio são de desenvolvimento. *(Fase 3)*

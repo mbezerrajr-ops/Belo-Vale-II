@@ -1,0 +1,9 @@
+[Unit]
+Description=Belo Vale II: verificação do backup aos domingos às 4h30
+
+[Timer]
+OnCalendar=Sun *-*-* 04:30:00 America/Sao_Paulo
+Persistent=true
+
+[Install]
+WantedBy=timers.target
