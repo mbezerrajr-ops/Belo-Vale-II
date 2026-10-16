@@ -971,13 +971,13 @@ export function ProductionPage({
       </PageHeader>
 
       {how === "exportar" && (
-        <Suspense fallback={<div className="skeleton" style={{ height: 120 }} aria-label="Carregando" />}>
+        <Suspense fallback={<div className="skeleton" style={{ height: 120 }} role="status" aria-label="Carregando" />}>
           <ExportPanel token={token} today={today} />
         </Suspense>
       )}
 
       {how === "importar" && (
-        <Suspense fallback={<div className="skeleton" style={{ height: 180 }} aria-label="Carregando" />}>
+        <Suspense fallback={<div className="skeleton" style={{ height: 180 }} role="status" aria-label="Carregando" />}>
           <ImportPanel
             token={token}
             canReplace={canCorrect}
@@ -1025,7 +1025,7 @@ export function ProductionPage({
       )}
 
       {sheet === null && !loadError && (
-        <div className="skeleton" style={{ height: 180 }} aria-label="Carregando" />
+        <div className="skeleton" style={{ height: 180 }} role="status" aria-label="Carregando" />
       )}
 
       {sheet !== null && sheet.lotes.length === 0 && (

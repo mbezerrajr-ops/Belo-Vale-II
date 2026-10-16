@@ -3383,6 +3383,14 @@ form.milk-price .hint {
   margin-left: 8px;
 }
 
+/* Alvo de dedo de 44 px, como o "Ver em tabela" dos gráficos: com 26 px o
+   "Versões anteriores" era difícil de acertar no celular. A setinha fica. */
+.history-older summary {
+  cursor: pointer;
+  padding-block: 10px;
+  line-height: 24px;
+}
+
 .history-older ul {
   display: grid;
   gap: 6px;

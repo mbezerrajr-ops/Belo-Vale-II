@@ -143,8 +143,9 @@ export function Legend({
   items: Array<{ label: string; color: string }>;
 }): JSX.Element {
   return (
-    <div className="legend" aria-label="Legenda">
-      <ul>
+    <div className="legend">
+      {/* O nome vai na lista: um <div> sem papel não pode ter aria-label. */}
+      <ul aria-label="Legenda">
         {items.map((item) => (
           <li key={item.label}>
             <span className="swatch" style={{ "--swatch": item.color } as CSSProperties} />
