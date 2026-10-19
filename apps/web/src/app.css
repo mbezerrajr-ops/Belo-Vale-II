@@ -3562,7 +3562,7 @@ form.milk-price .hint {
   color: var(--muted);
 }
 
-/* Situação e Atualizar na mesma linha; no celular, Atualizar desce. */
+/* As situações da caixa (Pendentes, Aprovadas, Rejeitadas). */
 .inbox-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -3575,7 +3575,7 @@ form.milk-price .hint {
   margin: 0;
 }
 
-/* Situação e Atualizar cabem numa linha no celular: Atualizar vira ícone. */
+/* No celular o trilho ocupa a linha toda. */
 @media (max-width: 519px) {
   .inbox-toolbar {
     flex-wrap: nowrap;
@@ -3588,14 +3588,6 @@ form.milk-price .hint {
 
   .inbox-toolbar .segmented button {
     padding: 6px 10px;
-  }
-
-  .refresh-inbox {
-    flex: 0 0 auto;
-    width: var(--touch);
-    height: var(--touch);
-    justify-content: center;
-    padding: 0;
   }
 
   .wide-only {
@@ -4330,8 +4322,7 @@ form.change-password,
     font-size: 0.64rem;
   }
 
-  /* Três situações e Atualizar não cabem numa linha de 288 px sem cortar
-   os rótulos: o trilho fica com a linha, Atualizar desce com o texto. */
+  /* Três situações numa linha de 288 px: o trilho fica com a linha toda. */
   .inbox-toolbar {
     flex-wrap: wrap;
   }
@@ -4342,16 +4333,6 @@ form.change-password,
 
   .inbox-toolbar .segmented button {
     padding: 6px 4px;
-  }
-
-  .inbox-toolbar .refresh-inbox {
-    width: auto;
-    margin-left: auto;
-    padding-inline: 12px;
-  }
-
-  .inbox-toolbar .refresh-inbox .wide-only {
-    display: inline;
   }
 }
 

@@ -826,16 +826,6 @@ export function ReviewInbox({
             </button>
           ))}
         </div>
-        {/* A leitura termina em segundo plano, e a caixa avisa o que chega;
-            Atualizar relê na hora — clicar na aba já escolhida não relê. */}
-        <button
-          type="button"
-          className="link-btn refresh-inbox"
-          aria-label="Atualizar"
-          onClick={() => void reload(tab)}
-        >
-          <Icons.atualizar /> <span className="wide-only">Atualizar</span>
-        </button>
       </div>
 
       {incoming && (

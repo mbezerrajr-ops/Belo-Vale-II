@@ -120,7 +120,7 @@ export const UPLOAD_TIMEOUT_MS = 90_000;
 
 /** Espera entre as perguntas ao servidor: rápido no começo, depois com calma. */
 export const WATCH_STEPS_MS = [1500, 2000, 3000, 5000, 8000];
-/** Depois disto, a tela para de perguntar e manda usar "Atualizar". */
+/** Depois disto, a tela para de perguntar; a caixa avisa quando chegar. */
 export const WATCH_LIMIT_MS = 10 * 60 * 1000;
 
 type State =
@@ -455,8 +455,8 @@ function Outcome({
     case "slow":
       return (
         <p className="warning">
-          A leitura está demorando mais que o normal. Quando terminar, as propostas aparecem aqui —
-          use Atualizar.
+          A leitura está demorando mais que o normal. Quando terminar, a caixa avisa que chegaram
+          propostas novas.
         </p>
       );
     case "duplicate":

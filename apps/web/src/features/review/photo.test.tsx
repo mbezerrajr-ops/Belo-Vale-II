@@ -194,19 +194,3 @@ describe("A folha e a gravação ao lado das propostas", () => {
   });
 });
 
-describe("Atualizar a caixa", () => {
-  it("relê a lista sem trocar de aba", async () => {
-    // A leitura termina em segundo plano: sem isto, quem enviou a foto fica
-    // olhando uma tela parada, porque clicar na aba já selecionada não
-    // recarrega nada.
-    const { onList } = setup();
-
-    await screen.findByRole("article");
-    const antes = onList.mock.calls.length;
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /atualizar/i }));
-    });
-
-    expect(onList.mock.calls.length).toBeGreaterThan(antes);
-  });
-});
