@@ -232,7 +232,7 @@ describe("Acompanhar a leitura até o fim", () => {
     expect(onWatch).toHaveBeenLastCalledWith("i-1", "token-renovado");
   });
 
-  it("depois de dez minutos, para de perguntar e manda usar Atualizar", async () => {
+  it("depois de dez minutos, para de perguntar e avisa que demorou", async () => {
     const { onWatch } = setup();
 
     await enviarGravacao();

@@ -48,15 +48,10 @@ test.describe("foto da folha até a medição oficial", () => {
     await page.getByRole("button", { name: "Enviar", exact: true }).click();
     await expect(page.getByText(/lendo a folha/i)).toBeVisible();
 
-    // O worker lê em segundo plano: a caixa é relida pelo botão "Atualizar"
-    // até a proposta aparecer, sem espera fixa. É o mesmo gesto que a pessoa
-    // faz na fazenda enquanto a leitura não termina.
+    // O worker lê em segundo plano: a tela pergunta como está a leitura e,
+    // quando termina, relê a caixa sozinha — ninguém precisa apertar nada.
     const card = page.getByRole("article", { name: new RegExp(`Produção — 497`) }).first();
-    const refresh = page.getByRole("button", { name: "Atualizar", exact: true });
-    await expect(async () => {
-      await refresh.click();
-      await expect(card).toBeVisible({ timeout: 2_000 });
-    }).toPass({ timeout: 45_000, intervals: [500, 1000, 2000] });
+    await expect(card).toBeVisible({ timeout: 45_000 });
 
     await expect(card).toContainText(E2E_ANIMAL_NAME, { ignoreCase: true });
 
