@@ -809,3 +809,57 @@ async def reject_proposal(
         proposal=proposal, new={"reason": reason.strip()},
     )
     await session.flush()
+
+
+# ------------------------------------------------------- limpeza das rejeitadas
+
+
+class ProposalNotRejected(ProposalError):
+    pass
+
+
+async def delete_rejected(
+    session: AsyncSession, *, farm_id: UUID, user: User, proposal_id: UUID | None = None
+) -> int:
+    """Apaga uma proposta rejeitada, ou todas da fazenda. Não faz commit.
+
+    Rejeitada não mudou nada no rebanho: apagar só limpa a caixa. O que foi
+    lido e o motivo da rejeição ficam na auditoria, e o arquivo de origem
+    continua guardado. Pendente e aprovada nunca são apagadas.
+    """
+    query = select(EventProposal).where(EventProposal.farm_id == farm_id).with_for_update()
+    if proposal_id is None:
+        query = query.where(EventProposal.status == STATUS_REJECTED)
+    else:
+        query = query.where(EventProposal.id == proposal_id)
+    proposals = list(await session.scalars(query))
+    if proposal_id is not None:
+        if not proposals:
+            raise ProposalNotFound("Proposta não encontrada.")
+        if proposals[0].status != STATUS_REJECTED:
+            raise ProposalNotRejected("Só uma proposta rejeitada pode ser excluída.")
+    for proposal in proposals:
+        session.add(
+            AuditEvent(
+                farm_id=farm_id,
+                actor=user.email,
+                action="proposal_deleted",
+                entity_type="event_proposal",
+                entity_id=proposal.id,
+                previous_value={
+                    "source_id": str(proposal.source_id),
+                    "event_type": proposal.event_type,
+                    "brinco_lido": proposal.brinco_lido,
+                    "nome_lido": proposal.nome_lido,
+                    "payload": proposal.payload,
+                    "raw_fields": proposal.raw_fields,
+                    "decided_by_user_id": str(proposal.decided_by_user_id),
+                    "decided_at": proposal.decided_at.isoformat() if proposal.decided_at else None,
+                    "decision_reason": proposal.decision_reason,
+                },
+                new_value=None,
+            )
+        )
+        await session.delete(proposal)
+    await session.flush()
+    return len(proposals)

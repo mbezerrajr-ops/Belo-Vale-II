@@ -728,3 +728,21 @@ export async function rejectProposal(
   });
   await parseJsonOrThrow(response);
 }
+
+/** Apaga uma proposta rejeitada. O que foi lido fica na auditoria. */
+export async function deleteRejectedProposal(token: string, proposalId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/proposals/${proposalId}`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+  await parseJsonOrThrow(response);
+}
+
+/** Apaga todas as rejeitadas da fazenda; devolve quantas foram. */
+export async function clearRejectedProposals(token: string): Promise<{ deleted: number }> {
+  const response = await fetch(`${API_BASE_URL}/api/proposals/rejected`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+  return parseJsonOrThrow(response);
+}

@@ -183,6 +183,11 @@ export const Icons = {
       <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />
     </svg>
   ),
+  excluir: (): JSX.Element => (
+    <svg {...ICON_PROPS} width={18} height={18}>
+      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+    </svg>
+  ),
   lote: (): JSX.Element => (
     <svg {...ICON_PROPS} width={18} height={18}>
       <path d="M4 8h13l-3-3M20 16H7l3 3" />

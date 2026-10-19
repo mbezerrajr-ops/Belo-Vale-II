@@ -346,6 +346,69 @@ describe("ReviewInbox", () => {
   });
 });
 
+describe("ReviewInbox — excluir rejeitadas", () => {
+  const rejected = (id: string): Proposal =>
+    proposal({
+      id,
+      status: "rejected",
+      decided_by: "maria@belovale",
+      decided_at: "2026-09-18T11:00:00Z",
+      decision_reason: "leitura de um rabisco",
+    });
+
+  function rejectedTab(props: Partial<Parameters<typeof ReviewInbox>[0]> = {}) {
+    let stored = [rejected("p-1"), rejected("p-2")];
+    const onList = vi.fn(async (_token: string, status: string) =>
+      status === "rejected" ? stored : [],
+    );
+    const onDelete = vi.fn(async (_token: string, id: string) => {
+      stored = stored.filter((item) => item.id !== id);
+    });
+    const onClear = vi.fn(async () => {
+      const deleted = stored.length;
+      stored = [];
+      return { deleted };
+    });
+    setup({ onList, onDelete, onClear, ...props });
+    return { onDelete, onClear };
+  }
+
+  it("exclui uma rejeitada só depois de confirmar", async () => {
+    const { onDelete } = rejectedTab();
+    fireEvent.click(await screen.findByRole("button", { name: /rejeitadas/i }));
+
+    const [first] = await screen.findAllByRole("button", { name: /^excluir$/i });
+    fireEvent.click(first);
+    expect(onDelete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /excluir de vez/i }));
+
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith(TOKEN, "p-1"));
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: /^excluir$/i })).toHaveLength(1),
+    );
+  });
+
+  it("limpa todas as rejeitadas e conta quantas saíram", async () => {
+    const { onClear } = rejectedTab();
+    fireEvent.click(await screen.findByRole("button", { name: /rejeitadas/i }));
+
+    fireEvent.click(await screen.findByRole("button", { name: /excluir todas as rejeitadas/i }));
+    fireEvent.click(screen.getByRole("button", { name: /excluir todas de vez/i }));
+
+    expect(await screen.findByText("2 rejeitadas excluídas.")).toBeInTheDocument();
+    expect(onClear).toHaveBeenCalledWith(TOKEN);
+    expect(screen.getByText(/nenhuma proposta nesta situação/i)).toBeInTheDocument();
+  });
+
+  it("operador não vê os botões de excluir", async () => {
+    rejectedTab({ canDecide: false });
+    fireEvent.click(await screen.findByRole("button", { name: /rejeitadas/i }));
+
+    expect(await screen.findAllByText(/leitura de um rabisco/)).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: /excluir/i })).not.toBeInTheDocument();
+  });
+});
+
 function fromSource(id: string, label: string, overrides: Partial<Proposal> = {}): Proposal {
   const base = proposal();
   return proposal({

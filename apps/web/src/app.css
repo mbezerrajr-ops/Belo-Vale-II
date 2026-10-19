@@ -3749,6 +3749,26 @@ form.milk-price .hint {
   color: var(--ink-2);
 }
 
+.decided-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.clear-rejected {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.clear-rejected .hint {
+  margin: 0;
+}
+
 /* ---------- revisão: filtro por arquivo e data do arquivo ---------- */
 
 /* Muitos arquivos: no celular a fileira rola de lado em vez de empilhar, e
