@@ -1,7 +1,7 @@
 """Caixa de revisão: propostas de eventos lidas de fotos, áudios e textos.
 
-Qualquer conta vê a caixa; decidir (aprovar ou rejeitar) é de revisor ou
-administrador, como as demais mudanças de cadastro. Toda decisão leva a
+Qualquer conta vê a caixa; decidir (aprovar ou rejeitar) e apagar as
+rejeitadas é de revisor ou administrador, como as demais mudanças de cadastro. Toda decisão leva a
 versão que a pessoa viu: se outra pessoa decidiu antes, a segunda é recusada
 em vez de sobrescrever.
 """
@@ -31,6 +31,7 @@ from app.services.event_proposals import (
     ReplacementRequired,
     animal_summary,
     approve_proposal,
+    delete_rejected,
     list_proposals,
     redate_source,
     reject_proposal,
@@ -221,6 +222,37 @@ async def reject(
         await session.rollback()
         raise failure from error
     return {"id": str(proposal_id), "status": "rejected"}
+
+
+@router.delete("/rejected")
+async def delete_all_rejected(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    farm: Annotated[Farm, Depends(resolve_current_farm)],
+    user: Annotated[User, Depends(require_minimum_role("reviewer"))],
+) -> dict[str, int]:
+    """Limpa a aba de rejeitadas. Declarada antes de `/{proposal_id}`."""
+    deleted = await delete_rejected(session, farm_id=farm.id, user=user)
+    await session.commit()
+    return {"deleted": deleted}
+
+
+@router.delete("/{proposal_id}")
+async def delete_one_rejected(
+    proposal_id: UUID,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    farm: Annotated[Farm, Depends(resolve_current_farm)],
+    user: Annotated[User, Depends(require_minimum_role("reviewer"))],
+) -> dict[str, int]:
+    try:
+        deleted = await delete_rejected(
+            session, farm_id=farm.id, user=user, proposal_id=proposal_id
+        )
+        await session.commit()
+    except ProposalError as error:
+        failure = _http_error(error)
+        await session.rollback()
+        raise failure from error
+    return {"deleted": deleted}
 
 
 @router.post("/sources/{source_id}/date")

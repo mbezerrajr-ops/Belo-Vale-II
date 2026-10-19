@@ -549,6 +549,82 @@ class TestReject:
         assert response.status_code == 422
 
 
+def _reject(api, token, proposal_id, version=1):
+    return api.post(
+        f"/api/proposals/{proposal_id}/reject",
+        headers=auth(token),
+        json={"expected_version": version, "reason": "leitura de um rabisco"},
+    )
+
+
+class TestDeleteRejected:
+    """Rejeitada não mudou nada: apagar só limpa a caixa, e a auditoria guarda."""
+
+    def test_a_rejected_proposal_is_deleted_and_audited(self, api, farm) -> None:
+        _, reviewer = make_user("reviewer")
+        [proposal] = _load(farm, "reviewer@belovale", _event("note", "389", None, texto="x"))
+        _reject(api, reviewer, proposal)
+
+        response = api.delete(f"/api/proposals/{proposal}", headers=auth(reviewer))
+
+        assert response.status_code == 200
+        assert response.json() == {"deleted": 1}
+        assert _inbox(api, reviewer, status="rejected").json() == []
+        assert one(
+            "SELECT actor, previous_value->>'decision_reason', previous_value->>'brinco_lido' "
+            "FROM audit_events WHERE action = 'proposal_deleted' AND entity_id = :p",
+            p=proposal,
+        ) == [("reviewer@belovale", "leitura de um rabisco", "389")]
+        # O arquivo lido continua guardado.
+        assert one("SELECT count(*) FROM event_proposal_sources") == [(1,)]
+
+    def test_pending_and_approved_are_never_deleted(self, api, farm) -> None:
+        _, reviewer = make_user("reviewer")
+        cow = make_animal(farm, brinco="389", name="ÁGATA", lote="LOTE 1")
+        pending, approved = _load(
+            farm, "reviewer@belovale", _event("dry_off", "389", None), _event("note", "389", None, texto="x")
+        )
+        _approve(api, reviewer, approved, cow, {"text": "x"})
+
+        for proposal in (pending, approved):
+            response = api.delete(f"/api/proposals/{proposal}", headers=auth(reviewer))
+            assert response.status_code == 409
+        assert one("SELECT count(*) FROM event_proposals") == [(2,)]
+
+    def test_clearing_deletes_only_the_rejected(self, api, farm) -> None:
+        _, reviewer = make_user("reviewer")
+        first, second, kept = _load(
+            farm,
+            "reviewer@belovale",
+            _event("note", "1", None, texto="a"),
+            _event("note", "2", None, texto="b"),
+            _event("note", "3", None, texto="c"),
+        )
+        _reject(api, reviewer, first)
+        _reject(api, reviewer, second)
+
+        response = api.delete("/api/proposals/rejected", headers=auth(reviewer))
+
+        assert response.json() == {"deleted": 2}
+        assert one("SELECT id::text, status FROM event_proposals") == [(kept, "pending")]
+
+    def test_another_farm_proposal_is_not_found(self, api, farm) -> None:
+        _, reviewer = make_user("reviewer")
+
+        response = api.delete(f"/api/proposals/{uuid.uuid4()}", headers=auth(reviewer))
+
+        assert response.status_code == 404
+
+    def test_operator_cannot_delete(self, api, farm) -> None:
+        _, reviewer = make_user("reviewer")
+        _, operator = make_user("operator")
+        [proposal] = _load(farm, "reviewer@belovale", _event("note", "389", None, texto="x"))
+        _reject(api, reviewer, proposal)
+
+        assert api.delete(f"/api/proposals/{proposal}", headers=auth(operator)).status_code == 403
+        assert api.delete("/api/proposals/rejected", headers=auth(operator)).status_code == 403
+
+
 class TestGuards:
     def test_operator_cannot_decide(self, api, farm) -> None:
         make_user("reviewer")

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   approveProposal,
+  clearRejectedProposals,
+  deleteRejectedProposal,
   listProposals,
   redateSource,
   rejectProposal,
@@ -51,6 +53,8 @@ type RejectFn = (
   expectedVersion: number,
   reason: string,
 ) => Promise<void>;
+type DeleteFn = (token: string, proposalId: string) => Promise<void>;
+type ClearFn = (token: string) => Promise<{ deleted: number }>;
 type SearchFn = (token: string, search: AnimalSearch) => Promise<AnimalPage>;
 type RedateFn = (
   token: string,
@@ -67,6 +71,9 @@ interface Props {
   onList?: ListFn;
   onApprove?: ApproveFn;
   onReject?: RejectFn;
+  /** Apaga uma rejeitada, ou todas; revisor e administrador. */
+  onDelete?: DeleteFn;
+  onClear?: ClearFn;
   onSearch?: SearchFn;
   onRedate?: RedateFn;
   onUpload?: UploadFn;
@@ -521,7 +528,35 @@ function ProposalCard({
   );
 }
 
-function DecidedItem({ proposal }: { proposal: Proposal }): JSX.Element {
+function DecidedItem({
+  proposal,
+  token,
+  onDelete,
+  onDone,
+}: {
+  proposal: Proposal;
+  token: string;
+  /** Só nas rejeitadas, para quem decide. */
+  onDelete?: DeleteFn;
+  onDone: () => void;
+}): JSX.Element {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function remove(): Promise<void> {
+    if (!onDelete) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onDelete(token, proposal.id);
+      onDone();
+    } catch (caught) {
+      setError(errorMessage(caught));
+      setBusy(false);
+    }
+  }
+
   const when = proposal.decided_at
     ? new Date(proposal.decided_at).toLocaleString("pt-BR", {
         day: "2-digit",
@@ -549,6 +584,25 @@ function DecidedItem({ proposal }: { proposal: Proposal }): JSX.Element {
         em {when}
         {proposal.decision_reason ? ` — ${proposal.decision_reason}` : ""}
       </small>
+      {onDelete && (
+        <div className="decided-actions">
+          {confirming ? (
+            <>
+              <button type="button" className="danger" disabled={busy} onClick={() => void remove()}>
+                Excluir de vez
+              </button>
+              <button type="button" className="secondary" onClick={() => setConfirming(false)}>
+                Cancelar
+              </button>
+            </>
+          ) : (
+            <button type="button" className="secondary danger" onClick={() => setConfirming(true)}>
+              <Icons.excluir /> Excluir
+            </button>
+          )}
+        </div>
+      )}
+      {error && <p role="alert">{error}</p>}
     </li>
   );
 }
@@ -639,6 +693,8 @@ export function ReviewInbox({
   onList = listProposals,
   onApprove = approveProposal,
   onReject = rejectProposal,
+  onDelete = deleteRejectedProposal,
+  onClear = clearRejectedProposals,
   onSearch = searchAnimals,
   onRedate = redateSource,
   onUpload,
@@ -655,6 +711,9 @@ export function ReviewInbox({
   const [items, setItems] = useState<Proposal[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [incoming, setIncoming] = useState<Incoming | null>(null);
+  // Limpar a aba de rejeitadas: pede confirmação e conta o que saiu.
+  const [clearing, setClearing] = useState<"idle" | "confirming" | "busy">("idle");
+  const [cleared, setCleared] = useState<number | null>(null);
   // A consulta periódica compara com o que está na tela agora, sem refazer o
   // relógio a cada mudança da lista.
   const shown = useRef<Proposal[] | null>(null);
@@ -672,6 +731,8 @@ export function ReviewInbox({
 
   useEffect(() => {
     setItems(null);
+    setClearing("idle");
+    setCleared(null);
     void reload(tab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, tab]);
@@ -726,6 +787,25 @@ export function ReviewInbox({
     void reload("pending");
     onChanged?.();
   };
+
+  const afterDelete = (): void => {
+    setCleared(null);
+    void reload("rejected");
+  };
+
+  async function clearRejected(): Promise<void> {
+    setClearing("busy");
+    setError(null);
+    try {
+      const { deleted } = await onClear(token);
+      setCleared(deleted);
+      await reload("rejected");
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setClearing("idle");
+    }
+  }
 
   return (
     <section className="review-inbox">
@@ -886,10 +966,49 @@ export function ReviewInbox({
           </div>
         ))}
 
+      {cleared !== null && (
+        <p role="status" className="hint">
+          {cleared === 1 ? "1 rejeitada excluída." : `${cleared} rejeitadas excluídas.`}
+        </p>
+      )}
+
+      {/* Rejeitada não mudou nada no rebanho: excluir só limpa esta lista. O
+          que foi lido e o motivo ficam na auditoria. */}
+      {tab === "rejected" && canDecide && items !== null && items.length > 0 && (
+        <div className="clear-rejected">
+          <p className="hint">Excluir só limpa esta lista. Nada muda no rebanho.</p>
+          {clearing === "idle" ? (
+            <button type="button" className="secondary danger" onClick={() => setClearing("confirming")}>
+              <Icons.excluir /> Excluir todas as rejeitadas
+            </button>
+          ) : (
+            <div className="decided-actions">
+              <button
+                type="button"
+                className="danger"
+                disabled={clearing === "busy"}
+                onClick={() => void clearRejected()}
+              >
+                Excluir todas de vez
+              </button>
+              <button type="button" className="secondary" onClick={() => setClearing("idle")}>
+                Cancelar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {tab !== "pending" && items !== null && items.length > 0 && (
         <ul className="decided-list">
           {visible.map((item) => (
-            <DecidedItem key={item.id} proposal={item} />
+            <DecidedItem
+              key={item.id}
+              proposal={item}
+              token={token}
+              onDelete={tab === "rejected" && canDecide ? onDelete : undefined}
+              onDone={afterDelete}
+            />
           ))}
         </ul>
       )}
