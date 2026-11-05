@@ -1,0 +1,14 @@
+# Infraestrutura exclusiva dos testes: e-mails nunca saem desta pilha.
+services:
+  api:
+    environment:
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_FROM: contas@example.test
+      SMTP_STARTTLS: "false"
+      PUBLIC_APP_URL: http://localhost:8080
+  mailpit:
+    image: axllent/mailpit:v1.31.3
+    networks: [ingestion_edge]
+    ports:
+      - "127.0.0.1:8025:8025"

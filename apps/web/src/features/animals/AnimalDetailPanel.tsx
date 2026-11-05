@@ -473,8 +473,7 @@ export function AnimalDetailPanel({
             onChange={(event) => setValidFrom(event.target.value)}
           />
           <p className="hint">
-            "LOTE 1", "LOTE 2" e "LOTE 3" são lotes de ordenha, com dieta e
-            custo. Outros nomes — ENGORDA, BEZERREIRO, PIQUETES — são áreas da
+            Lotes de ordenha recebem dieta e têm custo. Grupos de manejo são áreas da
             fazenda, e não substituem o lote de ordenha. O registro anterior do
             mesmo tipo fica no histórico, com a data em que terminou.
           </p>

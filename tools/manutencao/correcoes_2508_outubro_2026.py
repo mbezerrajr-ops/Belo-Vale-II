@@ -35,6 +35,7 @@ from datetime import date
 from sqlalchemy import select
 
 from app.db.models import Animal, AnimalLotAssignment, OfficialMeasurement, User
+from app.core.legacy_maintenance import require_legacy_single_farm
 from app.db.session import get_session_factory
 from app.services.animal_registry import link_brinco, unlink_brinco, update_animal
 from app.services.production_entry import diet_lot_on, milkings_of, producao_of, record_reading, void_reading
@@ -83,7 +84,7 @@ async def main(autor: str, aplicar: bool) -> int:
         usuario = await s.scalar(select(User).where(User.email == autor))
         if usuario is None or usuario.role != "admin":
             raise SystemExit(f"{autor} não é administrador nesta instalação")
-        fazenda = await s.scalar(select(Animal.farm_id).limit(1))
+        fazenda = await require_legacy_single_farm(s)
 
         print("== 1. A linha '541 BANIA/BAIANA' é a BAHIA 591 ==")
         baiana = await ficha_do_brinco(s, "541")

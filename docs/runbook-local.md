@@ -4,14 +4,18 @@ Todos os comandos abaixo foram executados de verdade durante o desenvolvimento
 da Task 8, contra o `docker-compose.yml` deste repositório. Rode-os a partir
 da raiz do repositório, salvo indicação contrária.
 
-## Limite de integração com o legado
+## Operação atual e ampliação
 
-A `main` histórica ainda é a POC baseada em HTML/JSON. Esta arquitetura nova
-fornece API, banco e frontend operacionais, mas **não migra os 401 animais nem
-suas 152 medições da baseline canônica**. Portanto, integrar o código não é um cutover: os
-JSONs, planilhas e HTMLs legados permanecem necessários para uma futura
-migração e validação. PostgreSQL ainda não é a fonte definitiva dos dados
-históricos.
+O PostgreSQL guarda a operação do sistema atual; a base canônica legada continua
+preservada como origem. A ampliação para vários produtores usa contas produtoras,
+vínculos e seleção autorizada de fazenda, descritos em
+[Produtores e fazendas](produtores-e-fazendas.md). Os exemplos antigos abaixo
+que criavam a primeira fazenda diretamente devem seguir o cadastro pelo app ou
+`POST /api/producer-accounts` e `POST /api/farms/new`.
+
+Para os E2E, acrescente `-f infra/docker-compose.e2e.yml` ao comando que sobe a
+pilha. Esse arquivo configura um Mailpit local para receber confirmações e
+convites; nenhum e-mail de teste sai para destinatários reais.
 
 ## Validação da baseline legada
 

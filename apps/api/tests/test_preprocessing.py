@@ -19,3 +19,14 @@ def test_preprocessor_normalizes_orientation_and_reencodes_as_jpeg() -> None:
     assert output.height == 10
     assert output.format == "JPEG"
     assert output.content.startswith(b"\xff\xd8\xff")
+
+
+def test_heic_from_photo_library_can_be_decoded_and_normalized() -> None:
+    from pillow_heif import from_pillow
+    image = Image.new("RGB", (32, 16), color=(120, 80, 40))
+    heic = from_pillow(image)
+    buffer = io.BytesIO()
+    heic.save(buffer)
+    output = preprocess_image(buffer.getvalue())
+    assert (output.width, output.height) == (32, 16)
+    assert output.content.startswith(b"\xff\xd8\xff")

@@ -163,7 +163,38 @@ export function SendUpload({
   // Gravação escolhida mais longa que o limite: o worker ouve só o começo.
   const [tooLong, setTooLong] = useState<number | null>(null);
   const chosenAt = useRef(0);
+  const libraryInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [previewFailed, setPreviewFailed] = useState(false);
   const queue = useOutbox();
+
+  useEffect(() => {
+    setPreviewFailed(false);
+    if (variant.arquivo !== "foto" || file === null || typeof URL.createObjectURL !== "function") {
+      setPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file, variant.arquivo]);
+
+  function choose(chosen: File | null): void {
+    // Cancelar o seletor não descarta a imagem já escolhida.
+    if (chosen === null) return;
+    setFile(chosen);
+    setRecorded(false);
+    setTooLong(null);
+    if (variant.arquivo === "gravação") {
+      const attempt = ++chosenAt.current;
+      void measureDuration(chosen).then((seconds) => {
+        if (attempt === chosenAt.current && seconds !== null && seconds > MAX_RECORDING_SECONDS) {
+          setTooLong(seconds);
+        }
+      });
+    }
+  }
 
   // O token é renovado enquanto a leitura roda: cada pergunta usa o atual.
   const currentToken = useRef(token);
@@ -253,14 +284,17 @@ export function SendUpload({
       // Sem sinal: o arquivo inteiro fica guardado no celular e sobe sozinho
       // quando der. A gravação da ordenha não se perde mais ao sair da tela.
       if (queue && isTransient(error)) {
-        await queue.outbox.addUpload({
+        try { await queue.outbox.addUpload({
           userId: queue.userId,
           arquivo: variant.arquivo,
           farmId,
           blob: file,
           fileName: file.name,
           declaredLot: variant.comLote && lote ? lote : undefined,
-        });
+        }); } catch {
+          setState({ status: "error", message: "Não foi possível guardar neste celular. Confira o espaço disponível e tente novamente; o arquivo ainda está nesta tela." });
+          return;
+        }
         setState({ status: "queued" });
         setFile(null);
         setRecorded(false);
@@ -342,27 +376,27 @@ export function SendUpload({
       <label htmlFor={variant.id}>{variant.rotulo}</label>
       <input
         key={inputKey}
+        ref={libraryInput}
         id={variant.id}
         type="file"
         accept={variant.accept}
-        // No celular, abre direto a câmera (foto) ou o gravador (áudio).
-        capture={variant.capture}
-        onChange={(event) => {
-          const chosen = event.target.files?.[0] ?? null;
-          setFile(chosen);
-          setRecorded(false);
-          setTooLong(null);
-          if (chosen !== null && variant.arquivo === "gravação") {
-            const attempt = ++chosenAt.current;
-            void measureDuration(chosen).then((seconds) => {
-              // Só vale a medida do último arquivo escolhido.
-              if (attempt === chosenAt.current && seconds !== null && seconds > MAX_RECORDING_SECONDS) {
-                setTooLong(seconds);
-              }
-            });
-          }
-        }}
+        capture={variant.arquivo === "foto" ? undefined : variant.capture}
+        onChange={(event) => choose(event.target.files?.[0] ?? null)}
       />
+      {variant.arquivo === "foto" && (
+        <>
+          <div className="send-photo-actions">
+            <button type="button" className="btn-ghost" onClick={() => cameraInput.current?.click()}>Tirar foto</button>
+            <button type="button" className="btn-ghost" onClick={() => libraryInput.current?.click()}>Escolher da biblioteca</button>
+          </div>
+          <input ref={cameraInput} type="file" accept="image/*" capture="environment"
+            aria-label="Câmera da folha" hidden
+            onChange={(event) => choose(event.target.files?.[0] ?? null)} />
+          {preview && !previewFailed && <img className="upload-preview" src={preview} alt="Prévia da foto escolhida" onError={() => setPreviewFailed(true)} />}
+          {previewFailed && <p className="hint">Este navegador não mostra a prévia deste formato. O arquivo escolhido pode ser enviado para leitura.</p>}
+          {file && <p className="hint">Foto escolhida: {file.name}. Você pode escolher outra antes de enviar.</p>}
+        </>
+      )}
       {tooLong !== null && (
         <p className="warning">
           Esta gravação tem {clock(tooLong)}; só os primeiros {clock(MAX_RECORDING_SECONDS)} serão

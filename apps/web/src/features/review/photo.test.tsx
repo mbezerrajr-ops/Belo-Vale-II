@@ -89,6 +89,16 @@ function chooseFile(): void {
 }
 
 describe("Enviar foto pela Revisão", () => {
+  it("permite escolher da biblioteca sem direcionar para a câmera", async () => {
+    setup();
+    fireEvent.click(await screen.findByRole("button", { name: /enviar foto/i }));
+    expect(screen.getByLabelText(/foto da folha/i)).not.toHaveAttribute("capture");
+    expect(screen.getByLabelText("Câmera da folha")).toHaveAttribute("capture", "environment");
+    expect(screen.getByRole("button", { name: "Escolher da biblioteca" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tirar foto" })).toBeInTheDocument();
+    chooseFile();
+    expect(screen.getByText(/foto escolhida: folha.jpg/i)).toBeInTheDocument();
+  });
   it("manda a foto e avisa que a leitura está em andamento", async () => {
     const { onUpload } = setup();
 

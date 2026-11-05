@@ -72,6 +72,10 @@ export interface Farm {
   name: string;
   code: string | null;
   milk_price_per_liter?: number | null;
+  producer_account_id?: string | null;
+  timezone?: string;
+  role?: string;
+  lot_settings?: Array<{ name: string; kind: LotKind }>;
 }
 
 export type LotKind = "diet" | "management";

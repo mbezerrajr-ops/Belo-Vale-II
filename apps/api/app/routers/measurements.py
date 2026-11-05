@@ -4,7 +4,7 @@ from datetime import date
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import require_minimum_role
@@ -18,11 +18,13 @@ router = APIRouter(tags=["measurements"])
 @router.get("/api/measurements")
 async def get_measurements(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _: Annotated[User, Depends(require_minimum_role("operator"))],
+    access: Annotated[User, Depends(require_minimum_role("operator"))],
     farm_id: UUID,
     date_from: Annotated[date | None, Query(alias="from")] = None,
     date_to: Annotated[date | None, Query(alias="to")] = None,
 ) -> list[dict[str, Any]]:
+    if farm_id != access.farm.id:
+        raise HTTPException(404, "Fazenda não encontrada.")
     records = await list_active_measurements(
         session, farm_id=farm_id, date_from=date_from, date_to=date_to
     )

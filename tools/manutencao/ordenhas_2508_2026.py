@@ -33,6 +33,7 @@ from pathlib import Path
 from sqlalchemy import select
 
 from app.db.models import Animal, OfficialMeasurement, User
+from app.core.legacy_maintenance import require_legacy_single_farm
 from app.db.session import get_session_factory
 from app.services.production_entry import (
     ProductionEntryError,
@@ -54,7 +55,7 @@ async def main(arquivo: Path, autor: str, aplicar: bool) -> int:
         usuario = await s.scalar(select(User).where(User.email == autor))
         if usuario is None or usuario.role != "admin":
             raise SystemExit(f"{autor} não é administrador nesta instalação")
-        fazenda = await s.scalar(select(Animal.farm_id).limit(1))
+        fazenda = await require_legacy_single_farm(s)
 
         completar, iguais, problemas = [], 0, []
         for linha in linhas:

@@ -2,8 +2,9 @@
 
 Um dia de ordenha acompanhada, com o iPhone de quem vai usar o app no curral.
 O objetivo é ver o app nas condições de verdade: sinal que cai, sol, mão
-ocupada, pressa. Os testes automáticos já rodam o motor do Safari; o que está
-aqui é o que só o aparelho de verdade mostra.
+ocupada, pressa. Executar depois da ampliação para produtores e fazendas.
+A validação automatizada desta entrega usou Chromium; Safari e os seletores
+nativos precisam desta conferência no aparelho real.
 
 **Quem:** você e o funcionário que vai lançar a produção. Ele usa o iPhone;
 você observa e anota. Não ajude antes de ele travar: o ponto onde ele trava é
@@ -14,9 +15,10 @@ produção do dia.
 
 ## Antes do dia
 
-- [ ] O endereço **https://desktop-caio.tailf88007.ts.net** abre no seu celular.
-- [ ] Em **Contas**, crie a conta do funcionário (função **Operador**) e anote
-      a senha provisória para entregar a ele.
+- [ ] O endereço HTTPS da versão a homologar abre no celular; anote endereço,
+      versão, modelo do aparelho e versão do iOS.
+- [ ] Entre na fazenda correta e prepare o funcionário em **Fazendas e equipe**
+      por convite, ou em **Contas** com senha provisória (função **Operador**).
 - [ ] No iPhone dele: iOS atualizado (Ajustes → Geral → Atualização de
       Software).
 - [ ] Anote a configuração dele de **Ajustes → Tela e Brilho → Bloqueio
@@ -51,7 +53,7 @@ volume para cima.
 | --- | --- | --- | --- |
 | 7 | Ligar o **Modo Avião** e lançar mais 3 vacas | Faixa "Sem sinal" no topo; cada linha fica amarela com "guardado neste celular"; aparece "3 guardados" perto das iniciais. | |
 | 8 | Ainda no Modo Avião: ir para outro app (WhatsApp, por exemplo) e voltar | O app continua na mesma tela, com os 3 guardados. | |
-| 9 | Ainda no Modo Avião: **fechar o app de vez** (deslizar de baixo para cima e jogar o app para fora) e abrir pelo ícone | **Esperado:** abre a tela de entrar, avisando "Sem sinal" (entrar precisa de sinal). Os 3 valores **não se perdem**. Anote se abriu, e o que apareceu. | |
+| 9 | Ainda no Modo Avião: **fechar o app de vez** (deslizar de baixo para cima e jogar o app para fora) e abrir pelo ícone | Retoma a identidade e a fazenda preparadas, com os valores guardados e aviso de falta de sinal. A retomada local vale até sete dias após acesso online; saída voluntária a encerra. Anote o resultado real. | |
 | 10 | Desligar o Modo Avião (entrar de novo, se o app pedir) | Em até 30 segundos o "3 guardados" some e aparece "enviado". | |
 | 11 | No computador: **Painel** ou **Medições** | Os 3 valores estão lá, com o e-mail do funcionário. | |
 
@@ -59,7 +61,7 @@ volume para cima.
 
 | # | O que fazer | O que deve acontecer | ✓/✗ e observação |
 | --- | --- | --- | --- |
-| 12 | **Revisão** → **Enviar foto** → fotografar a folha → **Enviar** | A câmera abre; depois "Lendo a folha"; em alguns minutos as linhas aparecem para aprovar. | |
+| 12 | **Revisão** → **Enviar foto** → **Tirar foto** → fotografar → **Enviar**. Depois repetir por **Escolher da biblioteca** com JPEG e HEIC. | Cada botão abre o seletor esperado; a foto escolhida aparece na prévia quando o navegador a suporta e chega corretamente à Revisão. | |
 | 13 | Repetir com o **Modo Avião** ligado | "a foto ficou guardada neste celular". Ao desligar o Modo Avião, ela sobe sozinha. | |
 
 ### E. Gravação da ordenha
@@ -77,6 +79,8 @@ volume para cima.
 | --- | --- | --- | --- |
 | 18 | **Animais** → buscar uma vaca → abrir a ficha → deslizar da borda esquerda para a direita | Volta para a busca, com o que tinha sido digitado. | |
 | 19 | Observar o dia todo | Onde ele parou sem saber o que fazer? Que palavra ele não entendeu? O que ele esperava que acontecesse e não aconteceu? | |
+| 20 | Com duas fazendas de teste, guardar lançamento e foto sem sinal na primeira, alternar para a segunda e reconectar | Cada item vai à fazenda de origem. Dados, equipe, relatórios e impressão identificam a fazenda selecionada. | |
+| 21 | Repetir com outro usuário e com acesso revogado | Outra identidade não acessa a fila do autor; envio recusado fica guardado para conferência e oferece nova tentativa após corrigir o acesso. | |
 
 ## Depois
 
@@ -87,8 +91,9 @@ volume para cima.
 
 ## O que já se sabe (não é defeito)
 
-- **Entrar precisa de sinal.** Depois de entrar, o que se lança sem sinal fica
-  guardado; mas se o app for fechado de vez sem sinal, só dá para entrar de
-  novo quando o sinal voltar. Nada do que foi guardado se perde.
+- **O primeiro acesso precisa de sinal.** A retomada local permite usar folhas
+  previamente carregadas por até sete dias. A leitura por IA e a sincronização
+  precisam de conexão e de autorização válida no servidor. O app envia ao ser
+  aberto/retomado; não promete execução com o processo encerrado.
 - O app instalado na tela inicial e o Safari têm sessões separadas: entrar em
   um não entra no outro.

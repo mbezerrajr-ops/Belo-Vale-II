@@ -9,9 +9,12 @@ evita depender da base de fusos do sistema operacional.
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
+from contextvars import ContextVar
+from zoneinfo import ZoneInfo
 
 FARM_TZ = timezone(timedelta(hours=-3), name="America/Recife")
+farm_timezone: ContextVar[str] = ContextVar("farm_timezone", default="America/Recife")
 
 
 def farm_today() -> date:
-    return datetime.now(FARM_TZ).date()
+    return datetime.now(ZoneInfo(farm_timezone.get())).date()

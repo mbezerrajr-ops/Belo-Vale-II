@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -43,7 +44,7 @@ from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
 from app.core.gemini import GeminiClient
-from app.db.models import Animal, OfficialMeasurement
+from app.db.models import Animal, OfficialMeasurement, Farm
 from app.services.event_normalization import parse_event_date
 from app.services.brinco import normalize_brinco
 from app.services.event_proposals import (
@@ -344,24 +345,35 @@ def _records_report(
     return "\n".join(rows)
 
 
-async def _load_herd_async() -> list[Any]:
+async def _evaluation_farm(session, farm_id):
+    if farm_id is not None:
+        if await session.get(Farm, farm_id) is None: raise ValueError("Fazenda não encontrada para avaliação.")
+        return farm_id
+    farms = list(await session.scalars(select(Farm.id).limit(2)))
+    if len(farms) != 1: raise ValueError("Informe --farm-id para avaliar uma única fazenda.")
+    return farms[0]
+
+
+async def _load_herd_async(farm_id=None) -> list[Any]:
     engine = create_async_engine(get_settings().postgres_url, poolclass=NullPool)
     try:
         async with async_sessionmaker(engine)() as session:
-            return list(await session.scalars(select(Animal)))
+            farm_id = await _evaluation_farm(session, farm_id)
+            return list(await session.scalars(select(Animal).where(Animal.farm_id == farm_id)))
     finally:
         await engine.dispose()
 
 
-def load_herd() -> list[Any]:
+def load_herd(farm_id=None) -> list[Any]:
     """O cadastro inteiro, para simular as sugestões da revisão."""
-    return asyncio.run(_load_herd_async())
+    return asyncio.run(_load_herd_async(farm_id))
 
 
-async def _load_records_async(day: date) -> list[dict[str, Any]]:
+async def _load_records_async(day: date, farm_id=None) -> list[dict[str, Any]]:
     engine = create_async_engine(get_settings().postgres_url, poolclass=NullPool)
     try:
         async with async_sessionmaker(engine)() as session:
+            farm_id = await _evaluation_farm(session, farm_id)
             rows = await session.execute(
                 select(Animal.brinco, Animal.name, OfficialMeasurement.values)
                 .join(Animal, Animal.id == OfficialMeasurement.animal_id)
@@ -369,6 +381,7 @@ async def _load_records_async(day: date) -> list[dict[str, Any]]:
                     OfficialMeasurement.measured_on == day,
                     OfficialMeasurement.status == "active",
                     Animal.brinco.is_not(None),
+                    Animal.farm_id == farm_id,
                 )
             )
             return [
@@ -385,9 +398,9 @@ def producao_of_values(values: dict[str, Any] | None) -> float | None:
     return None if value is None else float(value)
 
 
-def load_records(day: date) -> list[dict[str, Any]]:
+def load_records(day: date, farm_id=None) -> list[dict[str, Any]]:
     """Medições ativas do dia, com o brinco e o nome do cadastro."""
-    return asyncio.run(_load_records_async(day))
+    return asyncio.run(_load_records_async(day, farm_id))
 
 
 # -------------------------------------------------------------------- comando
@@ -446,6 +459,7 @@ def main(
         action="store_true",
         help="Reaproveita a transcrição salva da mesma versão do leitor, sem ler de novo.",
     )
+    parser.add_argument("--farm-id", type=UUID, help="Fazenda cujas medições e cadastro serão comparados.")
     args = parser.parse_args(argv)
 
     version = "externo"
@@ -506,8 +520,8 @@ def main(
             pooled.extend(tidy["linhas"])
 
     if args.records_date is not None:
-        day_records = records if records is not None else load_records(args.records_date)
-        animals = herd if herd is not None else (load_herd() if records is None else None)
+        day_records = records if records is not None else load_records(args.records_date, args.farm_id)
+        animals = herd if herd is not None else (load_herd(args.farm_id) if records is None else None)
         score = compare_with_records(pooled, day_records)
         reach = review_reach(pooled, day_records, animals) if animals is not None else None
         print(

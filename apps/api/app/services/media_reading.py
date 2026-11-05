@@ -236,6 +236,15 @@ async def _sender(session: AsyncSession, media: MediaAsset) -> User:
         raise UnknownSenderError(
             "Não foi possível identificar quem enviou o arquivo; a leitura não foi feita."
         )
+    from app.core.tenancy import available_farms
+    from app.core.farm_clock import farm_timezone
+    from app.services.lot_kind import active_lots
+    farms = await available_farms(session, user)
+    selected = next((farm for farm, _ in farms if farm.id == media.farm_id), None)
+    if selected is None:
+        raise UnknownSenderError("Quem enviou não tem mais acesso a esta fazenda.")
+    farm_timezone.set(selected.timezone)
+    active_lots.set(selected.lot_settings)
     return user
 
 
@@ -251,7 +260,9 @@ def _farm_time(enviado: datetime) -> datetime:
     """O instante no fuso da fazenda. O banco guarda em UTC."""
     if enviado.tzinfo is None:
         enviado = enviado.replace(tzinfo=timezone.utc)
-    return enviado.astimezone(FARM_TZ)
+    from app.core.farm_clock import farm_timezone
+    from zoneinfo import ZoneInfo
+    return enviado.astimezone(ZoneInfo(farm_timezone.get()))
 
 
 def _farm_date(enviado: datetime | None):

@@ -1,4 +1,5 @@
 import { LogoMark } from "./Brand";
+import { useActiveFarm } from "../features/workspace/context";
 
 /**
  * O alto de tudo que o sistema imprime: marca, que documento é, uma
@@ -15,13 +16,14 @@ export function PrintHeader({
   tag: string | null;
   date: string;
 }): JSX.Element {
+  const farm = useActiveFarm();
   return (
     <>
       <header className="ps-head">
         <div className="ps-brand">
           <LogoMark size={42} />
           <div>
-            <strong>Belo Vale II</strong>
+            <strong>{farm?.name ?? "Belo Vale II"}</strong>
             <span>{kind}</span>
           </div>
         </div>

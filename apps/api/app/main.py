@@ -16,6 +16,8 @@ from app.routers.users import router as users_router
 from app.routers.production import router as production_router
 from app.routers.production_import import router as production_import_router
 from app.routers.proposals import router as proposals_router
+from app.routers.tenancy import router as tenancy_router
+from app.routers.animal_import import router as animal_import_router
 from app.services.ingestion import (
     DuplicateImageError,
     FarmNotFoundError,
@@ -58,6 +60,20 @@ def create_app() -> FastAPI:
     _configure_logging()
     get_settings()
     app = FastAPI(title="Belo Vale Ingestion API", lifespan=_lifespan)
+    @app.middleware("http")
+    async def reset_farm_context(request, call_next):
+        from app.core.farm_clock import farm_timezone
+        from app.services.lot_kind import active_lots
+        clock_token = farm_timezone.set("America/Recife")
+        lots_token = active_lots.set(None)
+        try:
+            return await call_next(request)
+        finally:
+            farm_timezone.reset(clock_token)
+            active_lots.reset(lots_token)
+    # /farms/new precisa preceder as rotas com identificadores dinâmicos.
+    app.include_router(tenancy_router)
+    app.include_router(animal_import_router)
     app.include_router(auth_router)
     app.include_router(imports_router)
     app.include_router(measurements_router)

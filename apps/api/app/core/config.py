@@ -53,6 +53,13 @@ class Settings(BaseSettings):
     #: cookie viaja em texto puro. Só desligue para desenvolvimento local em
     #: http://localhost, onde o navegador não enviaria um cookie `Secure`.
     auth_cookie_secure: bool = True
+    public_app_url: str = "http://localhost:8080"
+    smtp_host: str | None = None
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_user: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_from: str = ""
+    smtp_starttls: bool = True
 
     @field_validator("auth_secret")
     @classmethod

@@ -190,6 +190,8 @@ async def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Troque a senha provisória antes de continuar.",
         )
+    if user.email_verification_required and user.email_verified_at is None:
+        raise HTTPException(403, "Confirme seu e-mail antes de continuar.")
     return user
 
 
@@ -199,15 +201,16 @@ def has_minimum_role(user: User, minimum_role: Role) -> bool:
 
 def require_minimum_role(minimum_role: Role) -> Callable[..., User]:
     minimum_level = _ROLE_LEVEL[minimum_role]
+    from app.core.tenancy import get_farm_access
 
     async def dependency(
-        user: Annotated[User, Depends(get_current_user)],
+        access=Depends(get_farm_access),
     ) -> User:
-        if _ROLE_LEVEL.get(user.role, -1) < minimum_level:
+        if _ROLE_LEVEL.get(access.role, -1) < minimum_level:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Insufficient role",
             )
-        return user
+        return access
 
     return dependency

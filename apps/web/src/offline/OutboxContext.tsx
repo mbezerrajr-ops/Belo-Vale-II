@@ -31,6 +31,7 @@ export const RETRY_MS = 30_000;
 interface Props {
   outbox: Outbox;
   userId: string;
+  farmId?: string;
   token: string;
   renew: () => Promise<string | null>;
   send: Senders;
@@ -41,7 +42,7 @@ function onlineNow(): boolean {
   return typeof navigator === "undefined" || navigator.onLine !== false;
 }
 
-export function OutboxProvider({ outbox, userId, token, renew, send, children }: Props): JSX.Element {
+export function OutboxProvider({ outbox, userId, farmId, token, renew, send, children }: Props): JSX.Element {
   const [pending, setPending] = useState<OutboxItem[]>([]);
   const [online, setOnline] = useState(onlineNow);
   const [notice, setNotice] = useState<string | null>(null);
@@ -51,8 +52,8 @@ export function OutboxProvider({ outbox, userId, token, renew, send, children }:
   latest.current = { token, renew, send };
 
   const refresh = useCallback(async () => {
-    setPending(await outbox.list(userId));
-  }, [outbox, userId]);
+    setPending((await outbox.list(userId)).filter((item) => !farmId || !item.farmId || item.farmId === farmId));
+  }, [outbox, userId, farmId]);
 
   const flushNow = useCallback(() => {
     void outbox.flush({ userId, ...latest.current }).then(refresh);
@@ -62,6 +63,7 @@ export function OutboxProvider({ outbox, userId, token, renew, send, children }:
     let sent = 0;
     let timer: number | undefined;
     const unsubscribe = outbox.subscribe((event) => {
+      if (event.type !== "changed" && (event.item.userId !== userId || (farmId && event.item.farmId && event.item.farmId !== farmId))) return;
       if (event.type === "changed") void refresh();
       if (event.type === "sent") {
         sent += 1;
@@ -82,7 +84,7 @@ export function OutboxProvider({ outbox, userId, token, renew, send, children }:
       unsubscribe();
       window.clearTimeout(timer);
     };
-  }, [outbox, refresh]);
+  }, [outbox, refresh, userId, farmId]);
 
   // Ao abrir: manda o que ficou de antes (de outra visita, sem sinal).
   useEffect(() => {

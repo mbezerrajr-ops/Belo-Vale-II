@@ -33,7 +33,7 @@ from app.core.security import (
     require_minimum_role,
     verify_password,
 )
-from app.db.models import AuditEvent, User
+from app.db.models import AuditEvent, User, FarmMembership, ProducerMembership
 from app.db.session import get_db_session
 from app.services.refresh_tokens import revoke_all_for_user
 from app.schemas.users import (
@@ -64,10 +64,11 @@ def _audit(
     entity_id: UUID,
     previous: dict | None = None,
     new: dict | None = None,
+    farm_id: UUID | None = None,
 ) -> None:
     session.add(
         AuditEvent(
-            farm_id=None,
+            farm_id=farm_id,
             actor=actor,
             action=action,
             entity_type="user",
@@ -111,12 +112,14 @@ async def create_user(
     )
     session.add(user)
     await session.flush()
+    session.add(FarmMembership(farm_id=admin.farm.id, user_id=user.id, role=payload.role))
     _audit(
         session,
         actor=admin.email,
         action="user_created",
         entity_id=user.id,
         new={"email": email, "role": payload.role},
+        farm_id=admin.farm.id,
     )
     await session.commit()
     return user
@@ -125,11 +128,11 @@ async def create_user(
 @router.get("", response_model=UserPage)
 async def list_users(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    _: Annotated[User, Depends(require_minimum_role("admin"))],
+    admin: Annotated[User, Depends(require_minimum_role("admin"))],
 ) -> UserPage:
-    users = list(await session.scalars(select(User).order_by(User.email)))
+    rows = (await session.execute(select(User, FarmMembership).join(FarmMembership, FarmMembership.user_id == User.id).where(FarmMembership.farm_id == admin.farm.id).order_by(User.email))).all()
     return UserPage(
-        items=[UserRead.model_validate(user) for user in users], total=len(users)
+        items=[UserRead.model_validate(user).model_copy(update={"role": link.role, "is_active": link.is_active and user.is_active}) for user, link in rows], total=len(rows)
     )
 
 
@@ -147,7 +150,8 @@ async def update_user(
         )
 
     user = await session.scalar(select(User).where(User.id == user_id))
-    if user is None:
+    membership = await session.get(FarmMembership, (admin.farm.id, user_id))
+    if user is None or membership is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Conta não encontrada."
         )
@@ -160,7 +164,7 @@ async def update_user(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Você não pode desativar a sua própria conta.",
             )
-        if "role" in changes and changes["role"] != user.role:
+        if "role" in changes and changes["role"] != membership.role:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
@@ -169,9 +173,12 @@ async def update_user(
                 ),
             )
 
-    previous = {key: getattr(user, key) for key in changes}
+    producer_membership = await session.get(ProducerMembership, (admin.farm.producer_account_id, user_id)) if admin.farm.producer_account_id else None
+    if producer_membership:
+        raise HTTPException(409, "O acesso do responsável pela conta produtora é administrado na conta produtora.")
+    previous = {key: getattr(membership, key) for key in changes}
     for key, value in changes.items():
-        setattr(user, key, value)
+        setattr(membership, key, value)
 
     _audit(
         session,
@@ -180,9 +187,10 @@ async def update_user(
         entity_id=user.id,
         previous=previous,
         new=changes,
+        farm_id=admin.farm.id,
     )
     await session.commit()
-    return user
+    return UserRead.model_validate(user).model_copy(update={"role": membership.role, "is_active": membership.is_active})
 
 
 @router.post("/me/password", status_code=status.HTTP_204_NO_CONTENT)
@@ -237,7 +245,8 @@ async def reset_password(
     a redefinição pode estar justamente perdendo o controle dela.
     """
     user = await session.scalar(select(User).where(User.id == user_id))
-    if user is None:
+    membership = await session.get(FarmMembership, (admin.farm.id, user_id))
+    if user is None or membership is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Conta não encontrada."
         )
@@ -246,6 +255,11 @@ async def reset_password(
             status_code=status.HTTP_409_CONFLICT,
             detail="Para a sua própria senha, use \"Trocar senha\".",
         )
+
+    links = await session.scalar(select(func.count()).select_from(FarmMembership).where(FarmMembership.user_id == user.id))
+    producer_link = await session.scalar(select(ProducerMembership).where(ProducerMembership.user_id == user.id).limit(1))
+    if links != 1 or producer_link is not None:
+        raise HTTPException(409, "Esta pessoa usa outras áreas de trabalho. Ela deve recuperar a própria senha pelo e-mail.")
 
     temporary = generate_temporary_password()
     expires_at = datetime.now(timezone.utc) + TEMPORARY_PASSWORD_TTL
@@ -259,6 +273,7 @@ async def reset_password(
         action="user_password_reset",
         entity_id=user.id,
         new={"expires_at": expires_at.isoformat()},
+        farm_id=admin.farm.id,
     )
     # Por último: a revogação faz o commit, e senha, auditoria e sessões
     # derrubadas entram juntos — nunca uma senha trocada sem registro.

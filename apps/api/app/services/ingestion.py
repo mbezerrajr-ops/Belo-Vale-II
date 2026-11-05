@@ -107,6 +107,9 @@ async def create_import(
         )
         raise DuplicateImageError(existing_import_id=existing.import_id)
 
+    from app.services.tenant_limits import reserve_capacity
+    await reserve_capacity(session, farm_id, len(content))
+
     import_row = Import(
         farm_id=farm_id,
         status="pending",
@@ -158,6 +161,8 @@ async def reprocess_import(
     import_row = await session.get(Import, import_id)
     if import_row is None:
         raise ImportNotFoundError(str(import_id))
+    from app.services.tenant_limits import reserve_capacity
+    await reserve_capacity(session, import_row.farm_id)
 
     image = await session.scalar(
         select(MediaAsset).where(MediaAsset.import_id == import_id)

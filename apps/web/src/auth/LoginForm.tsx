@@ -43,10 +43,10 @@ function loginError(error: unknown): string {
   // É assim que o fetch avisa que nem chegou ao servidor.
   if (error instanceof TypeError) return NO_CONNECTION;
   if (!(error instanceof ApiError)) return SERVER_DOWN;
-  if (error.status >= 500 || ![400, 401, 422, 429].includes(error.status)) return SERVER_DOWN;
+  if (error.status >= 500 || ![400, 401, 403, 422, 429].includes(error.status)) return SERVER_DOWN;
   const detail = (error.body as { detail?: unknown }).detail;
   if (typeof detail !== "string") return GENERIC_ERROR;
-  if (error.status === 429) return detail;
+  if (error.status === 429 || error.status === 403) return detail;
   if (error.status === 401 && detail.includes("provisória")) return detail;
   return GENERIC_ERROR;
 }

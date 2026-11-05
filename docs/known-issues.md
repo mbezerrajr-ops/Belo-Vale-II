@@ -5,6 +5,28 @@ registro em ordem de data: as seções abaixo guardam cada decisão como foi
 tomada. O que **ainda está aberto** fica resumido aqui, com a seção de
 origem.
 
+## Ampliação implementada; campo e publicação pendentes (05/11/2026)
+
+As frentes técnicas de offline, biblioteca e produtores/fazendas foram
+implementadas localmente. A [documentação da entrega](produtores-e-fazendas.md)
+registra modelo, migração, SMTP, limites, recuperação seletiva e validação.
+
+- **Offline:** persistência confirmada por transação IndexedDB, retomada local
+  limitada e filas por usuário/fazenda; reabertura e sincronização cobertas em
+  navegador. Falta homologação nos aparelhos e no curral.
+- **Biblioteca:** seleção explícita, câmera, prévia e suporte de decodificação
+  HEIC implementados. A interface nativa dos seletores será conferida no campo.
+- **Produtores e fazendas:** cadastro, confirmação, recuperação, múltiplas
+  fazendas, equipe e isolamento implementados. Migração conferida com a baseline
+  completa; produção real ainda não atualizada. SMTP de produção precisa ser
+  configurado para os novos fluxos de e-mail.
+- **Próximas etapas, nesta ordem:** teste de campo após a ampliação, piloto com
+  produtores independentes, preparação Android e Google Play. Também permanecem
+  decisões de marca, capacidade do piloto e política comercial/privacidade.
+
+Sequência, critérios de aceite, estimativa e dependências no
+[plano de execução](superpowers/plans/2026-11-05-offline-biblioteca-google-play.md).
+
 ## Pendências abertas (atualizado em 16/10/2026)
 
 **Com o titular (fora do código):**

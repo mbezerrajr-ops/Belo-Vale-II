@@ -24,6 +24,7 @@ from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from tests.legacy_tenancy import grant_in_session
 from app.db.models import (
     Animal,
     EventProposal,
@@ -109,6 +110,9 @@ def _run(body) -> None:
                 )
                 session.add(user)
                 await session.commit()
+                await grant_in_session(session)
+                await session.commit()
+                await session.refresh(farm)
 
                 storage = InMemoryObjectStorage()
                 created = await create_import(

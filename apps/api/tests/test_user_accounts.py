@@ -118,6 +118,11 @@ def _account(db, email: str, role: str, active: bool = True) -> tuple[str, str]:
 
 
 def _auth(token: str) -> dict[str, str]:
+    # Estes cenários antigos exercitam uma equipe de uma fazenda.
+    if not _execute([("SELECT id FROM farms", {})])[0]:
+        _execute([("INSERT INTO farms(name) VALUES ('Operação de teste')", {})])
+    from tests.legacy_tenancy import grant_legacy_memberships
+    grant_legacy_memberships()
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -269,14 +274,15 @@ class TestUpdateAccount:
         assert response.status_code == 200
         assert response.json()["is_active"] is False
 
-    def test_deactivated_account_cannot_authenticate(self, api, db) -> None:
+    def test_removed_member_loses_farm_access_but_keeps_identity(self, api, db) -> None:
         _, admin = _account(db, "dono@belovale", "admin")
         target_id, target_token = _account(db, "saiu@belovale", "operator")
         api.patch(
             f"/api/users/{target_id}", headers=_auth(admin), json={"is_active": False}
         )
 
-        assert api.get("/api/auth/me", headers=_auth(target_token)).status_code == 401
+        assert api.get("/api/auth/me", headers=_auth(target_token)).status_code == 200
+        assert api.get("/api/animals", headers=_auth(target_token)).status_code == 409
 
     def test_admin_changes_a_role(self, api, db) -> None:
         _, admin = _account(db, "dono@belovale", "admin")
@@ -543,7 +549,7 @@ class TestSessionLifecycle:
         assert api.post("/api/auth/logout").status_code == 204
         assert api.post("/api/auth/refresh").status_code == 401
 
-    def test_deactivating_an_account_ends_its_session(self, api, db) -> None:
+    def test_removing_membership_does_not_revoke_identity_in_other_workspaces(self, api, db) -> None:
         """Tirar o acesso de quem saiu da fazenda precisa valer na hora."""
         _, admin = _account(db, "dono@belovale", "admin")
         target_id, _ = _account(db, "demitido@belovale", "operator")
@@ -555,4 +561,6 @@ class TestSessionLifecycle:
             f"/api/users/{target_id}", headers=_auth(admin), json={"is_active": False}
         )
 
-        assert api.post("/api/auth/refresh").status_code == 401
+        response = api.post("/api/auth/refresh")
+        assert response.status_code == 200
+        assert api.get("/api/animals", headers=_auth(response.json()["access_token"])).status_code == 409

@@ -20,6 +20,9 @@ from app.core.security import (
 from app.db.models import User
 from app.db.session import get_db_session
 from app.main import create_app
+from app.core.tenancy import FarmAccess, get_farm_access
+from app.core.security import get_current_user
+from app.db.models import Farm
 
 
 class StubSession:
@@ -82,6 +85,9 @@ def _client_for(role: str = "operator") -> tuple[TestClient, User]:
 
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_db_session] = override_session
+    async def access(current=Depends(get_current_user)):
+        return FarmAccess(Farm(id=uuid4(), name="Teste"), current, current.role)
+    app.dependency_overrides[get_farm_access] = access
 
     @app.get("/test/reviewer")
     async def reviewer_only(

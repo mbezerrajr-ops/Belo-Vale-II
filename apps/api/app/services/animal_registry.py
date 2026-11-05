@@ -143,6 +143,7 @@ async def create_animal(
     observacoes: str | None = None,
     lote: str | None = None,
     lote_valid_from: date | None = None,
+    commit: bool = True,
 ) -> Animal:
     normalized = _require_readable_brinco(brinco) if brinco is not None else None
     if normalized is not None:
@@ -192,7 +193,10 @@ async def create_animal(
             )
         )
 
-    await session.commit()
+    if commit:
+        await session.commit()
+    else:
+        await session.flush()
     return animal
 
 

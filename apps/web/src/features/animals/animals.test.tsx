@@ -493,7 +493,7 @@ describe("AnimalDetailPanel — mudar de lote", () => {
     fireEvent.click(screen.getByRole("button", { name: /mudar de lote/i }));
 
     expect(
-      screen.getByText(/s[ãa]o lotes de ordenha, com dieta e custo/i),
+      screen.getByText(/lotes de ordenha recebem dieta e t[êe]m custo/i),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/registro anterior do mesmo tipo fica no hist[óo]rico/i),

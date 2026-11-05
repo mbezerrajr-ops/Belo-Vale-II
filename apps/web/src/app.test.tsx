@@ -31,6 +31,8 @@ beforeEach(() => {
   // anterior tinha parado.
   window.history.replaceState(null, "", "/");
   api.getCurrentFarm.mockResolvedValue({ id: "f-1", name: "Belo Vale II", code: null });
+  api.listFarms.mockResolvedValue([{ id: "f-1", name: "Belo Vale II", code: null }]);
+  api.workspaceRequest.mockResolvedValue([]);
   api.getProductionSheet.mockResolvedValue({
     measured_on: "2026-09-18",
     lote: null,

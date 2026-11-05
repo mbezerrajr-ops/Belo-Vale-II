@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import getpass
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +30,7 @@ async def create_first_admin(
         password_hash=hash_password(password),
         role="admin",
         is_active=True,
+        email_verified_at=datetime.now(timezone.utc),
     )
     session.add(admin)
     await session.commit()

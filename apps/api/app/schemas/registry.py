@@ -28,6 +28,9 @@ class FarmRead(BaseModel):
     #: Preço do leite em vigor, base da receita e do lucro. A tela de Insumos
     #: mostra este valor no campo de edição.
     milk_price_per_liter: float | None = None
+    producer_account_id: UUID | None = None
+    timezone: str = "America/Recife"
+    lot_settings: list[dict] = Field(default_factory=list)
 
 
 class AnimalCreate(BaseModel):

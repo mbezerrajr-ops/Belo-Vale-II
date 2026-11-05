@@ -113,6 +113,8 @@ async def login(
         )
 
     await throttle.record_success(email, origin)
+    if user.email_verification_required and user.email_verified_at is None:
+        raise HTTPException(403, "Confirme seu e-mail antes de entrar. Você pode solicitar novamente pelo cadastro.")
     try:
         token = create_access_token(
             user.id, settings.auth_secret, settings.auth_token_ttl_seconds
