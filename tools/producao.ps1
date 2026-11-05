@@ -63,7 +63,10 @@ switch ($Comando) {
   "subir" { Compose @("up", "-d", "--wait") }
   "atualizar" {
     $r = Read-Host "Rodar o backup antes de atualizar? (S/n)"
-    if ($r -ne "n") { & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Repo "tools\backup\backup.ps1") }
+    if ($r -ne "n") {
+      & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Repo "tools\backup\backup.ps1")
+      if ($LASTEXITCODE -ne 0) { throw "O backup falhou. A atualização foi interrompida antes de alterar os serviços ou o banco." }
+    }
     Compose @("build", "api", "worker", "web")
     # Validar a migração antes de substituir os serviços que estão no ar.
     # Uma recusa mantém a versão anterior atendendo sobre o banco anterior.

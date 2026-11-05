@@ -1,9 +1,33 @@
-# Runbook de produção no Windows (até 07/10/2026)
+# Runbook de produção no Windows
 
-> **Histórico.** A produção saiu do DESKTOP-CAIO em outubro de 2026 e foi
-> para um servidor Linux na nuvem: ver [runbook-producao.md](runbook-producao.md).
-> Os scripts do Windows (`tools/producao.ps1`, `tools/backup/`) continuam no
-> repositório e funcionando, para o caso de voltar a um PC.
+> **Confirmado pelo titular em 05/11/2026:** o site real roda em outro notebook
+> com Windows. Usar os scripts deste procedimento nessa máquina. Os detalhes
+> de hardware, endereços e configuração registrados em setembro abaixo são
+> históricos e devem ser conferidos no notebook atual. O
+> [runbook Linux](runbook-producao.md) descreve outra instalação.
+
+## Atualização da ampliação para produtores e fazendas
+
+No notebook que hospeda o site, abrir PowerShell na pasta do projeto, com
+Docker Desktop em execução. Depois de a mudança estar integrada à `main`:
+
+```powershell
+git switch main
+git pull --ff-only
+powershell -ExecutionPolicy Bypass -File tools\producao.ps1 atualizar
+powershell -ExecutionPolicy Bypass -File tools\producao.ps1 estado
+```
+
+Confirmar o backup oferecido pelo comando. Se ele falhar, a atualização para
+antes de alterar os serviços ou o banco. As imagens são compiladas e as
+migrações aplicadas antes de substituir os serviços. Manter o arquivo existente
+`infra/.env.production`; não gerar novamente os segredos de uma instalação
+que já está em uso.
+
+Cadastro público, convites e recuperação por e-mail precisam de `PUBLIC_APP_URL`
+e SMTP configurados nesse arquivo, conforme
+[Produtores e fazendas](produtores-e-fazendas.md#e-mails-transacionais).
+Os acessos legados preservados pela migração não exigem uma nova confirmação.
 
 Como o sistema roda de verdade, para a fazenda usar pelo celular. O ambiente de
 desenvolvimento e testes continua no [runbook local](runbook-local.md).
