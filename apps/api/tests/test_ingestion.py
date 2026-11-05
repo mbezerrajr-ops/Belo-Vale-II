@@ -12,6 +12,10 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.config import Settings, get_settings
 from app.core.security import create_access_token, hash_password
+from app.core.security import get_current_user
+from app.core.tenancy import get_farm_access, FarmAccess
+from fastapi import Depends
+from tests.legacy_tenancy import grant_in_session
 from app.db.models import ExtractionRun, Farm, MediaAsset, User
 from app.routers.registry import resolve_current_farm
 from app.db.session import get_db_session
@@ -55,6 +59,9 @@ def test_create_import_persists_farm_and_image_and_stores_bytes() -> None:
                 farm = Farm(name="Fazenda Modelo")
                 session.add(farm)
                 await session.commit()
+                await grant_in_session(session)
+                await session.commit()
+                await session.refresh(farm)
 
                 storage = InMemoryObjectStorage()
                 created = await create_import(
@@ -79,6 +86,9 @@ def test_create_import_rejects_a_duplicate_image_for_the_same_farm() -> None:
                 farm = Farm(name="Fazenda Modelo")
                 session.add(farm)
                 await session.commit()
+                await grant_in_session(session)
+                await session.commit()
+                await session.refresh(farm)
                 storage = InMemoryObjectStorage()
 
                 first = await create_import(
@@ -105,6 +115,9 @@ def test_create_import_rejects_unrecognized_image_bytes() -> None:
                 farm = Farm(name="Fazenda Modelo")
                 session.add(farm)
                 await session.commit()
+                await grant_in_session(session)
+                await session.commit()
+                await session.refresh(farm)
 
                 with pytest.raises(InvalidImageError):
                     await create_import(
@@ -129,6 +142,9 @@ def test_create_import_rejects_an_image_larger_than_the_configured_limit() -> No
                 farm = Farm(name="Fazenda Modelo")
                 session.add(farm)
                 await session.commit()
+                await grant_in_session(session)
+                await session.commit()
+                await session.refresh(farm)
 
                 with pytest.raises(ImageTooLargeError):
                     await create_import(
@@ -153,6 +169,9 @@ def test_reprocess_enqueues_a_new_run_for_an_existing_import() -> None:
                 farm = Farm(name="Fazenda Modelo")
                 session.add(farm)
                 await session.commit()
+                await grant_in_session(session)
+                await session.commit()
+                await session.refresh(farm)
 
                 created = await create_import(
                     session,
@@ -206,6 +225,9 @@ class _RecordingSession:
         return None
 
     async def get(self, model: object, identifier: object) -> None:
+        from app.db.models import ProducerAccount
+        if model is Farm: return _FARM
+        if model is ProducerAccount: return ProducerAccount(id=_FARM.producer_account_id, name="Teste", storage_limit_bytes=1_000_000_000, daily_reading_limit=100)
         return None
 
     def add(self, instance: Any) -> None:
@@ -245,10 +267,13 @@ def _build_client(
     app.dependency_overrides[get_extraction_dispatcher] = lambda: dispatcher
     # A fazenda vem do servidor; aqui, uma fixa, sem banco.
     app.dependency_overrides[resolve_current_farm] = lambda: _FARM
+    async def access(user=Depends(get_current_user)):
+        return FarmAccess(_FARM, user, user.role)
+    app.dependency_overrides[get_farm_access] = access
     return TestClient(app), dispatcher
 
 
-_FARM = Farm(id=uuid4(), name="Fazenda Modelo")
+_FARM = Farm(id=uuid4(), name="Fazenda Modelo", producer_account_id=uuid4(), timezone="America/Recife", lot_settings=[])
 
 
 def _operator() -> User:

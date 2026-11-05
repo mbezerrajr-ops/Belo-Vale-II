@@ -32,7 +32,8 @@ async function appFiles() {
 
 /** Guarda a versão atual inteira. A página por último: ela só passa a valer
  *  quando tudo o que ela usa já está guardado. */
-async function precache() {
+let preparing = null;
+async function prepareVersion() {
   const cache = await caches.open(CACHE);
   const page = await fetch("/", { cache: "no-store" });
   const files = await appFiles();
@@ -42,14 +43,24 @@ async function precache() {
     [...files].map(async (file) => {
       if (await cache.match(file)) return;
       const response = await fetch(file);
-      if (response.ok) await cache.put(file, response);
+      if (!response.ok) throw new Error("Uma parte do aplicativo não pôde ser guardada.");
+      await cache.put(file, response);
     }),
   );
+  const previous = await cache.match("/__current-app-files");
+  const previousFiles = previous ? await previous.json() : [];
+  await cache.put("/__previous-app-files", new Response(JSON.stringify(previousFiles)));
+  await cache.put("/__current-app-files", new Response(JSON.stringify([...files])));
   await cache.put("/", page);
   for (const request of await cache.keys()) {
     const path = new URL(request.url).pathname;
-    if (path.startsWith("/assets/") && !files.has(path)) await cache.delete(request);
+    if (path.startsWith("/assets/") && !files.has(path) && !previousFiles.includes(path)) await cache.delete(request);
   }
+}
+
+function precache() {
+  preparing ??= prepareVersion().finally(() => { preparing = null; });
+  return preparing;
 }
 
 self.addEventListener("install", (event) => {

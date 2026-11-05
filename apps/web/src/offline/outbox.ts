@@ -25,6 +25,8 @@ interface Base {
   id: string;
   userId: string;
   createdAt: string;
+  /** A fazenda de origem nunca muda ao alternar de área de trabalho. */
+  farmId?: string;
   /** Recusado pelo servidor: não é reenviado sozinho. */
   error?: string;
 }
@@ -102,16 +104,23 @@ export function indexedDbStore(): OutboxStore {
     });
     return db;
   };
-  const tx = async (mode: IDBTransactionMode): Promise<IDBObjectStore> =>
-    (await open()).transaction(STORE, mode).objectStore(STORE);
+  const read = async (): Promise<OutboxItem[]> =>
+    request((await open()).transaction(STORE, "readonly").objectStore(STORE).getAll());
+  const write = async (change: (store: IDBObjectStore) => void): Promise<void> => {
+    const database = await open();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(STORE, "readwrite");
+      // O sucesso do pedido não significa que a transação chegou ao disco.
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(transaction.error ?? new Error("Não foi possível guardar no celular."));
+      transaction.onerror = () => reject(transaction.error ?? new Error("Armazenamento indisponível."));
+      try { change(transaction.objectStore(STORE)); } catch (error) { reject(error); }
+    });
+  };
   return {
-    all: async () => request((await tx("readonly")).getAll() as IDBRequest<OutboxItem[]>),
-    put: async (item) => {
-      await request((await tx("readwrite")).put(item));
-    },
-    remove: async (id) => {
-      await request((await tx("readwrite")).delete(id));
-    },
+    all: read,
+    put: (item) => write((store) => { store.put(item); }),
+    remove: (id) => write((store) => { store.delete(id); }),
   };
 }
 
@@ -121,6 +130,7 @@ export interface Senders {
     animalId: string,
     measuredOn: string,
     input: number | ReadingInput,
+    farmId?: string,
   ) => Promise<Reading>;
   uploadImport: (
     input: { farmId: string; file: File; declaredLot?: string },
@@ -220,8 +230,9 @@ export class Outbox {
 
   async addReading(item: Omit<QueuedReading, "id" | "kind" | "createdAt">): Promise<QueuedReading> {
     // Uma produção por vaca e dia: a nova digitação substitui a guardada.
-    await this.removeReadings(item.userId, item.animalId, item.measuredOn);
-    const queued: QueuedReading = { ...item, kind: "reading", id: newId(), createdAt: new Date().toISOString() };
+    const previous = (await this.list(item.userId)).find((other) => other.kind === "reading" && other.animalId === item.animalId && other.measuredOn === item.measuredOn);
+    // Sobrescreve a mesma chave atomicamente: falta de espaço não perde o valor anterior.
+    const queued: QueuedReading = { ...item, kind: "reading", id: previous?.id ?? newId(), createdAt: previous?.createdAt ?? new Date().toISOString() };
     keepStorage();
     await this.store.put(queued);
     this.emit({ type: "changed" });
@@ -238,6 +249,14 @@ export class Outbox {
 
   async discard(id: string): Promise<void> {
     await this.store.remove(id);
+    this.emit({ type: "changed" });
+  }
+
+  /** Reenvio pedido pela pessoa depois de corrigir acesso ou outro impedimento. */
+  async retry(id: string, userId: string): Promise<void> {
+    const item = (await this.list(userId)).find((entry) => entry.id === id);
+    if (!item) return;
+    await this.store.put({ ...item, error: undefined });
     this.emit({ type: "changed" });
   }
 
@@ -307,7 +326,9 @@ export class Outbox {
   private async sendOne(item: OutboxItem, token: string, send: Senders): Promise<void> {
     if (item.kind === "reading") {
       const result = await withTimeout(
-        send.enterReading(token, item.animalId, item.measuredOn, queuedInput(item)),
+        item.farmId
+          ? send.enterReading(token, item.animalId, item.measuredOn, queuedInput(item), item.farmId)
+          : send.enterReading(token, item.animalId, item.measuredOn, queuedInput(item)),
         READING_TIMEOUT_MS,
       );
       await this.store.remove(item.id);
@@ -361,9 +382,14 @@ function keepStorage(): void {
 
 let shared: Outbox | null = null;
 
-/** A fila deste celular. Sem IndexedDB (aba privada antiga), fica na memória. */
+/** Sem persistência, recusa guardar: memória não pode ser anunciada como salva. */
 export function deviceOutbox(): Outbox {
-  shared ??= new Outbox(typeof indexedDB === "undefined" ? memoryStore() : indexedDbStore());
+  const unavailable: OutboxStore = {
+    all: async () => [],
+    put: async () => { throw new Error("O navegador não permite guardar neste celular. Confira o espaço e o modo privado."); },
+    remove: async () => undefined,
+  };
+  shared ??= new Outbox(typeof indexedDB === "undefined" ? unavailable : indexedDbStore());
   return shared;
 }
 

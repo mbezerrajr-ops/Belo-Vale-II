@@ -136,6 +136,8 @@ def _farm(db, name: str = "Belo Vale II") -> str:
 
 
 def _auth(token: str) -> dict[str, str]:
+    from tests.legacy_tenancy import grant_legacy_memberships
+    grant_legacy_memberships()
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -180,18 +182,20 @@ class TestCurrentFarm:
 class TestCreateFarm:
     def test_admin_creates_the_first_farm(self, api, db) -> None:
         token = _user(db, "admin@belovale", "admin")
-
+        account = api.post("/api/producer-accounts", headers=_auth(token), json={"name": "Produtor"})
+        assert account.status_code == 201
         response = api.post(
-            "/api/farms", headers=_auth(token), json={"name": "Belo Vale II"}
+            "/api/farms/new", headers=_auth(token), json={"name": "Belo Vale II", "producer_account_id": account.json()["id"]}
         )
 
         assert response.status_code == 201
         assert response.json()["name"] == "Belo Vale II"
 
     def test_reviewer_cannot_create_a_farm(self, api, db) -> None:
+        from uuid import uuid4
         token = _user(db, "revisor@belovale", "reviewer")
 
-        response = api.post("/api/farms", headers=_auth(token), json={"name": "Outra"})
+        response = api.post("/api/farms/new", headers=_auth(token), json={"name": "Outra", "producer_account_id": str(uuid4())})
 
         assert response.status_code == 403
 
@@ -265,7 +269,7 @@ class TestAnimalsEndpoints:
         )
 
         assert response.status_code == 409
-        assert "monofazenda" in response.json()["detail"].lower()
+        assert "escolha a fazenda" in response.json()["detail"].lower()
 
     def test_search_by_brinco(self, api, db) -> None:
         _farm(db)

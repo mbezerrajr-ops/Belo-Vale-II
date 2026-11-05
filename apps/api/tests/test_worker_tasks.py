@@ -65,6 +65,10 @@ def test_process_extraction_run_succeeds_across_repeated_calls_in_one_process(
                 )
                 session.add(sender)
                 await session.commit()
+                from tests.legacy_tenancy import grant_in_session
+                await grant_in_session(session)
+                await session.commit()
+                await session.refresh(farm)
                 created = await create_import(
                     session,
                     storage,

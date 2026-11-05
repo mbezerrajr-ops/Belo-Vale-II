@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.audio.speech_reader import SpokenEventReader
 from app.audio.transcriber import FAKE_SPEECH, FakeAudioTranscriber
 from app.core.farm_clock import FARM_TZ
+from tests.legacy_tenancy import grant_in_session
 from app.db.models import EventProposal, EventProposalSource, ExtractionRun, Farm, MediaAsset, User
 from app.services.event_extraction import FakeEventExtractor
 from app.services.ingestion import create_import
@@ -93,6 +94,9 @@ def _run(conteudo: bytes, body) -> None:
                 )
                 session.add(user)
                 await session.commit()
+                await grant_in_session(session)
+                await session.commit()
+                await session.refresh(farm)
                 storage = InMemoryObjectStorage()
                 created = await create_import(
                     session,

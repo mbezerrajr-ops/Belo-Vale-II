@@ -4,6 +4,9 @@ import io
 from dataclasses import dataclass
 
 from PIL import Image, ImageOps
+from pillow_heif import register_heif_opener
+
+register_heif_opener()
 
 
 @dataclass(frozen=True)

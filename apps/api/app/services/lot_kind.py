@@ -20,6 +20,9 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from contextvars import ContextVar
+
+active_lots: ContextVar[list[dict] | None] = ContextVar("active_lots", default=None)
 
 KIND_DIET = "diet"
 KIND_MANAGEMENT = "management"
@@ -67,6 +70,9 @@ def classify_lot(lote: str | None) -> str | None:
     folded = _fold(lote)
     if not folded:
         return None
+    configured = active_lots.get()
+    if configured is not None:
+        return next((item["kind"] for item in configured if _fold(item["name"]) == folded), KIND_MANAGEMENT)
     if folded in _DIET_FOLDED:
         return KIND_DIET
     return KIND_MANAGEMENT
@@ -77,4 +83,7 @@ def is_known_lot(lote: str | None) -> bool:
     if lote is None:
         return False
     folded = _fold(lote)
+    configured = active_lots.get()
+    if configured is not None:
+        return any(_fold(item["name"]) == folded for item in configured)
     return folded in _DIET_FOLDED or folded in _MANAGEMENT_FOLDED

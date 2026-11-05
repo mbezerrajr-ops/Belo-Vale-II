@@ -1,8 +1,7 @@
 """Endpoints do cadastro mestre: fazenda e animais.
 
-A fazenda é resolvida no servidor. Nenhum endpoint aceita `farm_id` do
-cliente: numa operação monofazenda, deixar o cliente escolher a fazenda seria
-autorização de domínio delegada ao navegador.
+A seleção de fazenda vem no cabeçalho e só vale depois de conferir o vínculo
+da identidade no servidor. Cada serviço recebe a fazenda autorizada.
 """
 
 from __future__ import annotations
@@ -19,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.farm_clock import farm_today
 from app.core.security import require_minimum_role
+from app.core.tenancy import FarmAccess, get_farm_access
 from app.db.models import Animal, Farm, User
 from app.db.session import get_db_session
 from app.schemas.registry import (
@@ -63,32 +63,9 @@ router = APIRouter(prefix="/api", tags=["registry"])
 
 
 async def resolve_current_farm(
-    session: Annotated[AsyncSession, Depends(get_db_session)],
+    access: Annotated[FarmAccess, Depends(get_farm_access)],
 ) -> Farm:
-    """A fazenda da operação, resolvida no servidor.
-
-    Enquanto a operação for monofazenda, existe exatamente uma. Mais de uma é
-    um estado que este modo não sabe desambiguar sozinho — falhar aqui é mais
-    seguro do que escolher uma.
-    """
-    farms = list(await session.scalars(select(Farm).order_by(Farm.created_at)))
-    if not farms:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Nenhuma fazenda cadastrada. Crie a primeira em POST /api/farms."
-            ),
-        )
-    if len(farms) > 1:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Mais de uma fazenda cadastrada, mas a operação está configurada "
-                "como monofazenda. Defina o modelo de autorização por fazenda "
-                "antes de seguir."
-            ),
-        )
-    return farms[0]
+    return access.farm
 
 
 def _conflict(error: AnimalRegistryError) -> HTTPException:
@@ -112,8 +89,15 @@ async def create_farm(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     _: Annotated[User, Depends(require_minimum_role("admin"))],
 ) -> Farm:
-    farm = Farm(name=payload.name, code=payload.code)
+    from app.db.models import FarmMembership
+    from app.routers.tenancy import producer_admin
+    await producer_admin(session, _.user, _.farm.producer_account_id)
+    # Este caminho acrescenta uma fazenda à mesma conta produtora. O cadastro
+    # da primeira fazenda é oferecido pelo onboarding de produtores.
+    farm = Farm(name=payload.name, code=payload.code, producer_account_id=_.farm.producer_account_id)
     session.add(farm)
+    await session.flush()
+    session.add(FarmMembership(farm_id=farm.id, user_id=_.id, role="admin"))
     await session.commit()
     return farm
 

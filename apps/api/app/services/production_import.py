@@ -354,6 +354,9 @@ async def commit_import(
     if previous is not None:
         return CommitResult(production_import=previous, already_imported=True)
 
+    from app.services.tenant_limits import reserve_capacity
+    await reserve_capacity(session, farm_id, len(content), reading=False)
+
     preview = await build_preview(
         session,
         farm_id=farm_id,

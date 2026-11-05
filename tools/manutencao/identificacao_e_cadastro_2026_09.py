@@ -31,6 +31,7 @@ import openpyxl
 from sqlalchemy import select
 
 from app.db.models import Animal, AnimalLotAssignment, OfficialMeasurement, User
+from app.core.legacy_maintenance import require_legacy_single_farm
 from app.db.session import get_session_factory
 from app.services.animal_merge import merge_animals, plan_merge
 from app.services.animal_registry import assign_lot, create_animal, link_brinco, update_animal
@@ -98,7 +99,7 @@ async def main(autor: str, aplicar: bool) -> int:
         usuario = await s.scalar(select(User).where(User.email == autor))
         if usuario is None or usuario.role != "admin":
             raise SystemExit(f"{autor} não é administrador nesta instalação")
-        fazenda = await s.scalar(select(Animal.farm_id).limit(1))
+        fazenda = await require_legacy_single_farm(s)
 
         print("== 1. Vacas a identificar de 25/08 ==")
         baiana = await uma(s, Animal.name == "BAIANA", Animal.numero_legado == "390")

@@ -16,6 +16,7 @@ import {
   enterReading,
   getProductionSheet,
   voidReading,
+  getActiveFarmId,
 } from "../../api/client";
 import {
   ApiError,
@@ -35,6 +36,8 @@ import { PrintPortal } from "../../ui/PrintPortal";
 import { PageHeader } from "../../ui/PageHeader";
 import { isTransient, withTimeout, type QueuedReading } from "../../offline/outbox";
 import { useOutbox } from "../../offline/OutboxContext";
+import { loadStoredUser } from "../../auth/session";
+import { useActiveFarm } from "../workspace/context";
 
 /**
  * Lançamento de produção, vaca a vaca.
@@ -61,16 +64,17 @@ const QUEUED =
   "Sem sinal — guardado neste celular. Vai sozinho quando o sinal voltar.";
 
 /**
- * A última folha vista de cada lote e dia, na aba: sem sinal, dá para lançar
- * no curral com a lista de vacas que se tinha. Vai junto com a sessão.
+ * A última folha vista de cada usuário/fazenda/lote/dia fica no aparelho,
+ * inclusive após fechar a aba. Não é compartilhada com outra identidade.
  */
 function sheetKey(day: string, lote: string | null): string {
-  return `belo-vale.folha:${day}|${lote ?? ""}`;
+  const userId = loadStoredUser()?.id ?? "";
+  return `belo-vale.folha:${userId}|${getActiveFarmId() ?? ""}|${day}|${lote ?? ""}`;
 }
 
 function rememberSheet(day: string, lote: string | null, sheet: ProductionSheet): void {
   try {
-    sessionStorage.setItem(sheetKey(day, lote), JSON.stringify({ at: Date.now(), sheet }));
+    localStorage.setItem(sheetKey(day, lote), JSON.stringify({ at: Date.now(), sheet }));
   } catch {
     // Sem espaço: só não haverá a folha guardada.
   }
@@ -78,7 +82,7 @@ function rememberSheet(day: string, lote: string | null, sheet: ProductionSheet)
 
 function rememberedSheet(day: string, lote: string | null): { at: number; sheet: ProductionSheet } | null {
   try {
-    const raw = sessionStorage.getItem(sheetKey(day, lote));
+    const raw = localStorage.getItem(sheetKey(day, lote));
     return raw ? (JSON.parse(raw) as { at: number; sheet: ProductionSheet }) : null;
   } catch {
     return null;
@@ -462,6 +466,7 @@ function PrintSheet({
   lote: string | null;
   day: string;
 }): JSX.Element {
+  const activeFarm = useActiveFarm();
   const saved = items.filter((item) => rows[item.animal_id]?.saved);
   const filled = saved.length > 0;
   const reference = previousDate(items);
@@ -571,7 +576,7 @@ function PrintSheet({
         <div className="ps-sign">Anotado por</div>
         <div className="ps-sign">Conferido por</div>
         <p>
-          Impresso em {brDate(farmToday())} · Belo Vale II · {lote} · {items.length} vacas
+          Impresso em {brDate(farmToday())} · {activeFarm?.name ?? "Belo Vale II"} · {lote} · {items.length} vacas
         </p>
       </footer>
     </div>
@@ -713,6 +718,7 @@ export function ProductionPage({
   }
 
   async function save(animalId: string, input: ReadingInput): Promise<void> {
+    const originFarm = getActiveFarmId();
     patch(animalId, { status: "saving", message: null });
     try {
       const result = await withTimeout(onEnter(token, animalId, day, input), SAVE_TIMEOUT_MS);
@@ -731,14 +737,18 @@ export function ProductionPage({
       // primeiro envio tiver chegado, reenviar o mesmo valor é seguro.
       if (queue && isTransient(error)) {
         const item = items.find((entry) => entry.animal_id === animalId);
-        await queue.outbox.addReading({
+        try { await queue.outbox.addReading({
           userId: queue.userId,
+          farmId: originFarm ?? undefined,
           animalId,
           label: item ? label(item) : "vaca",
           measuredOn: day,
           producao: input.producao ?? 0,
           observacao: input.observacao ?? null,
-        });
+        }); } catch {
+          patch(animalId, { status: "error", message: "Não foi possível guardar neste celular. Confira o espaço disponível. Mantenha a tela aberta para tentar novamente." });
+          return;
+        }
         patch(animalId, { status: "queued", message: QUEUED });
         return;
       }

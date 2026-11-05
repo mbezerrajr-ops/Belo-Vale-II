@@ -64,9 +64,15 @@ async def reprocess(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     dispatcher: Annotated[ExtractionDispatcher, Depends(get_extraction_dispatcher)],
     user: Annotated[User, Depends(require_minimum_role("operator"))],
+    farm: Annotated[Farm, Depends(resolve_current_farm)],
 ) -> dict[str, str]:
     # Quem enviou tenta de novo a leitura que falhou; ler de novo a que deu
     # certo é de revisor.
+    from app.db.models import Import
+    record = await session.get(Import, import_id)
+    if record is None or record.farm_id != farm.id:
+        from app.services.ingestion import ImportNotFoundError
+        raise ImportNotFoundError(str(import_id))
     created = await reprocess_import(
         session, import_id=import_id, only_if_failed=not has_minimum_role(user, "reviewer")
     )

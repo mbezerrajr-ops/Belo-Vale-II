@@ -4952,3 +4952,26 @@ h2[tabindex="-1"]:focus,
   padding-left: 1.3rem;
   line-height: 1.45;
 }
+img.upload-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  margin-block: 12px;
+  border-radius: 8px;
+}
+ .workspace-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--surface, #fff);
+  border-bottom: 1px solid var(--line, #ddd);
+ }
+ .workspace-bar select { min-height: 44px; max-width: min(100%, 360px); font-size: 16px; }
+ .farm-management { padding-bottom: 100px; }
+ .farm-management form { display: grid; gap: 10px; max-width: 640px; padding: 20px 0; border-bottom: 1px solid var(--line, #ddd); }
+ .farm-management input, .farm-management select, .farm-management textarea { min-height: 44px; max-width: 100%; font: inherit; font-size: 16px; padding: 8px; }
+ .account-entry { display: grid; gap: 10px; }
+ .catalogue-preview { overflow: auto; max-height: 360px; }

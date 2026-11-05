@@ -30,6 +30,7 @@ import sys
 from sqlalchemy import select
 
 from app.db.models import Animal, User
+from app.core.legacy_maintenance import require_legacy_single_farm
 from app.db.session import get_session_factory
 from app.services.animal_merge import merge_animals, plan_merge
 from app.services.animal_registry import link_brinco, unlink_brinco
@@ -67,7 +68,7 @@ async def main(autor: str, aplicar: bool) -> int:
         if usuario is None or usuario.role != "admin":
             raise SystemExit(f"{autor} não é administrador nesta instalação")
         # Monofazenda: a fazenda é a das fichas.
-        fazenda = await session.scalar(select(Animal.farm_id).limit(1))
+        fazenda = await require_legacy_single_farm(session)
 
         print("== Passo 1: correções de 19/09 ==")
         redonda = await uma(session, name="REDONDA", brinco="B2-649")

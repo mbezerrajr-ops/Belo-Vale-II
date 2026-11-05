@@ -12,7 +12,8 @@ import {
 } from "./api/client";
 import type { AnimalDetail, CurrentUser, Farm } from "./api/types";
 import { ApiError } from "./api/types";
-import { LoginForm } from "./auth/LoginForm";
+import { AccountEntry } from "./auth/AccountEntry";
+import { Workspace } from "./features/workspace/Workspace";
 import { LoginBranch, LoginLandscape } from "./auth/LoginLandscape";
 import {
   clearStoredToken,
@@ -29,7 +30,7 @@ import { AreaBoundary } from "./ui/AreaBoundary";
 import { InstallHint } from "./ui/InstallHint";
 import { closeAndReturn, usePanelFocus } from "./ui/usePanelFocus";
 import { useRoute, type AreaRoute } from "./router";
-import { deviceOutbox } from "./offline/outbox";
+import { deviceOutbox, isTransient } from "./offline/outbox";
 import { OutboxProvider, useOutbox } from "./offline/OutboxContext";
 import { OfflineBanner, OutboxButton } from "./offline/OutboxStatus";
 
@@ -102,8 +103,16 @@ export function App(): JSX.Element {
         }
       }
 
-      const renewed = await refreshSession().catch(() => null);
+      let renewed;
+      try { renewed = await refreshSession(); }
+      catch (error) {
+        const cached = loadStoredUser();
+        if (!cancelled && cached && isTransient(error)) setSession({ status: "signed-in", token: "offline", user: cached });
+        else if (!cancelled) setSession({ status: "signed-out" });
+        return;
+      }
       if (renewed === null) {
+        clearStoredToken();
         if (!cancelled) setSession({ status: "signed-out" });
         return;
       }
@@ -183,7 +192,11 @@ export function App(): JSX.Element {
   // envio atrasado renova antes de desistir.
   const renewToken = async (): Promise<string | null> => {
     const renewed = await refreshSession();
-    if (renewed === null) return null;
+    if (renewed === null) {
+      clearStoredToken();
+      setSession({ status: "signed-out" });
+      return null;
+    }
     storeToken(renewed.access_token);
     setSession((current) =>
       current.status === "signed-in" ? { ...current, token: renewed.access_token } : current,
@@ -283,7 +296,7 @@ export function App(): JSX.Element {
                 <small>Gestão do rebanho leiteiro</small>
               </span>
             </h1>
-            <LoginForm onLoggedIn={handleLoggedIn} />
+            <AccountEntry onLoggedIn={handleLoggedIn} />
           </section>
           <LoginLandscape />
         </div>
@@ -306,6 +319,7 @@ interface AuthenticatedAppProps {
   user: CurrentUser;
   onLogout: () => void;
   onRenew?: () => Promise<string | null>;
+  selectedFarm?: Farm;
 }
 
 /** Áreas do aplicativo. `painel` abre primeiro: é a visão do dia. */
@@ -351,15 +365,21 @@ function initials(email: string): string {
 function AuthenticatedApp(props: AuthenticatedAppProps): JSX.Element {
   const { token, user, onRenew } = props;
   return (
+    <Workspace token={token} user={user} onLogout={props.onLogout}>
+      {(activeUser, farmKey, selectedFarm) => (
     <OutboxProvider
+      key={farmKey}
       outbox={deviceOutbox()}
       userId={user.id}
+      farmId={selectedFarm.id}
       token={token}
       renew={onRenew ?? (async () => null)}
       send={{ enterReading, uploadImport }}
     >
-      <AppShell {...props} />
+      <AppShell {...props} user={activeUser} selectedFarm={selectedFarm} />
     </OutboxProvider>
+      )}
+    </Workspace>
   );
 }
 
@@ -367,6 +387,7 @@ function AppShell({
   token,
   user,
   onLogout: endSessionNow,
+  selectedFarm,
 }: AuthenticatedAppProps): JSX.Element {
   // Sair com algo guardado: avisa que fica no celular, esperando esta conta.
   const queue = useOutbox();
@@ -386,7 +407,7 @@ function AppShell({
   // A área e a ficha aberta vêm do endereço: recarregar, voltar e mandar o
   // link funcionam como se espera de qualquer página.
   const { route, navigate, replace } = useRoute();
-  const [farm, setFarm] = useState<Farm | null>(null);
+  const [farm, setFarm] = useState<Farm | null>(selectedFarm ?? null);
   const [farmError, setFarmError] = useState<string | null>(null);
   const [animal, setAnimal] = useState<AnimalDetail | null>(null);
   const [animalError, setAnimalError] = useState<string | null>(null);
@@ -416,6 +437,7 @@ function AppShell({
         if (!cancelled) setFarm(resolved);
       })
       .catch((error: unknown) => {
+        if (selectedFarm && (!(error instanceof ApiError) || error.status >= 500)) return;
         const body = (error as { body?: { detail?: string } })?.body;
         if (!cancelled) {
           setFarmError(
@@ -511,8 +533,9 @@ function AppShell({
 
   useEffect(() => {
     const titulo = area === "animais" && animal && openAnimalId ? animal.name ?? animal.brinco : AREA_LABEL[area];
-    document.title = titulo ? `${titulo} · Belo Vale II` : "Belo Vale II";
-  }, [area, animal, openAnimalId]);
+    const name = farm?.name ?? selectedFarm?.name ?? "Belo Vale II";
+    document.title = titulo ? `${titulo} · ${name}` : name;
+  }, [area, animal, openAnimalId, farm?.name, selectedFarm?.name]);
 
   // O voltar do celular também fecha o painel Mais. (Os toques na barra já
   // fecham por conta própria; a correção inicial do endereço não fecha.)
@@ -529,15 +552,11 @@ function AppShell({
 
   return (
     <div className="shell">
-      {/* Teclado: pula os botões da barra direto para a tela. */}
-      <a className="skip-link" href="#conteudo">
-        Pular para o conteúdo
-      </a>
       <header className="topbar">
         <h1 className="wordmark">
           <LogoMark />
           <span>
-            <strong>Belo Vale II</strong>
+            <strong>{farm?.name ?? selectedFarm?.name ?? "Belo Vale II"}</strong>
             <small>Gestão do rebanho leiteiro</small>
           </span>
         </h1>

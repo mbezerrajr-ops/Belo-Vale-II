@@ -5,6 +5,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    BigInteger,
     LargeBinary,
     CheckConstraint,
     Boolean,
@@ -56,6 +57,9 @@ class Farm(TimestampedModel, Base):
     code: Mapped[str | None] = mapped_column(String(64), unique=True)
     #: Preço pago por litro. Base do cálculo de receita no painel.
     milk_price_per_liter: Mapped[float | None] = mapped_column(Numeric(10, 4))
+    producer_account_id: Mapped[UUID | None] = mapped_column(ForeignKey("producer_accounts.id", ondelete="RESTRICT"), index=True)
+    timezone: Mapped[str] = mapped_column(String(64), default="America/Recife", server_default=text("'America/Recife'"), nullable=False)
+    lot_settings: Mapped[list[dict]] = mapped_column(JSONB, default=list, server_default=text("'[]'::jsonb"), nullable=False)
     animals: Mapped[list[Animal]] = relationship(back_populates="farm")
 
 
@@ -89,6 +93,47 @@ class User(TimestampedModel, Base):
     password_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    email_verification_required: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"), nullable=False)
+    is_platform_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"), nullable=False)
+
+
+class ProducerAccount(TimestampedModel, Base):
+    __tablename__ = "producer_accounts"
+    id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()"))
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    storage_limit_bytes: Mapped[int] = mapped_column(BigInteger, default=1_000_000_000, server_default=text("1000000000"), nullable=False)
+    daily_reading_limit: Mapped[int] = mapped_column(Integer, default=100, server_default=text("100"), nullable=False)
+
+
+class ProducerMembership(TimestampedModel, Base):
+    __tablename__ = "producer_memberships"
+    __table_args__ = (CheckConstraint("role IN ('owner', 'admin')", name="ck_producer_membership_role"),)
+    producer_account_id: Mapped[UUID] = mapped_column(ForeignKey("producer_accounts.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+
+
+class FarmMembership(TimestampedModel, Base):
+    __tablename__ = "farm_memberships"
+    __table_args__ = (CheckConstraint("role IN ('operator', 'reviewer', 'admin')", name="ck_farm_membership_role"),)
+    farm_id: Mapped[UUID] = mapped_column(ForeignKey("farms.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"), nullable=False)
+
+
+class AccountToken(TimestampedModel, Base):
+    __tablename__ = "account_tokens"
+    id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()"))
+    user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    farm_id: Mapped[UUID | None] = mapped_column(ForeignKey("farms.id", ondelete="CASCADE"))
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    purpose: Mapped[str] = mapped_column(String(16), nullable=False)
+    role: Mapped[str | None] = mapped_column(String(16))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Animal(TimestampedModel, Base):

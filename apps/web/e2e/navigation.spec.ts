@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import {
   E2E_ADMIN_EMAIL,
   E2E_ADMIN_PASSWORD,
+  E2E_FARM_NAME,
   createMilkingCow,
   ensureAdminExists,
   ensureFarm,
@@ -32,7 +33,7 @@ test("recarregar mantém a área", async ({ page }) => {
   await page.reload();
 
   await expect(page.getByRole("heading", { name: "Insumos e dieta" })).toBeVisible();
-  await expect(page).toHaveTitle("Insumos · Belo Vale II");
+  await expect(page).toHaveTitle(`Insumos · ${E2E_FARM_NAME}`);
 });
 
 test("ficha tem link; voltar devolve a busca como estava", async ({ page }) => {

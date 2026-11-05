@@ -56,6 +56,13 @@ export function ensureFarm(): string {
       `INSERT INTO farms (id, name) VALUES (gen_random_uuid(), '${E2E_FARM_NAME}') RETURNING id`,
     );
   }
+  let accountId = psql(`SELECT producer_account_id FROM farms WHERE id='${farmId}'`);
+  if (!accountId) {
+    accountId = psql(`INSERT INTO producer_accounts(name) VALUES ('Produtor E2E') RETURNING id`);
+    psql(`UPDATE farms SET producer_account_id='${accountId}', lot_settings='[{"name":"LOTE 1","kind":"diet"},{"name":"LOTE 2","kind":"diet"},{"name":"LOTE 3","kind":"diet"}]'::jsonb WHERE id='${farmId}'`);
+  }
+  psql(`INSERT INTO producer_memberships(producer_account_id,user_id,role) SELECT '${accountId}',id,'owner' FROM users WHERE email='${E2E_ADMIN_EMAIL}' ON CONFLICT DO NOTHING`);
+  psql(`INSERT INTO farm_memberships(farm_id,user_id,role,is_active) SELECT '${farmId}',id,role,is_active FROM users WHERE email LIKE '%@belovale.test' ON CONFLICT DO NOTHING`);
   return farmId;
 }
 
@@ -153,6 +160,7 @@ export function loadProposals(extraction: object, label: string): void {
     [
       "api", "uv", "run", "--no-sync", "python", "-m", "app.core.load_proposals",
       "--email", E2E_ADMIN_EMAIL, "--file", "-", "--label", label, "--kind", "photo",
+      "--farm-id", ensureFarm(),
     ],
     JSON.stringify(extraction),
   );

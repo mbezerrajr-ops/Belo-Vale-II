@@ -50,6 +50,7 @@ _CLEANUP = (
     "DELETE FROM imports",
     "DELETE FROM farms",
     "DELETE FROM users",
+    "DELETE FROM producer_accounts",
 )
 
 
@@ -136,6 +137,8 @@ def make_user(role: str, email: str | None = None) -> tuple[str, str]:
         h=hash_password(PASSWORD),
         r=role,
     )[0][0]
+    from tests.legacy_tenancy import grant_legacy_memberships
+    grant_legacy_memberships()
     return str(user_id), create_access_token(user_id, SECRET, 3600)
 
 
@@ -144,7 +147,10 @@ def auth(token: str) -> dict[str, str]:
 
 
 def make_farm(name: str = "Belo Vale II") -> str:
-    return str(one("INSERT INTO farms (name) VALUES (:n) RETURNING id", n=name)[0][0])
+    farm_id = str(one("INSERT INTO farms (name) VALUES (:n) RETURNING id", n=name)[0][0])
+    from tests.legacy_tenancy import grant_legacy_memberships
+    grant_legacy_memberships()
+    return farm_id
 
 
 def make_animal(

@@ -101,6 +101,9 @@ export function OutboxButton(): JSX.Element | null {
                   {item.error ? (
                     <>
                       <small>Não enviado: {item.error}</small>
+                      <button type="button" className="secondary" onClick={() => {
+                        void queue.outbox.retry(item.id, queue.userId).then(queue.flushNow);
+                      }}>Tentar enviar novamente</button>
                       <button
                         type="button"
                         className="secondary danger"

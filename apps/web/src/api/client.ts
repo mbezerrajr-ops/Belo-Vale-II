@@ -36,6 +36,25 @@ import {
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+let activeFarmId: string | null = null;
+export function setActiveFarmId(farmId: string | null): void { activeFarmId = farmId; }
+export function getActiveFarmId(): string | null { return activeFarmId; }
+
+export async function workspaceRequest<T>(path: string, token: string, method = "GET", body?: unknown): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}/api${path}`, {
+    method, headers: { ...authHeaders(token), ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  if (response.status === 204 && response.ok) return undefined as T;
+  return parseJsonOrThrow<T>(response);
+}
+
+export async function accountRequest(path: string, body: unknown): Promise<{ message: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  return parseJsonOrThrow<{ message: string }>(response);
+}
+
+export function listFarms(token: string): Promise<Farm[]> { return workspaceRequest("/farms", token); }
 
 async function parseJsonOrThrow<T>(response: Response): Promise<T> {
   // Nem toda resposta vem da nossa API: um envio grande demais morre no
@@ -50,8 +69,8 @@ async function parseJsonOrThrow<T>(response: Response): Promise<T> {
   return body as T;
 }
 
-function authHeaders(token: string): HeadersInit {
-  return { Authorization: `Bearer ${token}` };
+function authHeaders(token: string, farmId: string | null = activeFarmId): HeadersInit {
+  return { Authorization: `Bearer ${token}`, ...(farmId ? { "X-Farm-ID": farmId } : {}) };
 }
 
 export async function login(
@@ -126,7 +145,7 @@ export async function uploadImport(
 
   const response = await fetch(`${API_BASE_URL}/api/imports`, {
     method: "POST",
-    headers: authHeaders(token),
+    headers: authHeaders(token, input.farmId),
     body: formData,
   });
   return parseJsonOrThrow<UploadResult>(response);
@@ -191,8 +210,8 @@ export async function getMeasurements(
 
 // --- Cadastro mestre ---
 //
-// Nenhuma destas funções recebe `farm_id`: a fazenda é resolvida no servidor.
-// Pedir isso ao usuário seria expor um UUID a quem só quer achar uma vaca.
+// A fazenda selecionada acompanha as chamadas no cabeçalho. A fila usa a
+// origem gravada no item; o servidor sempre confere os vínculos.
 
 function jsonHeaders(token: string): HeadersInit {
   return { ...authHeaders(token), "Content-Type": "application/json" };
@@ -532,10 +551,11 @@ export async function enterReading(
   animalId: string,
   measuredOn: string,
   input: number | ReadingInput,
+  farmId: string | null = activeFarmId,
 ): Promise<Reading> {
   const response = await fetch(`${API_BASE_URL}/api/production`, {
     method: "POST",
-    headers: jsonHeaders(token),
+    headers: { ...authHeaders(token, farmId), "Content-Type": "application/json" },
     body: JSON.stringify({ animal_id: animalId, measured_on: measuredOn, ...readingBody(input) }),
   });
   return parseJsonOrThrow<Reading>(response);

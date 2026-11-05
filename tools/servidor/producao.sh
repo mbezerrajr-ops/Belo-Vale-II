@@ -49,8 +49,11 @@ subir)
 atualizar)
   "$REPO/tools/servidor/backup.sh"
   git -C "$REPO" pull --ff-only
-  compose up -d --build --wait
-  compose exec -T api uv run --no-sync alembic upgrade head
+  compose build api worker web
+  # Migrações aditivas antes de trocar os serviços: uma recusa de migração
+  # mantém a aplicação anterior, em vez de iniciar código sobre schema antigo.
+  compose run --rm --no-deps api uv run --no-sync alembic upgrade head
+  compose up -d --wait
   responde "$APP/healthz" || { echo "O app não voltou. Veja: $0 registros api" >&2; exit 1; }
   # As imagens antigas e o cache da compilação enchem o disco aos poucos.
   docker image prune -f >/dev/null

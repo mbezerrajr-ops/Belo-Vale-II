@@ -1,5 +1,10 @@
 # Runbook de produção — Belo Vale II no servidor
 
+Atualização de 05/11/2026: o titular confirmou que o site real está em outro
+notebook com Windows. Para essa instalação, seguir o
+[runbook Windows](runbook-producao-windows.md). Este documento descreve a
+instalação Linux e seu histórico; não presumir que ela hospeda o site atual.
+
 Como o sistema roda de verdade, para a fazenda usar pelo celular. O ambiente de
 desenvolvimento e testes continua no [runbook local](runbook-local.md). Até
 07/10/2026 a produção rodava num PC com Windows: ver

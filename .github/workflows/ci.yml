@@ -84,6 +84,9 @@ jobs:
         working-directory: apps/api
     steps:
       - uses: actions/checkout@v4
+        with:
+          # O ensaio de migração monta a origem com o commit anterior.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -145,11 +148,11 @@ jobs:
       # redis e minio por dependência) e confere o worker à parte.
       - name: Subir a pilha
         run: |
-          docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml up -d --build
-          docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml up -d --wait --wait-timeout 180 api web
-          test -n "$(docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml ps --status running -q worker)"
+          docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml -f infra/docker-compose.e2e.yml up -d --build
+          docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml -f infra/docker-compose.e2e.yml up -d --wait --wait-timeout 180 api web
+          test -n "$(docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml -f infra/docker-compose.e2e.yml ps --status running -q worker)"
       - name: Migrations
-        run: docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml exec -T api uv run --no-sync alembic upgrade head
+        run: docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml -f infra/docker-compose.e2e.yml exec -T api uv run --no-sync alembic upgrade head
       # `/healthz` não toca o banco, então a API passa por "saudável" antes de
       # abrir a primeira conexão real ao Postgres (a engine do SQLAlchemy é
       # preguiçosa, e `pool_pre_ping` soma outro round-trip nessa primeira
@@ -192,4 +195,4 @@ jobs:
           retention-days: 7
       - name: Logs da pilha em caso de falha
         if: failure()
-        run: docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml logs --no-color --tail 200
+        run: docker compose --env-file infra/.env.e2e -f infra/docker-compose.yml -f infra/docker-compose.e2e.yml logs --no-color --tail 200

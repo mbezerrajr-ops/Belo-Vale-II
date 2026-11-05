@@ -21,13 +21,17 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
-from app.db.models import Farm, User
+from app.db.models import User
+from app.core.tenancy import available_farms
+from app.core.farm_clock import farm_timezone
+from app.services.lot_kind import active_lots
 from app.services.event_extraction import ExtractionFormatError, extraction_from_dict
 from app.services.event_proposals import SOURCE_KINDS, create_proposals
 
@@ -36,7 +40,7 @@ class LoadError(Exception):
     """Carga recusada. A mensagem vai para o terminal."""
 
 
-async def _load(email: str, path: Path, kind: str, label: str) -> int:
+async def _load(email: str, path: Path, kind: str, label: str, farm_id: UUID | None = None) -> int:
     try:
         # "-" lê da entrada padrão: útil para mandar a extração para dentro
         # de um contêiner sem copiar arquivo.
@@ -60,11 +64,15 @@ async def _load(email: str, path: Path, kind: str, label: str) -> int:
             )
             if user is None:
                 raise LoadError(f"Nenhuma conta ativa com o e-mail {email}.")
-            farms = list(await session.scalars(select(Farm)))
+            farms = [farm for farm, _ in await available_farms(session, user)]
+            if farm_id is not None:
+                farms = [farm for farm in farms if farm.id == farm_id]
             if len(farms) != 1:
                 raise LoadError(
-                    "A carga exige exatamente uma fazenda cadastrada (operação monofazenda)."
+                    "Informe --farm-id de uma fazenda à qual a conta tenha acesso."
                 )
+            farm_timezone.set(farms[0].timezone)
+            active_lots.set(farms[0].lot_settings)
             await create_proposals(
                 session,
                 farm_id=farms[0].id,
@@ -87,10 +95,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--kind", default="text", choices=SOURCE_KINDS)
     parser.add_argument("--label", default="", help="Nome exibido na caixa de revisão.")
+    parser.add_argument("--farm-id", type=UUID, help="Fazenda autorizada de destino; obrigatória se houver mais de uma disponível.")
     args = parser.parse_args(argv)
 
     try:
-        count = asyncio.run(_load(args.email, args.file, args.kind, args.label))
+        count = asyncio.run(_load(args.email, args.file, args.kind, args.label, args.farm_id))
     except LoadError as error:
         print(f"erro: {error}", file=sys.stderr)
         return 2

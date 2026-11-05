@@ -9,10 +9,13 @@
  */
 
 /** Deslocamento fixo da fazenda, o mesmo do servidor. */
-const FARM_OFFSET_MS = 3 * 60 * 60 * 1000;
+let selectedTimezone = "America/Recife";
+export function setFarmTimezone(value: string): void { selectedTimezone = value; }
 
 export function farmToday(now: Date = new Date()): string {
-  return new Date(now.getTime() - FARM_OFFSET_MS).toISOString().slice(0, 10);
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: selectedTimezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const part = (name: string): string => parts.find((item) => item.type === name)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 /** `2026-09-18` → `18/09/2026`. */

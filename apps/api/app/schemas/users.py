@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Role = Literal["operator", "reviewer", "admin"]
 
@@ -29,6 +29,11 @@ class UserUpdate(BaseModel):
 
     role: Role | None = None
     is_active: bool | None = None
+    @field_validator("role", "is_active")
+    @classmethod
+    def no_explicit_null(cls, value):
+        if value is None: raise ValueError("Informe um valor válido.")
+        return value
 
 
 class PasswordChange(BaseModel):
