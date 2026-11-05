@@ -64,8 +64,11 @@ switch ($Comando) {
   "atualizar" {
     $r = Read-Host "Rodar o backup antes de atualizar? (S/n)"
     if ($r -ne "n") { & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Repo "tools\backup\backup.ps1") }
-    Compose @("up", "-d", "--build", "--wait")
-    Compose @("exec", "-T", "api", "uv", "run", "--no-sync", "alembic", "upgrade", "head")
+    Compose @("build", "api", "worker", "web")
+    # Validar a migração antes de substituir os serviços que estão no ar.
+    # Uma recusa mantém a versão anterior atendendo sobre o banco anterior.
+    Compose @("run", "--rm", "--no-deps", "api", "uv", "run", "--no-sync", "alembic", "upgrade", "head")
+    Compose @("up", "-d", "--wait")
     if (-not (Responde "http://127.0.0.1:8090/healthz")) { throw "O app não voltou. Veja: tools\producao.ps1 registros api" }
     "Atualizado e no ar."
   }
