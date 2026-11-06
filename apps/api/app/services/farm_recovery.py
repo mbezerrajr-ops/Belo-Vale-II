@@ -140,6 +140,15 @@ async def recover_farm(session, snapshot, media, storage, *, apply=False):
     # Identidades atuais prevalecem: uma recuperação nunca troca a senha,
     # estado global ou privilégios de alguém que já usa a plataforma.
     existing_users = set()
+    occupied_users = set(
+        (
+            await session.scalars(
+                select(tables["farm_memberships"].c.user_id).where(
+                    tables["farm_memberships"].c.is_active
+                )
+            )
+        ).all()
+    )
     for row in snapshot["users"]:
         existing = await session.scalar(
             select(tables["users"].c.id).where(
@@ -183,6 +192,9 @@ async def recover_farm(session, snapshot, media, storage, *, apply=False):
                     row["name"] += " (recuperação)"
                 if name == "users":
                     row["is_platform_admin"] = False
+                if name == "farm_memberships" and row["user_id"] in occupied_users:
+                    # A cópia não pode conceder uma segunda fazenda à identidade.
+                    row["is_active"] = False
                 if name == "animals" and row["merged_into_id"]:
                     merged.append((row["id"], row["merged_into_id"], row["merged_at"]))
                     row["merged_into_id"] = row["merged_at"] = None

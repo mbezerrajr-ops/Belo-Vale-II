@@ -1,10 +1,9 @@
 # Runbook de produção no Windows
 
-> **Confirmado pelo titular em 05/11/2026:** o site real roda em outro notebook
-> com Windows. Usar os scripts deste procedimento nessa máquina. Os detalhes
-> de hardware, endereços e configuração registrados em setembro abaixo são
-> históricos e devem ser conferidos no notebook atual. O
-> [runbook Linux](runbook-producao.md) descreve outra instalação.
+> **Histórico.** A hospedagem atual foi confirmada em 05/11/2026 no servidor
+> Ubuntu `belo-vale`: seguir o [runbook Linux](runbook-producao.md).
+> O notebook Windows é a estação de acesso. Os procedimentos abaixo continuam
+> disponíveis para instalações Windows, mas não atualizam a hospedagem atual.
 
 ## Atualização da ampliação para produtores e fazendas
 

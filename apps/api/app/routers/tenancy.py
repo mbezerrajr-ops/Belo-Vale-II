@@ -16,7 +16,7 @@ from app.core.security import (
     require_minimum_role,
     verify_password,
 )
-from app.core.tenancy import FarmAccess, available_farms
+from app.core.tenancy import FarmAccess, available_farms, ensure_single_farm
 from app.db.models import (
     AccountToken,
     AuditEvent,
@@ -213,7 +213,7 @@ async def verify(payload: TokenInput, session: DB):
         raise HTTPException(400, "Conta indisponível.")
     user.email_verified_at = record.consumed_at = datetime.now(UTC)
     await session.commit()
-    return {"message": "E-mail confirmado. Entre para administrar suas fazendas."}
+    return {"message": "E-mail confirmado. Entre para administrar sua fazenda."}
 
 
 @router.post(
@@ -305,6 +305,13 @@ async def new_account(payload: ProducerCreate, session: DB, user: Identity):
             403,
             "Confirme seu e-mail pelo cadastro ou pela recuperação de acesso antes de criar uma conta produtora.",
         )
+    await ensure_single_farm(session, user.id)
+    if await session.scalar(
+        select(ProducerMembership.user_id)
+        .where(ProducerMembership.user_id == user.id)
+        .limit(1)
+    ):
+        raise HTTPException(409, "Esta conta já possui um cadastro de produtor.")
     if not payload.name.strip():
         raise HTTPException(422, "Informe o nome da conta produtora.")
     account = ProducerAccount(name=payload.name.strip())
@@ -331,6 +338,18 @@ async def producer_admin(session, user, account_id, *, owner_only=False):
 @router.post("/farms/new", status_code=201)
 async def new_farm(payload: NewFarm, session: DB, user: Identity):
     await producer_admin(session, user, payload.producer_account_id)
+    await ensure_single_farm(session, user.id)
+    await session.scalar(
+        select(ProducerAccount.id)
+        .where(ProducerAccount.id == payload.producer_account_id)
+        .with_for_update()
+    )
+    if await session.scalar(
+        select(Farm.id)
+        .where(Farm.producer_account_id == payload.producer_account_id)
+        .limit(1)
+    ):
+        raise HTTPException(409, "Este produtor já possui sua fazenda cadastrada.")
     farm = Farm(
         **payload.model_dump(exclude={"lot_settings"}),
         lot_settings=[lot.model_dump() for lot in payload.lot_settings],
@@ -417,6 +436,7 @@ async def accept_invitation(payload: TokenInput, session: DB, user: Identity):
     )
     if not any(farm.id == record.farm_id and role == "admin" for farm, role in allowed):
         raise HTTPException(403, "Este convite não está mais autorizado.")
+    await ensure_single_farm(session, user.id, record.farm_id)
     membership = await session.get(FarmMembership, (record.farm_id, user.id))
     if membership is None:
         membership = FarmMembership(

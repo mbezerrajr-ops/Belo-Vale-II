@@ -17,7 +17,6 @@ from app.routers.production import router as production_router
 from app.routers.production_import import router as production_import_router
 from app.routers.proposals import router as proposals_router
 from app.routers.tenancy import router as tenancy_router
-from app.routers.animal_import import router as animal_import_router
 from app.services.ingestion import (
     DuplicateImageError,
     FarmNotFoundError,
@@ -73,7 +72,6 @@ def create_app() -> FastAPI:
             active_lots.reset(lots_token)
     # /farms/new precisa preceder as rotas com identificadores dinâmicos.
     app.include_router(tenancy_router)
-    app.include_router(animal_import_router)
     app.include_router(auth_router)
     app.include_router(imports_router)
     app.include_router(measurements_router)

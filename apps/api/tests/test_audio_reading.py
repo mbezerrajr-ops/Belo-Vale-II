@@ -94,7 +94,7 @@ def _run(conteudo: bytes, body) -> None:
                 )
                 session.add(user)
                 await session.commit()
-                await grant_in_session(session)
+                await grant_in_session(session, preferred_farm_id=farm.id)
                 await session.commit()
                 await session.refresh(farm)
                 storage = InMemoryObjectStorage()

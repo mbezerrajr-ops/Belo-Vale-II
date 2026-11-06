@@ -89,17 +89,7 @@ async def create_farm(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     _: Annotated[User, Depends(require_minimum_role("admin"))],
 ) -> Farm:
-    from app.db.models import FarmMembership
-    from app.routers.tenancy import producer_admin
-    await producer_admin(session, _.user, _.farm.producer_account_id)
-    # Este caminho acrescenta uma fazenda à mesma conta produtora. O cadastro
-    # da primeira fazenda é oferecido pelo onboarding de produtores.
-    farm = Farm(name=payload.name, code=payload.code, producer_account_id=_.farm.producer_account_id)
-    session.add(farm)
-    await session.flush()
-    session.add(FarmMembership(farm_id=farm.id, user_id=_.id, role="admin"))
-    await session.commit()
-    return farm
+    raise HTTPException(409, "Esta conta já está vinculada a uma fazenda.")
 
 
 @router.get("/farms/current", response_model=FarmRead)

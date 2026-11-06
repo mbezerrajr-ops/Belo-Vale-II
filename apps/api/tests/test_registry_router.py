@@ -258,9 +258,9 @@ class TestAnimalsEndpoints:
         stored = db([("SELECT farm_id FROM animals WHERE brinco = '502'", {})])[0][0]
         assert str(stored) == farm_id
 
-    def test_refuses_to_guess_when_more_than_one_farm_exists(self, api, db) -> None:
-        """Ambiguidade não é resolvida por chute: falhar é mais seguro."""
-        _farm(db)
+    def test_uses_the_users_only_farm_when_other_producers_exist(self, api, db) -> None:
+        """A presença de outros produtores não exige seleção da própria fazenda."""
+        farm_id = _farm(db)
         _farm(db, "Fazenda alheia")
         token = _user(db, "revisor@belovale", "reviewer")
 
@@ -268,8 +268,8 @@ class TestAnimalsEndpoints:
             "/api/animals", headers=_auth(token), json={"brinco": "503", "name": "X"}
         )
 
-        assert response.status_code == 409
-        assert "escolha a fazenda" in response.json()["detail"].lower()
+        assert response.status_code == 201
+        assert response.json()["farm_id"] == farm_id
 
     def test_search_by_brinco(self, api, db) -> None:
         _farm(db)

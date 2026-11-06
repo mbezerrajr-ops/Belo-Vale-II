@@ -116,7 +116,10 @@ class ProducerMembership(TimestampedModel, Base):
 
 class FarmMembership(TimestampedModel, Base):
     __tablename__ = "farm_memberships"
-    __table_args__ = (CheckConstraint("role IN ('operator', 'reviewer', 'admin')", name="ck_farm_membership_role"),)
+    __table_args__ = (
+        CheckConstraint("role IN ('operator', 'reviewer', 'admin')", name="ck_farm_membership_role"),
+        Index("uq_farm_membership_active_user", "user_id", unique=True, postgresql_where=text("is_active")),
+    )
     farm_id: Mapped[UUID] = mapped_column(ForeignKey("farms.id", ondelete="CASCADE"), primary_key=True)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     role: Mapped[str] = mapped_column(String(16), nullable=False)

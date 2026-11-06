@@ -7,6 +7,12 @@ origem.
 
 ## Ampliação implementada; campo e publicação pendentes (05/11/2026)
 
+**Correção de escopo após a primeira implantação:** novos produtores devem
+criar conta para sua própria fazenda. Cada usuário acessa uma única fazenda.
+A faixa superior, a seleção de fazendas e a importação de cadastro adicional
+foram retiradas. A importação de produção já existente foi preservada.
+O servidor real foi confirmado como Ubuntu `belo-vale`, acessado por SSH.
+
 As frentes técnicas de offline, biblioteca e produtores/fazendas foram
 implementadas localmente. A [documentação da entrega](produtores-e-fazendas.md)
 registra modelo, migração, SMTP, limites, recuperação seletiva e validação.
@@ -16,10 +22,10 @@ registra modelo, migração, SMTP, limites, recuperação seletiva e validação
   navegador. Falta homologação nos aparelhos e no curral.
 - **Biblioteca:** seleção explícita, câmera, prévia e suporte de decodificação
   HEIC implementados. A interface nativa dos seletores será conferida no campo.
-- **Produtores e fazendas:** cadastro, confirmação, recuperação, múltiplas
-  fazendas, equipe e isolamento implementados. Migração conferida com a baseline
-  completa; produção real ainda não atualizada. SMTP de produção precisa ser
-  configurado para os novos fluxos de e-mail.
+- **Produtores e fazendas:** cadastro, confirmação, recuperação, equipe e
+  isolamento implementados. Migração conferida com a baseline completa.
+  A primeira versão foi implantada; esta correção exige migração `0019` e nova
+  atualização no servidor. SMTP é necessário para os fluxos de e-mail.
 - **Próximas etapas, nesta ordem:** teste de campo após a ampliação, piloto com
   produtores independentes, preparação Android e Google Play. Também permanecem
   decisões de marca, capacidade do piloto e política comercial/privacidade.

@@ -227,3 +227,58 @@ def test_ambiguous_legacy_ownership_aborts_without_partial_migration(
             await connection.close()
 
     asyncio.run(verify())
+
+
+def test_single_farm_migration_preserves_ambiguous_existing_links(migration_database):
+    env = migration_database
+    command([sys.executable, "-m", "alembic", "upgrade", "0018_farm_integrity"], env)
+
+    async def prepare():
+        connection = await asyncpg.connect(
+            env["POSTGRES_URL"].replace("postgresql+asyncpg", "postgresql")
+        )
+        try:
+            user = await connection.fetchval(
+                "INSERT INTO users(email,password_hash,role) VALUES ('ambiguous@example.org','not-a-login-hash','admin') RETURNING id"
+            )
+            farms = await connection.fetch(
+                "INSERT INTO farms(name) VALUES ('Primeira'),('Segunda') RETURNING id"
+            )
+            for farm in farms:
+                await connection.execute(
+                    "INSERT INTO farm_memberships(farm_id,user_id,role) VALUES ($1,$2,'admin')",
+                    farm["id"],
+                    user,
+                )
+        finally:
+            await connection.close()
+
+    asyncio.run(prepare())
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=API,
+        env=env,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+
+    async def verify():
+        connection = await asyncpg.connect(
+            env["POSTGRES_URL"].replace("postgresql+asyncpg", "postgresql")
+        )
+        try:
+            assert (
+                await connection.fetchval("SELECT version_num FROM alembic_version")
+                == "0018_farm_integrity"
+            )
+            assert (
+                await connection.fetchval(
+                    "SELECT count(*) FROM farm_memberships WHERE is_active"
+                )
+                == 2
+            )
+            assert await connection.fetchval("SELECT count(*) FROM farms") == 2
+        finally:
+            await connection.close()
+
+    asyncio.run(verify())
