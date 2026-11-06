@@ -39,7 +39,7 @@ export function AccountEntry({ onLoggedIn }: { onLoggedIn: (result: LoginResult)
       <form onSubmit={(event) => void submit(event)} className="account-entry">
         <h2>{labels[mode]}</h2>
         {(mode === "register" || mode === "forgot-password") && <><label htmlFor="account-email">Seu e-mail</label><input id="account-email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></>}
-        {mode === "register" && <><label htmlFor="producer-name">Seu nome ou nome da empresa</label><input id="producer-name" required maxLength={255} value={producer} onChange={(e) => setProducer(e.target.value)} /><label htmlFor="first-farm">Nome da primeira fazenda</label><input id="first-farm" required maxLength={255} value={farm} onChange={(e) => setFarm(e.target.value)} /></>}
+        {mode === "register" && <><label htmlFor="producer-name">Seu nome ou nome da empresa</label><input id="producer-name" required maxLength={255} value={producer} onChange={(e) => setProducer(e.target.value)} /><label htmlFor="first-farm">Nome da fazenda</label><input id="first-farm" required maxLength={255} value={farm} onChange={(e) => setFarm(e.target.value)} /></>}
         {(mode === "register" || mode === "recover-password") && <><label htmlFor="account-password">Nova senha</label><input id="account-password" type="password" autoComplete="new-password" required minLength={12} value={password} onChange={(e) => setPassword(e.target.value)} /><p className="hint">Use uma frase longa, com pelo menos 12 caracteres.</p></>}
         <button type="submit" disabled={busy}>{busy ? "Aguarde…" : labels[mode]}</button>
       </form>

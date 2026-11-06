@@ -1,9 +1,10 @@
 # Runbook de produção — Belo Vale II no servidor
 
-Atualização de 05/11/2026: o titular confirmou que o site real está em outro
-notebook com Windows. Para essa instalação, seguir o
-[runbook Windows](runbook-producao-windows.md). Este documento descreve a
-instalação Linux e seu histórico; não presumir que ela hospeda o site atual.
+Confirmado em 05/11/2026 pelo acesso SSH e pelo estado dos serviços: a produção
+roda no servidor Ubuntu `belo-vale`, com usuário `belovale`, atendendo
+`https://belo-vale.taile2ed91.ts.net/`. O notebook Windows é usado para acessar
+esse servidor. Executar a atualização no terminal Linux, dentro de
+`~/Belo-Vale-II`, conforme este runbook.
 
 Como o sistema roda de verdade, para a fazenda usar pelo celular. O ambiente de
 desenvolvimento e testes continua no [runbook local](runbook-local.md). Até

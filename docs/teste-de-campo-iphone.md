@@ -79,7 +79,7 @@ volume para cima.
 | --- | --- | --- | --- |
 | 18 | **Animais** → buscar uma vaca → abrir a ficha → deslizar da borda esquerda para a direita | Volta para a busca, com o que tinha sido digitado. | |
 | 19 | Observar o dia todo | Onde ele parou sem saber o que fazer? Que palavra ele não entendeu? O que ele esperava que acontecesse e não aconteceu? | |
-| 20 | Com duas fazendas de teste, guardar lançamento e foto sem sinal na primeira, alternar para a segunda e reconectar | Cada item vai à fazenda de origem. Dados, equipe, relatórios e impressão identificam a fazenda selecionada. | |
+| 20 | Com dois produtores de teste, guardar lançamento e foto sem sinal com o primeiro; sair e entrar com o segundo quando houver conexão | Cada usuário abre apenas sua fazenda. O segundo não acessa nem envia a fila do primeiro; os dados pendentes seguem vinculados ao autor e à origem. | |
 | 21 | Repetir com outro usuário e com acesso revogado | Outra identidade não acessa a fila do autor; envio recusado fica guardado para conferência e oferece nova tentativa após corrigir o acesso. | |
 
 ## Depois

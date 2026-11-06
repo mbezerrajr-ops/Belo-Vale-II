@@ -69,6 +69,37 @@ def animal(api, person, brinco="027"):
     return response.json()
 
 
+def teammate(api, owner, email="funcionario@example.org", role="operator"):
+    created = api.post(
+        "/api/users",
+        headers=headers(owner),
+        json={"email": email, "password": PASSWORD, "role": role},
+    )
+    assert created.status_code == 201, created.text
+    login = api.post("/api/auth/login", json={"email": email, "password": PASSWORD})
+    token = login.json()["access_token"]
+    changed = api.post(
+        "/api/users/me/password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": PASSWORD,
+            "new_password": "bezerra no pasto",
+        },
+    )
+    assert changed.status_code == 204, changed.text
+    login = api.post(
+        "/api/auth/login",
+        json={"email": email, "password": "bezerra no pasto"},
+    )
+    return {
+        "token": login.json()["access_token"],
+        "email": email,
+        "user": created.json(),
+        "farm": owner["farm"],
+        "account": owner["account"],
+    }
+
+
 def test_registration_verifies_contact_and_starts_with_an_empty_farm(api, db, mail):
     response = api.post(
         "/api/auth/register",
@@ -120,35 +151,89 @@ def test_two_producers_cannot_select_or_read_each_others_farms(api, db, mail):
     )
 
 
-def test_owner_creates_multiple_farms_and_settings_are_independent(api, db, mail):
+def test_producer_cannot_create_a_second_farm_or_account(api, db, mail):
     ana = producer(api, mail)
-    response = api.post(
-        "/api/farms/new",
-        headers=headers(ana),
-        json={
-            "producer_account_id": ana["account"]["id"],
-            "name": "Segunda",
-            "timezone": "America/Manaus",
-            "lot_settings": [{"name": "Ordenha azul", "kind": "diet"}],
-        },
-    )
-    assert response.status_code == 201, response.text
-    other = response.json()
-    assert len(api.get("/api/farms", headers=headers(ana)).json()) == 2
+    original = api.get("/api/farms", headers=headers(ana)).json()
     assert (
-        api.get(
-            "/api/farms/current", headers={"Authorization": f"Bearer {ana['token']}"}
+        api.post(
+            "/api/farms/new",
+            headers=headers(ana),
+            json={"producer_account_id": ana["account"]["id"], "name": "Segunda"},
         ).status_code
         == 409
     )
     assert (
-        api.get("/api/farms/current", headers=headers(ana, other["id"])).json()[
-            "timezone"
-        ]
-        == "America/Manaus"
+        api.post(
+            "/api/farms", headers=headers(ana), json={"name": "Segunda"}
+        ).status_code
+        == 409
     )
     assert (
-        api.get("/api/farms/current", headers=headers(ana)).json()["lot_settings"] == []
+        api.post(
+            "/api/producer-accounts",
+            headers=headers(ana),
+            json={"name": "Outro produtor"},
+        ).status_code
+        == 409
+    )
+    assert api.get("/api/farms", headers=headers(ana)).json() == original
+    assert (
+        api.get(
+            "/api/farms/current", headers={"Authorization": f"Bearer {ana['token']}"}
+        ).json()["id"]
+        == ana["farm"]["id"]
+    )
+
+
+def test_user_cannot_accept_a_second_farm_even_with_an_invitation(api, db, mail):
+    ana = producer(api, mail)
+    bia = producer(api, mail, "bia@example.org")
+    assert (
+        api.post(
+            "/api/farms/current/invitations",
+            headers=headers(ana),
+            json={"email": bia["email"], "role": "admin"},
+        ).status_code
+        == 201
+    )
+    assert (
+        api.post(
+            "/api/invitations/accept",
+            headers=headers(bia),
+            json={"token": mail_token(mail)},
+        ).status_code
+        == 409
+    )
+    assert api.get("/api/farms", headers=headers(bia)).json() == [bia["farm"]]
+    with pytest.raises(DBAPIError, match="uq_farm_membership_active_user"):
+        one(
+            "INSERT INTO farm_memberships(farm_id,user_id,role) VALUES (:f,:u,'admin') RETURNING farm_id",
+            f=ana["farm"]["id"],
+            u=bia["user"]["id"],
+        )
+
+
+def test_account_membership_does_not_grant_a_second_farm(api, db, mail):
+    ana = producer(api, mail)
+    bia = producer(api, mail, "bia@example.org")
+    one(
+        "INSERT INTO producer_memberships(producer_account_id,user_id,role) VALUES (:a,:u,'admin') RETURNING user_id",
+        a=ana["account"]["id"],
+        u=bia["user"]["id"],
+    )
+    assert api.get("/api/farms", headers=headers(bia)).json() == [bia["farm"]]
+    assert (
+        api.get("/api/animals", headers=headers(bia, ana["farm"]["id"])).status_code
+        == 404
+    )
+    assert api.get("/api/producer-accounts", headers=headers(bia)).json() == [
+        bia["account"]
+    ]
+    assert (
+        api.get(
+            f"/api/producer-accounts/{ana['account']['id']}/usage", headers=headers(bia)
+        ).status_code
+        == 403
     )
 
 
@@ -170,11 +255,11 @@ def test_global_role_does_not_grant_access_to_another_producer(api, db, mail):
 
 def test_invitation_is_bound_to_email_farm_and_can_be_revoked(api, db, mail):
     ana = producer(api, mail)
-    bia = producer(api, mail, "bia@example.org")
+    employee = teammate(api, ana)
     invited = api.post(
         "/api/farms/current/invitations",
         headers=headers(ana),
-        json={"email": bia["email"], "role": "operator"},
+        json={"email": employee["email"], "role": "reviewer"},
     )
     assert invited.status_code == 201, invited.text
     raw = mail_token(mail)
@@ -186,57 +271,38 @@ def test_invitation_is_bound_to_email_farm_and_can_be_revoked(api, db, mail):
     )
     assert (
         api.post(
-            "/api/invitations/accept", headers=headers(bia), json={"token": raw}
+            "/api/invitations/accept", headers=headers(employee), json={"token": raw}
         ).status_code
         == 200
     )
     assert (
         api.post(
-            "/api/invitations/accept", headers=headers(bia), json={"token": raw}
+            "/api/invitations/accept", headers=headers(employee), json={"token": raw}
         ).status_code
         == 400
     )
-    assert (
-        api.get("/api/animals", headers=headers(bia, ana["farm"]["id"])).status_code
-        == 200
-    )
-    assert (
-        api.get("/api/users", headers=headers(bia, ana["farm"]["id"])).status_code
-        == 403
-    )
+    assert api.get("/api/animals", headers=headers(employee)).status_code == 200
+    assert api.get("/api/users", headers=headers(employee)).status_code == 403
     assert (
         api.patch(
-            f"/api/users/{bia['user']['id']}",
+            f"/api/users/{employee['user']['id']}",
             headers=headers(ana),
-            json={"role": "operator", "is_active": False},
+            json={"is_active": False},
         ).status_code
         == 200
     )
-    assert (
-        api.get("/api/animals", headers=headers(bia, ana["farm"]["id"])).status_code
-        == 404
-    )
-    assert api.get("/api/animals", headers=headers(bia)).status_code == 200
+    assert api.get("/api/animals", headers=headers(employee)).status_code == 404
+    assert api.get("/api/auth/me", headers=headers(employee)).status_code == 200
 
 
-def test_admin_cannot_reset_identity_used_by_another_producer(api, db, mail):
+def test_admin_cannot_reset_identity_from_another_producer(api, db, mail):
     ana = producer(api, mail)
     bia = producer(api, mail, "bia@example.org")
-    api.post(
-        "/api/farms/current/invitations",
-        headers=headers(ana),
-        json={"email": bia["email"], "role": "reviewer"},
-    )
-    api.post(
-        "/api/invitations/accept",
-        headers=headers(bia),
-        json={"token": mail_token(mail)},
-    )
     assert (
         api.post(
             f"/api/users/{bia['user']['id']}/password-reset", headers=headers(ana)
         ).status_code
-        == 409
+        == 404
     )
 
 
@@ -293,16 +359,7 @@ def test_owner_transfer_requires_password_and_an_existing_member(api, db, mail):
         ).status_code
         == 404
     )
-    api.post(
-        "/api/farms/current/invitations",
-        headers=headers(ana),
-        json={"email": bia["email"], "role": "reviewer"},
-    )
-    api.post(
-        "/api/invitations/accept",
-        headers=headers(bia),
-        json={"token": mail_token(mail)},
-    )
+    bia = teammate(api, ana, "nova-responsavel@example.org", "reviewer")
     assert (
         api.post(
             route,
@@ -325,14 +382,11 @@ def test_owner_transfer_requires_password_and_an_existing_member(api, db, mail):
         == 1
     )
 
-
     # O novo proprietário consegue encerrar o acesso administrativo anterior
     # sem desativar a identidade nem interferir na própria operação dele.
     members_route = f"/api/producer-accounts/{ana['account']['id']}/members"
     assert api.get(members_route, headers=headers(ana)).status_code == 403
-    removed = api.delete(
-        f"{members_route}/{ana['user']['id']}", headers=headers(bia)
-    )
+    removed = api.delete(f"{members_route}/{ana['user']['id']}", headers=headers(bia))
     assert removed.status_code == 204, removed.text
     assert api.get("/api/animals", headers=headers(ana)).status_code == 404
     assert api.get("/api/animals", headers=headers(bia)).status_code == 200
@@ -355,7 +409,7 @@ def test_reading_capacity_is_account_scoped(api, db, mail):
     )
 
 
-def test_custom_lots_and_catalogue_import_are_farm_scoped(api, db, mail):
+def test_custom_lots_are_scoped_to_each_producers_farm(api, db, mail):
     ana = producer(api, mail)
     bia = producer(api, mail, "bia@example.org")
     configured = api.patch(
@@ -368,18 +422,12 @@ def test_custom_lots_and_catalogue_import_are_farm_scoped(api, db, mail):
         },
     )
     assert configured.status_code == 200, configured.text
-    content = {
-        "csv": "brinco;nome;lote\n027;Mimosa;Ordenha azul\n028;Estrela;Ordenha azul"
-    }
-    preview = api.post(
-        "/api/animals/import/preview", headers=headers(ana), json=content
+    created = api.post(
+        "/api/animals",
+        headers=headers(ana),
+        json={"brinco": "027", "name": "Mimosa", "lote": "Ordenha azul"},
     )
-    assert preview.status_code == 200 and preview.json()["new"] == 2, preview.text
-    assert api.get("/api/animals", headers=headers(ana)).json()["total"] == 0
-    imported = api.post("/api/animals/import", headers=headers(ana), json=content)
-    assert imported.status_code == 201 and imported.json()["created"] == 2, (
-        imported.text
-    )
+    assert created.status_code == 201, created.text
     assert api.get("/api/animals", headers=headers(bia)).json()["total"] == 0
     sheet = api.get(
         "/api/production/sheet",
@@ -389,12 +437,6 @@ def test_custom_lots_and_catalogue_import_are_farm_scoped(api, db, mail):
     assert sheet.status_code == 200, sheet.text
     assert sheet.json()["lotes"] == ["Ordenha azul"]
     assert (
-        api.post("/api/animals/import", headers=headers(ana), json=content).json()[
-            "created"
-        ]
-        == 0
-    )
-    assert (
         api.patch(
             "/api/farms/current",
             headers=headers(ana),
@@ -402,16 +444,6 @@ def test_custom_lots_and_catalogue_import_are_farm_scoped(api, db, mail):
         ).status_code
         == 409
     )
-
-
-def test_invalid_catalogue_is_not_partially_applied(api, db, mail):
-    ana = producer(api, mail)
-    data = {"csv": "brinco;nome\n027;Mimosa\n027;Duplicada"}
-    assert (
-        api.post("/api/animals/import", headers=headers(ana), json=data).status_code
-        == 422
-    )
-    assert api.get("/api/animals", headers=headers(ana)).json()["total"] == 0
 
 
 class Dispatcher:
@@ -472,17 +504,7 @@ def test_worker_rechecks_membership_before_reading(api, db, mail):
     from app.services.event_extraction import FakeEventExtractor
 
     ana = producer(api, mail)
-    bia = producer(api, mail, "bia@example.org")
-    api.post(
-        "/api/farms/current/invitations",
-        headers=headers(ana),
-        json={"email": bia["email"], "role": "operator"},
-    )
-    api.post(
-        "/api/invitations/accept",
-        headers=headers(bia),
-        json={"token": mail_token(mail)},
-    )
+    bia = teammate(api, ana)
     api.app.dependency_overrides[get_extraction_dispatcher] = lambda: Dispatcher()
     uploaded = api.post(
         "/api/imports",

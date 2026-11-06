@@ -3,7 +3,8 @@
 Sistema de gestão do rebanho leiteiro para produtores administrarem suas
 fazendas: cadastro dos animais, produção por vaca e por dia, lotes, insumos e
 custos. A Belo Vale II é a primeira operação atendida. Cada produtor tem sua
-conta, uma ou mais fazendas e sua equipe, com permissões por fazenda.
+conta e sua fazenda, com dados separados dos demais produtores. Cada usuário
+tem acesso a uma única fazenda; a equipe é gerenciada em Contas.
 
 A ampliação está documentada em
 [`docs/produtores-e-fazendas.md`](docs/produtores-e-fazendas.md), incluindo
@@ -22,9 +23,9 @@ animais, produção, custos). Trate como confidencial e mantenha-o **privado**.
 
 ## O que o sistema faz
 
-- **Produtores e fazendas:** cadastro com confirmação de e-mail, recuperação de
-  acesso, seleção de fazenda, configuração de lotes e fuso, convites, permissões
-  da equipe e transferência da responsabilidade pela conta produtora.
+- **Produtores:** cadastro com confirmação de e-mail e recuperação de acesso.
+  Ao entrar, o usuário abre diretamente a própria fazenda, com as mesmas áreas
+  da operação atual. Nome, lotes e fuso ficam em Minha conta.
 - **Produção:** lançar os litros do dia, lote por lote, inclusive sem sinal
   (fica guardado no celular e sobe quando o sinal volta); importar a coleta
   de uma planilha ou PDF; imprimir a folha de coleta, em branco ou preenchida;
@@ -33,8 +34,7 @@ animais, produção, custos). Trate como confidencial e mantenha-o **privado**.
   o que for lido chega como proposta, com a foto ou o áudio ao lado, para
   aprovar, corrigir ou rejeitar.
 - **Animais:** buscar, ver a ficha e o histórico de produção, vincular ou
-  tirar o brinco, mudar de lote, dar baixa, juntar fichas duplicadas e importar
-  o cadastro próprio por CSV com prévia.
+  tirar o brinco, mudar de lote, dar baixa e juntar fichas duplicadas.
 - **Painel, Insumos e Medições:** a produção do rebanho e de cada lote, os
   preços e dietas dos insumos, o preço do leite e as medições oficiais.
 - **Contas:** três perfis — operador (lança), revisor (corrige, aprova,

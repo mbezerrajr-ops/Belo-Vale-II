@@ -13,7 +13,10 @@ import {
 import type { AnimalDetail, CurrentUser, Farm } from "./api/types";
 import { ApiError } from "./api/types";
 import { AccountEntry } from "./auth/AccountEntry";
-import { Workspace } from "./features/workspace/Workspace";
+import { FarmWorkspace } from "./features/workspace/FarmWorkspace";
+import { FarmSettings } from "./features/workspace/FarmSettings";
+import { FarmContext } from "./features/workspace/context";
+import { setFarmTimezone } from "./ui/dates";
 import { LoginBranch, LoginLandscape } from "./auth/LoginLandscape";
 import {
   clearStoredToken,
@@ -365,7 +368,7 @@ function initials(email: string): string {
 function AuthenticatedApp(props: AuthenticatedAppProps): JSX.Element {
   const { token, user, onRenew } = props;
   return (
-    <Workspace token={token} user={user} onLogout={props.onLogout}>
+    <FarmWorkspace token={token} user={user} onLogout={props.onLogout}>
       {(activeUser, farmKey, selectedFarm) => (
     <OutboxProvider
       key={farmKey}
@@ -379,7 +382,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps): JSX.Element {
       <AppShell {...props} user={activeUser} selectedFarm={selectedFarm} />
     </OutboxProvider>
       )}
-    </Workspace>
+    </FarmWorkspace>
   );
 }
 
@@ -551,6 +554,7 @@ function AppShell({
   const barAreas = areas.filter((name) => name !== "minha-conta");
 
   return (
+    <FarmContext.Provider value={farm}>
     <div className="shell">
       <header className="topbar">
         <h1 className="wordmark">
@@ -744,6 +748,11 @@ function AppShell({
                 {user.email}
               </PageHeader>
               <ChangePasswordForm token={token} />
+              {isAdmin && farm && <FarmSettings token={token} farm={farm} onSaved={(saved) => {
+                setFarm(saved);
+                setFarmTimezone(saved.timezone ?? "America/Recife");
+                try { localStorage.setItem(`belo-vale.workspaces:${user.id}`, JSON.stringify([saved])); } catch { /* A configuração segue salva no servidor. */ }
+              }} />}
               <InstallHint />
             </>
           )}
@@ -751,5 +760,6 @@ function AppShell({
         </AreaBoundary>
       </main>
     </div>
+    </FarmContext.Provider>
   );
 }

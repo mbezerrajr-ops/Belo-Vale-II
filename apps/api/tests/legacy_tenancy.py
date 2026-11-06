@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
 
 
-async def grant_in_session(session):
+async def grant_in_session(session, preferred_farm_id=None):
     from app.services.lot_kind import DIET_LOTS, MANAGEMENT_GROUPS
 
     lots = json.dumps(
@@ -44,8 +44,11 @@ async def grant_in_session(session):
         )
     await session.execute(
         text("""INSERT INTO farm_memberships(farm_id,user_id,role,is_active)
-      SELECT f.id,u.id,u.role,u.is_active FROM farms f CROSS JOIN users u
-      ON CONFLICT (farm_id,user_id) DO NOTHING""")
+      SELECT COALESCE(CAST(:preferred_farm_id AS uuid),(SELECT id FROM farms ORDER BY created_at,id LIMIT 1)),u.id,u.role,u.is_active FROM users u
+      WHERE EXISTS (SELECT 1 FROM farms)
+        AND NOT EXISTS (SELECT 1 FROM farm_memberships m WHERE m.user_id=u.id)
+      ON CONFLICT (farm_id,user_id) DO NOTHING"""),
+        {"preferred_farm_id": preferred_farm_id},
     )
     await session.execute(
         text(

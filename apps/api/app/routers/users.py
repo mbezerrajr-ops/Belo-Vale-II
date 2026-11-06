@@ -23,6 +23,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.password_policy import PasswordPolicyError, validate_password
+from app.core.tenancy import ensure_single_farm
 from app.core.temporary_password import (
     TEMPORARY_PASSWORD_TTL,
     generate_temporary_password,
@@ -176,6 +177,8 @@ async def update_user(
     producer_membership = await session.get(ProducerMembership, (admin.farm.producer_account_id, user_id)) if admin.farm.producer_account_id else None
     if producer_membership:
         raise HTTPException(409, "O acesso do responsável pela conta produtora é administrado na conta produtora.")
+    if changes.get("is_active") is True:
+        await ensure_single_farm(session, user.id, admin.farm.id)
     previous = {key: getattr(membership, key) for key in changes}
     for key, value in changes.items():
         setattr(membership, key, value)

@@ -1,5 +1,14 @@
 # Plano: offline, biblioteca, ampliação para produtores e Google Play
 
+> **Escopo corrigido pelo titular após a implantação:** um usuário acessa uma
+> única fazenda. Outros produtores criam suas contas para suas próprias fazendas,
+> com as mesmas áreas de análise e operação. Não haverá faixa superior, seletor
+> ou gestão de várias fazendas por usuário. A importação já existente atende a
+> necessidade; o cadastro CSV adicional foi retirado. As referências a múltiplas
+> fazendas por usuário abaixo registram o plano anterior e foram substituídas
+> por esta decisão. O comportamento vigente está em
+> [Produtores e fazendas](../../produtores-e-fazendas.md).
+
 Data: 05/11/2026. Base analisada: `main`, commit `e6a21da`.
 Status: implementação técnica concluída até a ampliação para produtores e
 fazendas, validada em ambiente local isolado. Campo, piloto, implantação real,

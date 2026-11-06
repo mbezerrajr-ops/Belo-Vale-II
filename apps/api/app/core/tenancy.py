@@ -1,4 +1,4 @@
-"""Contexto de fazenda: a seleção vem do cliente, a autorização vem do banco."""
+"""Cada usuário acessa uma única fazenda, definida pelo vínculo no banco."""
 
 from dataclasses import dataclass
 from typing import Annotated
@@ -10,7 +10,7 @@ from app.db.models import Farm, FarmMembership, ProducerMembership, User
 from app.db.session import get_db_session
 from app.services.lot_kind import active_lots
 from fastapi import Depends, HTTPException, Request
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -33,7 +33,7 @@ async def available_farms(session: AsyncSession, user: User) -> list[tuple[Farm,
     rows = (
         await session.execute(
             select(Farm, FarmMembership.role, ProducerMembership.role)
-            .outerjoin(
+            .join(
                 FarmMembership,
                 (FarmMembership.farm_id == Farm.id)
                 & (FarmMembership.user_id == user.id)
@@ -44,18 +44,31 @@ async def available_farms(session: AsyncSession, user: User) -> list[tuple[Farm,
                 (ProducerMembership.producer_account_id == Farm.producer_account_id)
                 & (ProducerMembership.user_id == user.id),
             )
-            .where(
-                or_(
-                    FarmMembership.user_id.is_not(None),
-                    ProducerMembership.user_id.is_not(None),
-                )
-            )
             .order_by(Farm.name, Farm.id)
         )
     ).all()
+    if len(rows) > 1:
+        raise HTTPException(
+            409,
+            "A conta precisa estar vinculada a uma única fazenda. Fale com o administrador.",
+        )
     return [
         (farm, "admin" if producer_role else role) for farm, role, producer_role in rows
     ]
+
+
+async def ensure_single_farm(
+    session: AsyncSession, user_id: UUID, farm_id: UUID | None = None
+):
+    # Serializa criações e reativações para a mesma identidade.
+    await session.scalar(select(User.id).where(User.id == user_id).with_for_update())
+    query = select(FarmMembership.farm_id).where(
+        FarmMembership.user_id == user_id, FarmMembership.is_active
+    )
+    if farm_id is not None:
+        query = query.where(FarmMembership.farm_id != farm_id)
+    if await session.scalar(query.limit(1)) is not None:
+        raise HTTPException(409, "Esta conta já está vinculada a uma fazenda.")
 
 
 async def get_farm_access(
@@ -85,7 +98,7 @@ async def get_farm_access(
             409,
             "Nenhuma fazenda disponível. Cadastre uma fazenda ou aceite um convite."
             if not farms
-            else "Escolha a fazenda para continuar.",
+            else "A conta precisa estar vinculada a uma única fazenda.",
         )
     farm, role = farms[0]
     request.state.farm_timezone = farm.timezone
