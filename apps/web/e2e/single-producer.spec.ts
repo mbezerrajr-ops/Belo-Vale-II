@@ -43,7 +43,7 @@ test("cada produtor entra direto na própria fazenda, sem seletor nem importaç�
   await openArea(page, "Animais");
   await page.getByRole("button", { name: "Cadastrar animal", exact: true }).click();
   await page.getByLabel("Brinco (opcional)").fill("027");
-  await page.getByLabel("Nome (opcional)").fill("Mimosa da Ana");
+  await page.locator("form.create-animal").getByLabel("Nome", { exact: true }).fill("Mimosa da Ana");
   await page.getByLabel("Lote ou grupo (opcional)").fill("Lote principal");
   await page.locator("form.create-animal").getByRole("button", { name: "Salvar animal", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Mimosa da Ana", exact: true })).toBeVisible();
