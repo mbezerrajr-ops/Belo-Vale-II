@@ -226,6 +226,15 @@ def test_account_membership_does_not_grant_a_second_farm(api, db, mail):
         api.get("/api/animals", headers=headers(bia, ana["farm"]["id"])).status_code
         == 404
     )
+    assert api.get("/api/producer-accounts", headers=headers(bia)).json() == [
+        bia["account"]
+    ]
+    assert (
+        api.get(
+            f"/api/producer-accounts/{ana['account']['id']}/usage", headers=headers(bia)
+        ).status_code
+        == 403
+    )
 
 
 def test_global_role_does_not_grant_access_to_another_producer(api, db, mail):

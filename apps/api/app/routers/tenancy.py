@@ -289,7 +289,14 @@ async def list_accounts(session: DB, user: Identity):
                 ProducerMembership,
                 ProducerMembership.producer_account_id == ProducerAccount.id,
             )
-            .where(ProducerMembership.user_id == user.id)
+            .where(
+                ProducerMembership.user_id == user.id,
+                ProducerAccount.id.in_(
+                    select(Farm.producer_account_id)
+                    .join(FarmMembership, FarmMembership.farm_id == Farm.id)
+                    .where(FarmMembership.user_id == user.id, FarmMembership.is_active)
+                ),
+            )
         )
     ).all()
     return [
@@ -326,18 +333,27 @@ async def new_account(payload: ProducerCreate, session: DB, user: Identity):
     return {"id": str(account.id), "name": account.name, "role": "owner"}
 
 
-async def producer_admin(session, user, account_id, *, owner_only=False):
+async def producer_admin(
+    session, user, account_id, *, owner_only=False, allow_unassigned=False
+):
     membership = await session.get(ProducerMembership, (account_id, user.id))
     if membership is None or (owner_only and membership.role != "owner"):
         raise HTTPException(
             403, "Somente o responsável pela conta produtora pode realizar esta ação."
         )
+    if not allow_unassigned and not any(
+        farm.producer_account_id == account_id
+        for farm, _ in await available_farms(session, user)
+    ):
+        raise HTTPException(403, "Esta conta produtora não pertence à sua fazenda.")
     return membership
 
 
 @router.post("/farms/new", status_code=201)
 async def new_farm(payload: NewFarm, session: DB, user: Identity):
-    await producer_admin(session, user, payload.producer_account_id)
+    await producer_admin(
+        session, user, payload.producer_account_id, allow_unassigned=True
+    )
     await ensure_single_farm(session, user.id)
     await session.scalar(
         select(ProducerAccount.id)
