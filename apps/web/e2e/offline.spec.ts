@@ -6,7 +6,7 @@ import { uniqueFixtureCopy } from "./testFiles";
 
 import { createMilkingCow, ensureAdminExists, ensureFarm, loginAsAdmin, openArea, runTag } from "./seed";
 
-// No curral o sinal vai e volta. O que se lança sem sinal fica no celular,
+// No curral o sinal vai e volta. O que se lança sem sinal fica no aparelho,
 // sobrevive a recarregar a página (ainda sem sinal) e chega ao servidor
 // quando o sinal volta — sem digitar de novo.
 
@@ -29,7 +29,7 @@ test("lança sem sinal, recarrega sem sinal e o valor chega quando o sinal volta
   test.skip(browserName === "webkit", "Playwright/WebKit no Windows não simula rede ausente com service worker");
   test.setTimeout(120_000);
   await loginAsAdmin(page);
-  // O app fica guardado no celular antes de o sinal cair.
+  // O app fica guardado no aparelho antes de o sinal cair.
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
   await openArea(page, "Produção");
   await page.getByRole("group", { name: "Lote de ordenha" }).getByRole("button", { name: "LOTE 3" }).click();
@@ -40,9 +40,9 @@ test("lança sem sinal, recarrega sem sinal e o valor chega quando o sinal volta
   await field.fill("23,5");
   await field.press("Tab");
 
-  await expect(page.getByText(/guardado neste celular/i).first()).toBeVisible();
+  await expect(page.getByText(/guardado neste aparelho/i).first()).toBeVisible();
   await expect(page.getByRole("button", { name: /1 guardado/ })).toBeVisible();
-  await expect(page.getByText(/sem sinal\. o que você lançar/i)).toBeVisible();
+  await expect(page.getByText(/sem sinal\. produção, fotos e áudios enviados/i)).toBeVisible();
 
   // Recarregar sem sinal: o app abre, com a mesma pessoa, e o valor continua.
   await page.reload();
@@ -52,7 +52,7 @@ test("lança sem sinal, recarrega sem sinal e o valor chega quando o sinal volta
   await expect(page.getByText(/folha guardada/i)).toBeVisible();
 
   // Uma tela nunca aberta também abre sem sinal: as partes do app que são
-  // baixadas sob demanda já estavam guardadas no celular.
+  // baixadas sob demanda já estavam guardadas no aparelho.
   await openArea(page, "Insumos");
   await expect(page.getByRole("heading", { name: "Insumos e dieta" })).toBeVisible();
   await openArea(page, "Produção");
@@ -81,7 +81,7 @@ test("fechar a página sem sinal conserva a sessão local e a fila até reabrir"
   await expect(field).toBeVisible();
   await context.setOffline(true);
   await field.fill("19,5"); await field.press("Tab");
-  await expect(page.getByText(/guardado neste celular/i).first()).toBeVisible();
+  await expect(page.getByText(/guardado neste aparelho/i).first()).toBeVisible();
   await expect(page.getByRole("button", { name: /^1 guardado$/ })).toBeVisible();
   await page.close();
   const reopened = await context.newPage();
@@ -104,11 +104,11 @@ test("foto da biblioteca conserva os bytes sem sinal e após fechar a página", 
   await loginAsAdmin(page);
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
   await openArea(page, "Revisão");
-  await page.getByRole("button", { name: "Enviar foto", exact: true }).click();
+  await page.getByRole("button", { name: "Ler foto da folha", exact: true }).click();
   await page.getByLabel("Foto da folha", { exact: true }).setInputFiles(file);
   await expect(page.getByAltText("Prévia da foto escolhida")).toBeVisible();
   await context.setOffline(true);
-  await page.getByRole("button", { name: "Enviar", exact: true }).click();
+  await page.getByRole("button", { name: /Enviar (áudio )?para leitura/,  exact: true }).click();
   await expect(page.getByText(/a foto ficou guardada/i)).toBeVisible();
   await expect(page.getByRole("button", { name: /^1 guardado$/ })).toBeVisible();
   await page.close();

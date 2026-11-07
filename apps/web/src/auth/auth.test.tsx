@@ -147,7 +147,7 @@ describe("LoginForm — o que dizer quando não entra", () => {
   });
 });
 
-describe("LoginForm — digitar no celular", () => {
+describe("LoginForm — digitar no aparelho", () => {
   const originalFetch = globalThis.fetch;
   afterEach(() => {
     globalThis.fetch = originalFetch;
@@ -211,7 +211,7 @@ describe("LoginForm — digitar no celular", () => {
 
   it("diz o que fazer quando a senha foi esquecida", () => {
     render(<LoginForm onLoggedIn={vi.fn()} />);
-    expect(screen.getByText(/esqueceu a senha/i)).toHaveTextContent(/administrador/i);
+    expect(screen.getByText(/pedir ao administrador uma senha provisória/i)).toHaveTextContent(/administrador/i);
   });
 
   it("o erro aparece antes do botão e marca os campos, para não sumir atrás do teclado", async () => {

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getMeasurements } from "../../api/client";
 import type { MeasurementRecord } from "../../api/types";
 import { BarList, ChartCard, StatTile, TableView, fmt } from "../../ui/charts";
 import { Icons } from "../../ui/Brand";
+import { farmToday } from '../../ui/dates';
 import { PageHeader } from "../../ui/PageHeader";
 
 interface OfficialMeasurementsProps {
@@ -63,60 +64,78 @@ export function OfficialMeasurements({
   farmId,
   token,
 }: OfficialMeasurementsProps): JSX.Element {
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [shown, setShown] = useState(30);
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [applied, setApplied] = useState({ from: '', to: '' });
+  const requestId = useRef(0);
   const [records, setRecords] = useState<MeasurementRecord[]>([]);
   const [state, setState] = useState<LoadState>("loading");
 
+  const problem = Boolean(dateFrom && dateTo && dateFrom > dateTo);
   const load = useCallback(async (): Promise<void> => {
+    const request = ++requestId.current;
+    if (dateFrom && dateTo && dateFrom > dateTo) return;
     setState("loading");
     try {
-      const result = await getMeasurements({ farmId }, token);
-      setRecords(result);
+      const result = await getMeasurements({ farmId, from: dateFrom || undefined, to: dateTo || undefined }, token);
+      if (request !== requestId.current) return;
+      setRecords(result); setShown(30); setApplied({ from: dateFrom, to: dateTo });
       setState("ready");
     } catch {
-      setState("error");
-    }
-  }, [farmId, token]);
+      if (request === requestId.current) setState("error");
+    } finally { if (request === requestId.current) setLoadedOnce(true); }
+  }, [farmId, token, dateFrom, dateTo]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  if (state === "loading") {
+  if (state === "loading" && !loadedOnce) {
     return (
-      <section aria-label="Medições oficiais">
-        <PageHeader title="Medições oficiais" />
+      <section aria-label="Histórico de produção">
+        <PageHeader title="Histórico de produção" />
         <div className="skeleton skeleton-card" />
       </section>
     );
   }
-  if (state === "error") {
-    return <p role="alert">Não foi possível carregar as medições oficiais.</p>;
-  }
+
 
   const byAnimal = totalsByAnimal(records);
   const recent = [...records]
     .sort((a, b) => (a.measured_on < b.measured_on ? 1 : -1))
-    .slice(0, 30);
+    .slice(0, shown);
 
   return (
-    <section aria-label="Medições oficiais">
+    <section aria-label="Histórico de produção">
       <PageHeader
-        title="Medições oficiais"
+        title="Histórico de produção"
         actions={
           <button type="button" className="link-btn icon-on-phone" aria-label="Atualizar" onClick={load}>
             <Icons.atualizar /> <span className="wide-only">Atualizar</span>
           </button>
         }
       >
-        Só entram aqui leituras aprovadas por uma pessoa ou trazidas do sistema antigo.
+        Consulte a produção já registrada. Fotos e áudios ainda aguardando conferência ficam em Revisão.
       </PageHeader>
 
+      <div className="filters">
+        <div><label htmlFor="history-from">De</label><input id="history-from" type="date" max={farmToday()} value={dateFrom} onChange={e => setDateFrom(e.target.value)} /></div>
+        <div><label htmlFor="history-to">Até</label><input id="history-to" type="date" max={farmToday()} value={dateTo} onChange={e => setDateTo(e.target.value)} /></div>
+        <button type="button" className="secondary" onClick={() => { setDateFrom(''); setDateTo(''); }}>Todo o histórico</button>
+      </div>
+      {problem && <p role="alert">A data final deve ser igual ou posterior à inicial. Os números abaixo ainda são da última consulta válida.</p>}
+      <p className="hint" role="status">{applied.from || applied.to ? `Período consultado: ${applied.from ? br(applied.from) : 'primeiro registro'} até ${applied.to ? br(applied.to) : 'último registro'}.` : 'Período consultado: todo o histórico disponível.'}</p>
+      {state === 'loading' && <p role="status">Atualizando o período…</p>}
+      {state === 'error' && <p role="alert">Não foi possível atualizar o histórico. Os números continuam sendo da última consulta concluída. <button type="button" onClick={() => void load()}>Tentar novamente</button></p>}
+      <div aria-busy={state === 'loading'}>
       {/* Três indicadores: no celular o total ocupa a linha, e os outros
           dois dividem a de baixo — em vez de um ficar sozinho. */}
       <div className="kpis kpis-trio">
         <StatTile
           index={0}
-          label="Total no período"
+          label={applied.from || applied.to ? "Total no período consultado" : "Total de todo o histórico"}
           value={totalLiters(records)}
           format={fmt.liters}
           color="var(--series-3)"
@@ -148,7 +167,7 @@ export function OfficialMeasurements({
         />
       </ChartCard>
 
-      <ChartCard title="Histórico recente" index={2}>
+      <ChartCard title={`Registros: ${recent.length} de ${records.length} · mais recentes primeiro`} index={2}>
         {recent.length === 0 ? (
           <p className="chart-empty">Nenhuma medição oficial ainda.</p>
         ) : (
@@ -176,6 +195,8 @@ export function OfficialMeasurements({
           </div>
         )}
       </ChartCard>
+      {shown < records.length && <button type="button" className="secondary" onClick={() => setShown(n => n + 30)}>Mostrar mais registros ({records.length - shown} restantes)</button>}
+      </div>
     </section>
   );
 }

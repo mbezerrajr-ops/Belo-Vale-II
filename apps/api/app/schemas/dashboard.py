@@ -75,6 +75,7 @@ class DashboardRead(BaseModel):
     total_feed_cost: float
     total_revenue: float | None
     total_profit: float | None
+    missing_diet_lots: list[str] = Field(default_factory=list)
 
 
 class DietRead(BaseModel):

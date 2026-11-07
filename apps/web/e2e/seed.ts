@@ -143,11 +143,13 @@ export async function openArea(page: Page, name: RegExp | string): Promise<void>
   await expect(async () => {
     if ((await button.count()) > 0) {
       await button.click();
+      await expect(button).toHaveAttribute("aria-current", "true", { timeout: 2_000 });
     } else {
-      await nav.getByRole("button", { name: /^(Mais|Insumos|Medições|Contas|Minha conta)$/ }).click();
+      const more = nav.getByRole("button", { name: "Mais", exact: true });
+      await more.click();
       await page.getByRole("group", { name: /mais áreas/i }).getByRole("button", { name }).click();
+      await expect(more).toHaveAttribute("aria-current", "true", { timeout: 2_000 });
     }
-    await expect(button).toHaveAttribute("aria-current", "true", { timeout: 2_000 });
   }).toPass({ timeout: 15_000 });
 }
 

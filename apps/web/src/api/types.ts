@@ -255,6 +255,7 @@ export interface ProductionPoint {
 }
 
 export interface DashboardSummary {
+  missing_diet_lots?: string[];
   measured_on: string | null;
   available_dates: string[];
   production_by_date: ProductionPoint[];

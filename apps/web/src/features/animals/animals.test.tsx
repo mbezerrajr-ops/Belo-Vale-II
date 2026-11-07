@@ -1,13 +1,15 @@
+import type { ReactElement } from 'react';
+import { FarmContext } from '../workspace/context';
 /**
  * Telas do cadastro de animais.
  *
- * Quem usa isto está no curral, no celular, com o brinco na mão. Os testes
+ * Quem usa isto está no curral, no aparelho, com o brinco na mão. Os testes
  * cobrem o caminho principal — achar a vaca, vincular brinco, mudar de lote —
  * e as proteções que impedem um erro caro: evidência obrigatória ao vincular
  * brinco, e nenhum campo de fazenda para o usuário preencher.
  */
 
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render as rtlRender, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AnimalDetailPanel } from "./AnimalDetailPanel";
@@ -22,6 +24,12 @@ vi.mock("../../api/client", async (importOriginal) => ({
   getAnimalProduction: () => new Promise(() => {}),
 }));
 
+const testFarm = { id: 'farm-test', name: 'Fazenda de teste', code: null, role: 'admin' as const, lot_settings: [
+  { name: 'LOTE 1', kind: 'diet' as const }, { name: 'LOTE 2', kind: 'diet' as const }, { name: 'LOTE 3', kind: 'diet' as const },
+  { name: 'LOTE 5', kind: 'diet' as const },
+  { name: 'ENGORDA', kind: 'management' as const },
+] };
+function render(ui: ReactElement) { return rtlRender(ui, { wrapper: ({ children }) => <FarmContext.Provider value={testFarm}>{children}</FarmContext.Provider> }); }
 const TOKEN = "token-de-teste";
 
 function animal(overrides: Partial<AnimalDetail> = {}): AnimalDetail {
@@ -234,7 +242,7 @@ describe("AnimalDetailPanel — vincular brinco", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /vincular brinco/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /registrar brinco/i })).toBeInTheDocument();
     expect(screen.getByText(/sem brinco/i)).toBeInTheDocument();
   });
 
@@ -294,13 +302,13 @@ describe("AnimalDetailPanel — vincular brinco", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /vincular brinco/i }));
+    fireEvent.click(screen.getByRole("button", { name: /registrar brinco/i }));
     fireEvent.change(screen.getByLabelText(/novo brinco/i), {
       target: { value: "B1-900" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /confirmar v[íi]nculo/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirmar (registro|troca)/i }));
 
-    expect(await screen.findByText(/informe a evid[êe]ncia/i)).toBeInTheDocument();
+    expect(await screen.findByText(/explique/i)).toBeInTheDocument();
     expect(link).not.toHaveBeenCalled();
   });
 
@@ -320,7 +328,7 @@ describe("AnimalDetailPanel — vincular brinco", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /mais ações/i }));
     fireEvent.click(screen.getByRole("button", { name: /tirar o brinco/i }));
-    fireEvent.change(screen.getByLabelText(/evid[êe]ncia/i), {
+    fireEvent.change(screen.getByLabelText(/motivo da alteração/i), {
       target: { value: "O 649 é da BRANQUINHA (folha de 25/08)" },
     });
     await act(async () => {
@@ -348,7 +356,7 @@ describe("AnimalDetailPanel — vincular brinco", () => {
     fireEvent.click(screen.getByRole("button", { name: /tirar o brinco/i }));
     fireEvent.click(screen.getByRole("button", { name: /confirmar e tirar o brinco/i }));
 
-    expect(await screen.findByText(/informe a evid[êe]ncia/i)).toBeInTheDocument();
+    expect(await screen.findByText(/explique/i)).toBeInTheDocument();
     expect(unlink).not.toHaveBeenCalled();
   });
 
@@ -379,14 +387,14 @@ describe("AnimalDetailPanel — vincular brinco", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /vincular brinco/i }));
+    fireEvent.click(screen.getByRole("button", { name: /registrar brinco/i }));
     fireEvent.change(screen.getByLabelText(/novo brinco/i), {
       target: { value: "B1-900" },
     });
-    fireEvent.change(screen.getByLabelText(/evid[êe]ncia/i), {
+    fireEvent.change(screen.getByLabelText(/motivo da alteração/i), {
       target: { value: "Brinco aplicado no curral" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /confirmar v[íi]nculo/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirmar (registro|troca)/i }));
 
     await waitFor(() =>
       expect(link).toHaveBeenCalledWith(
@@ -419,14 +427,14 @@ describe("AnimalDetailPanel — vincular brinco", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /vincular brinco/i }));
+    fireEvent.click(screen.getByRole("button", { name: /registrar brinco/i }));
     fireEvent.change(screen.getByLabelText(/novo brinco/i), {
       target: { value: "444" },
     });
-    fireEvent.change(screen.getByLabelText(/evid[êe]ncia/i), {
+    fireEvent.change(screen.getByLabelText(/motivo da alteração/i), {
       target: { value: "conferido" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /confirmar v[íi]nculo/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirmar (registro|troca)/i }));
 
     expect(await screen.findByText(/j[áa] pertence a outro animal/i)).toBeInTheDocument();
   });
@@ -442,7 +450,7 @@ describe("AnimalDetailPanel — vincular brinco", () => {
     );
 
     expect(
-      screen.queryByRole("button", { name: /vincular brinco/i }),
+      screen.queryByRole("button", { name: /registrar brinco/i }),
     ).not.toBeInTheDocument();
   });
 });

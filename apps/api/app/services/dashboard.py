@@ -129,6 +129,9 @@ class DashboardSummary:
     total_feed_cost: float = 0.0
     total_revenue: float | None = None
     total_profit: float | None = None
+    #: Nomes de lotes com animais e sem qualquer dieta cadastrada. Zero
+    #: explicitamente cadastrado continua sendo uma base de custo conhecida.
+    missing_diet_lots: list[str] = field(default_factory=list)
 
 
 def _as_float(value: Decimal | float | None) -> float:
@@ -301,8 +304,12 @@ async def build_dashboard(
     )
 
     lot_summaries: list[LotSummary] = []
+    missing_diet_lots: list[str] = []
     for name in lot_names:
         in_lot = [a for a in selected if lots.get(a.id) == name]
+        missing_diet = bool(in_lot) and name not in feed_by_lot
+        if missing_diet:
+            missing_diet_lots.append(name)
         production = sum(readings.get(a.id, 0.0) for a in in_lot)
         cost = feed_by_lot.get(name, 0.0)
         revenue = production * milk_price if has_milk_price else None
@@ -313,7 +320,7 @@ async def build_dashboard(
                 production=production,
                 feed_cost=cost,
                 revenue=revenue,
-                profit=(revenue - cost) if revenue is not None else None,
+                profit=(revenue - cost) if revenue is not None and not missing_diet else None,
                 cost_per_animal=cost / len(in_lot) if in_lot else 0.0,
                 production_per_animal=production / len(in_lot) if in_lot else 0.0,
                 cost_ratio=(cost / revenue) if revenue else 0.0,
@@ -361,5 +368,8 @@ async def build_dashboard(
         total_production=total_production,
         total_feed_cost=total_cost,
         total_revenue=total_revenue,
-        total_profit=(total_revenue - total_cost) if total_revenue is not None else None,
+        total_profit=(total_revenue - total_cost)
+        if total_revenue is not None and not missing_diet_lots
+        else None,
+        missing_diet_lots=missing_diet_lots,
     )

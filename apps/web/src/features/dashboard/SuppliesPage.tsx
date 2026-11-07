@@ -1,3 +1,4 @@
+import { SupplyDietForm } from './SupplyDietForm';
 import { useEffect, useState, type CSSProperties } from "react";
 
 import {
@@ -80,6 +81,8 @@ export function SuppliesPage({
   // olhada — antes cada um ocupava quase uma tela do celular.
   const [editing, setEditing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [dietEditor, setDietEditor] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function toggleHistory(supplyId: string): Promise<void> {
     if (history[supplyId]) {
@@ -142,6 +145,8 @@ export function SuppliesPage({
       </PageHeader>
 
       {error && <p role="alert">{error}</p>}
+      {notice && <p role="status">{notice}</p>}
+      {supplies?.length === 0 && <p className="notice">Comece cadastrando um insumo. Depois informe quanto o lote inteiro consome por dia para calcular o custo de alimentação.</p>}
 
       {canEdit && creating && (
         <form
@@ -176,7 +181,7 @@ export function SuppliesPage({
           />
           <button type="submit" disabled={busy || !newName.trim() || !newPrice}>
             Cadastrar insumo
-          </button>
+          </button><button type="button" className="secondary" onClick={() => setCreating(false)}>Cancelar</button>
         </form>
       )}
 
@@ -195,7 +200,7 @@ export function SuppliesPage({
           }}
         >
           <h3>Preço do leite</h3>
-          <p className="hint">Base do cálculo de receita e lucro.</p>
+          <p className="hint">Base da receita do leite e do resultado após alimentação.</p>
           <label htmlFor="milk-price">Preço por litro (R$)</label>
           <div className="inline-field">
             <input
@@ -274,7 +279,7 @@ export function SuppliesPage({
 
               {item.diets.length > 0 && (
                 <TableView
-                  columns={["Lote", "kg/dia", "Custo/dia"]}
+                  columns={["Lote", "kg/dia do lote inteiro", "Custo de alimentação/dia"]}
                   rows={item.diets.map((diet) => [
                     diet.lote,
                     diet.kg_per_day,
@@ -283,7 +288,9 @@ export function SuppliesPage({
                 />
               )}
 
+              {dietEditor === item.id && <SupplyDietForm supply={item} token={token} onCancel={() => setDietEditor(null)} onSaved={() => { setDietEditor(null); setNotice(`Dieta de ${item.name} salva. O painel usará a quantidade informada.`); void reload(); }} />}
               <div className="supply-actions">
+                {canEdit && <button type="button" className="secondary" aria-expanded={dietEditor === item.id} onClick={() => { setDietEditor(item.id); setEditing(null); setNotice(null); }}>Definir dieta</button>}
                 {canEdit && (
                   <button
                     type="button"
@@ -337,7 +344,7 @@ export function SuppliesPage({
                   </p>
                   <button type="submit" disabled={busy || !prices[item.id]}>
                     Salvar preço
-                  </button>
+                  </button><button type="button" className="secondary" onClick={() => setEditing(null)}>Cancelar</button>
                 </form>
               )}
             </li>

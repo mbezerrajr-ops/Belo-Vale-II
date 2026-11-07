@@ -1,3 +1,4 @@
+import { AppLink } from '../../ui/AppLink';
 import {
   Suspense,
   lazy,
@@ -61,7 +62,7 @@ const MAX_LITERS = 80;
 export const SAVE_TIMEOUT_MS = 15_000;
 
 const QUEUED =
-  "Sem sinal — guardado neste celular. Vai sozinho quando o sinal voltar.";
+  "Sem sinal — guardado neste aparelho. Ao recuperar a conexão, abra o aplicativo para enviar.";
 
 /**
  * A última folha vista de cada usuário/fazenda/lote/dia fica no aparelho,
@@ -332,12 +333,12 @@ const ProductionRow = memo(function ProductionRow({
       <span className="prod-state" aria-live="polite">
         {row.status === "saving" && "salvando…"}
         {row.status === "queued" && (
-          <span className="queued" aria-label="guardado no celular" title="Guardado no celular">
+          <span className="queued" role="img" aria-label="guardado no aparelho" title="Guardado no aparelho">
             <Icons.guardado />
           </span>
         )}
         {row.status === "saved" && (
-          <span className="ok" aria-label="salvo">
+          <span className="ok" role="img" aria-label="salvo">
             ✓
           </span>
         )}
@@ -746,7 +747,7 @@ export function ProductionPage({
           producao: input.producao ?? 0,
           observacao: input.observacao ?? null,
         }); } catch {
-          patch(animalId, { status: "error", message: "Não foi possível guardar neste celular. Confira o espaço disponível. Mantenha a tela aberta para tentar novamente." });
+          patch(animalId, { status: "error", message: "Não foi possível guardar neste aparelho. Confira o espaço disponível. Mantenha a tela aberta para tentar novamente." });
           return;
         }
         patch(animalId, { status: "queued", message: QUEUED });
@@ -955,7 +956,7 @@ export function ProductionPage({
             >
               {/* No celular estreito o "arquivo" sai da vista, mas o nome
                   lido continua "Importar arquivo". */}
-              Importar<span className="narrow-hide"> arquivo</span>
+              Importar planilha/PDF
             </button>
             {/* Exportar leva a produção do rebanho para fora do sistema: só
                 revisor e administrador (o servidor confere de novo). */}
@@ -979,6 +980,8 @@ export function ProductionPage({
             ? "Planilha (CSV ou XLSX) ou PDF com o brinco e os litros — total, ou manhã e tarde — e a observação, se houver. Nada é gravado antes da prévia."
             : "Planilha (XLSX) com a produção do período: uma linha por vaca por dia, com lote, manhã, tarde, total e observação."}
       </PageHeader>
+
+      <p className="production-photo-link">Recebeu uma foto de uma folha? <AppLink href="/revisao/foto">Ler foto da folha</AppLink>. O resultado será conferido em Revisão.</p>
 
       {how === "exportar" && (
         <Suspense fallback={<div className="skeleton" style={{ height: 120 }} role="status" aria-label="Carregando" />}>
@@ -1030,7 +1033,7 @@ export function ProductionPage({
         <p className="warning">
           Sem sinal: esta é a folha guardada às{" "}
           {new Date(staleAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.
-          Pode lançar — fica guardado e vai quando o sinal voltar.
+          Pode lançar: fica guardado neste aparelho. Ao recuperar a conexão, mantenha o aplicativo aberto ou abra novamente para enviar.
         </p>
       )}
 
@@ -1053,7 +1056,7 @@ export function ProductionPage({
               <span>
                 {savedRows.length} de {items.length} lançadas
                 {queuedCount > 0 &&
-                  ` · ${queuedCount} ${queuedCount === 1 ? "guardada" : "guardadas"} no celular`} · {lote} ·{" "}
+                  ` · ${queuedCount} ${queuedCount === 1 ? "guardada" : "guardadas"} no aparelho`} · {lote} ·{" "}
                 {brDate(day)}
               </span>
             </div>

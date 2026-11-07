@@ -114,7 +114,7 @@ describe("Gravar a ordenha no próprio app", () => {
     const tocador = screen.getByLabelText(/ouvir o que foi gravado/i);
     expect(tocador).toHaveAttribute("src", "blob:gravacao");
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^enviar$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^enviar (áudio )?para leitura$/i }));
     });
 
     const [[{ file }]] = onUpload.mock.calls;
@@ -166,7 +166,7 @@ describe("Gravar a ordenha no próprio app", () => {
       fireEvent.click(screen.getByRole("button", { name: /gravar de novo/i }));
     });
 
-    expect(screen.getByRole("button", { name: /^enviar$/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^enviar (áudio )?para leitura$/i })).toBeDisabled();
   });
 
   it("microfone negado explica o que fazer, e o campo de arquivo continua ali", async () => {
@@ -209,12 +209,12 @@ describe("A gravação não se perde", () => {
     await gravarEParar();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^enviar$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^enviar (áudio )?para leitura$/i }));
     });
     expect(screen.getByRole("alert")).toHaveTextContent(/confira a conex[ãa]o/i);
     expect(screen.getByLabelText(/ouvir o que foi gravado/i)).toBeInTheDocument();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^enviar$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^enviar (áudio )?para leitura$/i }));
     });
 
     expect(onUpload).toHaveBeenCalledTimes(2);
@@ -246,7 +246,7 @@ describe("A gravação não se perde", () => {
     setup();
     await gravarEParar();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^enviar$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^enviar (áudio )?para leitura$/i }));
     });
 
     const saida = new Event("beforeunload", { cancelable: true });

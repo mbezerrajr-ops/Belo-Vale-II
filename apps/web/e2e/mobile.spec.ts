@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { createMilkingCow, ensureAdminExists, ensureFarm, login, E2E_ADMIN_EMAIL, E2E_ADMIN_PASSWORD, runTag } from "./seed";
 
-// O app é usado no celular, no curral. Esta auditoria mede — não olha — as
+// O app é usado no aparelho, no curral. Esta auditoria mede — não olha — as
 // regras que já quebraram uma vez e foram corrigidas:
 //
 // - nada rola de lado (a Revisão chegou a 351 px num celular de 320);
@@ -102,7 +102,7 @@ for (const [width, height] of SIZES) {
 
     await go(page, "Produção");
     problems.push(...(await measure(page, "produção")));
-    await page.getByRole("button", { name: "Importar arquivo" }).click();
+    await page.getByRole("button", { name: "Importar planilha/PDF" }).click();
     problems.push(...(await measure(page, "produção / importar")));
     await page.getByRole("button", { name: "Exportar" }).click();
     await expect(page.getByRole("button", { name: "Baixar planilha" })).toBeVisible();
@@ -110,7 +110,7 @@ for (const [width, height] of SIZES) {
 
     await go(page, "Revisão");
     problems.push(...(await measure(page, "revisão")));
-    await page.getByRole("button", { name: "Enviar foto" }).click();
+    await page.getByRole("button", { name: "Ler foto da folha" }).click();
     problems.push(...(await measure(page, "revisão / enviar foto")));
     await page.getByRole("button", { name: "Cancelar" }).first().click();
 
@@ -126,10 +126,10 @@ for (const [width, height] of SIZES) {
 
     await go(page, "Insumos");
     problems.push(...(await measure(page, "insumos")));
-    await go(page, "Medições");
+    await go(page, "Histórico");
     problems.push(...(await measure(page, "medições")));
-    await go(page, "Contas");
-    await page.getByRole("button", { name: /Nova conta/ }).click();
+    await go(page, "Equipe");
+    await page.getByRole("button", { name: /Adicionar pessoa/ }).click();
     problems.push(...(await measure(page, "contas / nova conta")));
     await page.locator(".who .avatar").click();
     problems.push(...(await measure(page, "minha conta")));

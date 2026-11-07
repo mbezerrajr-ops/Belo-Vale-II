@@ -49,8 +49,8 @@ describe("UsersPage", () => {
       <UsersPage token={TOKEN} currentUserId="u-9" onList={list} onCreate={create} />,
     );
 
-    await screen.findByRole("button", { name: /nova conta/i });
-    fireEvent.click(screen.getByRole("button", { name: /nova conta/i }));
+    await screen.findByRole("button", { name: /adicionar pessoa/i });
+    fireEvent.click(screen.getByRole("button", { name: /adicionar pessoa/i }));
     fireEvent.change(screen.getByLabelText(/e-mail/i), {
       target: { value: "novo@belovale" },
     });
@@ -60,7 +60,7 @@ describe("UsersPage", () => {
     fireEvent.change(screen.getByLabelText(/fun[çc][ãa]o/i), {
       target: { value: "reviewer" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /criar conta/i }));
+    fireEvent.click(screen.getByRole("button", { name: /adicionar à equipe/i }));
 
     await waitFor(() =>
       expect(create).toHaveBeenCalledWith(
@@ -81,7 +81,7 @@ describe("UsersPage", () => {
       />,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: /nova conta/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /adicionar pessoa/i }));
     expect(screen.getByText(/pelo menos 8 caracteres/i)).toBeInTheDocument();
   });
 
@@ -102,15 +102,15 @@ describe("UsersPage", () => {
       />,
     );
 
-    await screen.findByRole("button", { name: /nova conta/i });
-    fireEvent.click(screen.getByRole("button", { name: /nova conta/i }));
+    await screen.findByRole("button", { name: /adicionar pessoa/i });
+    fireEvent.click(screen.getByRole("button", { name: /adicionar pessoa/i }));
     fireEvent.change(screen.getByLabelText(/e-mail/i), {
       target: { value: "fraco@belovale" },
     });
     fireEvent.change(screen.getByLabelText(/^senha/i), {
       target: { value: "senha123" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /criar conta/i }));
+    fireEvent.click(screen.getByRole("button", { name: /adicionar à equipe/i }));
 
     expect(await screen.findByText(/f[áa]cil de adivinhar/i)).toBeInTheDocument();
   });

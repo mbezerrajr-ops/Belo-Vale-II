@@ -56,7 +56,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(page.getByRole("navigation", { name: "Áreas" })).toBeVisible();
     problems.push(...(await audit(page, "painel")));
 
-    for (const area of ["Produção", "Revisão", "Animais", "Insumos", "Medições", "Contas"]) {
+    for (const area of ["Produção", "Revisão", "Animais", "Insumos", "Histórico", "Equipe"]) {
       await go(page, area);
       problems.push(...(await audit(page, area.toLowerCase())));
     }

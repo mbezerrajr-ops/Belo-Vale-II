@@ -38,10 +38,10 @@ test("grava, ouve, envia, e a proposta chega sozinha", async ({ page, browserNam
   await page.getByRole("button", { name: "Parar", exact: true }).click();
 
   await expect(page.getByLabel(/ouvir o que foi gravado/i)).toBeVisible();
-  await page.getByRole("button", { name: "Enviar", exact: true }).click();
+  await page.getByRole("button", { name: /Enviar (áudio )?para leitura/,  exact: true }).click();
 
   // Sem apertar "Atualizar": a tela acompanha a leitura até o fim.
-  await expect(page.getByText(/pronto: 1 proposta da grava[çc][ãa]o/i)).toBeVisible({
+  await expect(page.getByText(/1 registro da grava[çc][ãa]o.*aguardando conferência/i)).toBeVisible({
     timeout: 45_000,
   });
 });

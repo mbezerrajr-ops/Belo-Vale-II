@@ -73,6 +73,7 @@ export interface Variant {
 
 export interface SendUploadProps {
   token: string;
+  canReview?: boolean;
   /** Resolvida no servidor por quem renderiza; ninguém digita isto. */
   farmId: string;
   onUpload?: UploadFn;
@@ -142,6 +143,7 @@ function plural(n: number, um: string, varios: string): string {
 
 export function SendUpload({
   variant,
+  canReview = true,
   token,
   farmId,
   onUpload = uploadImport,
@@ -152,7 +154,7 @@ export function SendUpload({
   confirmDiscard = (message) => window.confirm(message),
   measureDuration = browserDuration,
 }: SendUploadProps & { variant: Variant }): JSX.Element {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(variant.arquivo === 'foto' && location.pathname.endsWith('/foto'));
   const [file, setFile] = useState<File | null>(null);
   // A gravação feita aqui só existe nesta tela até ser enviada.
   const [recorded, setRecorded] = useState(false);
@@ -292,7 +294,7 @@ export function SendUpload({
           fileName: file.name,
           declaredLot: variant.comLote && lote ? lote : undefined,
         }); } catch {
-          setState({ status: "error", message: "Não foi possível guardar neste celular. Confira o espaço disponível e tente novamente; o arquivo ainda está nesta tela." });
+          setState({ status: "error", message: "Não foi possível guardar neste aparelho. Confira o espaço disponível e tente novamente; o arquivo ainda está nesta tela." });
           return;
         }
         setState({ status: "queued" });
@@ -305,7 +307,12 @@ export function SendUpload({
       // O mesmo arquivo já está guardado: em vez de criar outra cópia, o
       // caminho certo é mandar ler de novo aquele.
       if (error instanceof ApiError && error.code === "duplicate_image") {
-        setState({ status: "duplicate", importId: String(error.body.existing_import_id ?? "") });
+        const importId = String(error.body.existing_import_id ?? "");
+        try {
+          const reading = await onWatch(importId, token);
+          if (reading.status === 'failed') { setState({ status: 'failed', importId, failure: reading.failure ?? 'internal' }); return; }
+        } catch { /* O retorno de duplicidade continua disponível para orientar a pessoa. */ }
+        setState({ status: "duplicate", importId });
         return;
       }
       // A gravação continua aqui: dá para tentar de novo quando o sinal voltar.
@@ -342,7 +349,7 @@ export function SendUpload({
     setOpen(false);
   }
 
-  const outcome = <Outcome state={state} variant={variant} onTryAgain={(id) => void readAgain(id)} />;
+  const outcome = <Outcome canReview={canReview} state={state} variant={variant} onTryAgain={(id) => void readAgain(id)} />;
 
   if (!open) {
     return (
@@ -373,8 +380,10 @@ export function SendUpload({
           }}
         />
       )}
-      <label htmlFor={variant.id}>{variant.rotulo}</label>
+      {variant.arquivo !== 'foto' && <label htmlFor={variant.id}>{variant.rotulo}</label>}
       <input
+        aria-label={variant.rotulo}
+        hidden={variant.arquivo === 'foto'}
         key={inputKey}
         ref={libraryInput}
         id={variant.id}
@@ -387,7 +396,7 @@ export function SendUpload({
         <>
           <div className="send-photo-actions">
             <button type="button" className="btn-ghost" onClick={() => cameraInput.current?.click()}>Tirar foto</button>
-            <button type="button" className="btn-ghost" onClick={() => libraryInput.current?.click()}>Escolher da biblioteca</button>
+            <button type="button" className="btn-ghost" onClick={() => libraryInput.current?.click()}>Escolher foto</button>
           </div>
           <input ref={cameraInput} type="file" accept="image/*" capture="environment"
             aria-label="Câmera da folha" hidden
@@ -423,7 +432,7 @@ export function SendUpload({
 
       <div className="send-photo-actions">
         <button type="submit" disabled={file === null || state.status === "sending"}>
-          Enviar
+          {state.status === 'sending' ? 'Enviando…' : variant.arquivo === 'foto' ? 'Enviar para leitura' : 'Enviar áudio para leitura'}
         </button>
         <button type="button" className="link-btn" onClick={cancel}>
           Cancelar
@@ -451,10 +460,12 @@ function RecorderSlot({
 }
 
 function Outcome({
+  canReview,
   state,
   variant,
   onTryAgain,
 }: {
+  canReview: boolean;
   state: State;
   variant: Variant;
   onTryAgain: (importId: string) => void;
@@ -470,8 +481,7 @@ function Outcome({
     case "done":
       return state.proposals > 0 ? (
         <p role="status">
-          Pronto: {plural(state.proposals, "proposta", "propostas")} {variant.daqui} esperando
-          revisão, logo abaixo.
+          Leitura concluída: {plural(state.proposals, "registro", "registros")} {variant.daqui} aguardando conferência, logo abaixo. Ainda não foram aprovados.
         </p>
       ) : (
         <p className="warning">{variant.vazio}</p>
@@ -498,16 +508,14 @@ function Outcome({
         <div className="hint">
           <p>{variant.repetido}</p>
           {state.notice && <p>{state.notice}</p>}
-          <button type="button" onClick={() => onTryAgain(state.importId)}>
-            {variant.deNovo}
-          </button>
+          {canReview ? <button type="button" onClick={() => onTryAgain(state.importId)}>{variant.deNovo}</button> : <p>Consulte as leituras desta foto na lista. Se ela já foi lida, peça a um revisor para solicitar uma nova leitura.</p>}
         </div>
       );
     case "queued":
       return (
         <p role="status" className="queued-note">
           Sem sinal — {variant.arquivo === "foto" ? "a foto ficou guardada" : "a gravação ficou guardada"}{" "}
-          neste celular. Vai sozinha quando o sinal voltar, e o que for lido aparece aqui.
+          neste aparelho. Ao recuperar a conexão, mantenha o aplicativo aberto ou abra novamente para enviar. A leitura automática será feita com conexão; depois, os dados aguardam conferência.
         </p>
       );
     case "error":

@@ -72,8 +72,8 @@ export function OutboxProvider({ outbox, userId, farmId, token, renew, send, chi
         timer = window.setTimeout(() => {
           setNotice(
             sent === 1
-              ? "O que estava guardado no celular foi enviado."
-              : `${sent} envios guardados no celular foram enviados.`,
+              ? "O que estava guardado no aparelho foi enviado."
+              : `${sent} envios guardados no aparelho foram enviados.`,
           );
           sent = 0;
           window.setTimeout(() => setNotice(null), 6_000);

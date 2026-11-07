@@ -31,8 +31,7 @@ export function OfflineBanner(): JSX.Element | null {
     return (
       <p className="offline-banner" role="status">
         <Icons.semSinal />
-        Sem sinal. O que você lançar fica guardado neste celular e vai sozinho quando o sinal
-        voltar.
+        Sem sinal. Produção, fotos e áudios enviados ficam guardados neste aparelho. Ao recuperar a conexão, mantenha o aplicativo aberto ou abra novamente para enviar.
       </p>
     );
   }
@@ -84,16 +83,17 @@ export function OutboxButton(): JSX.Element | null {
             className="outbox-panel"
             id="guardados"
             role="dialog"
-            aria-label="Guardados neste celular"
+            aria-label="Guardados neste aparelho"
             tabIndex={-1}
             ref={panel}
           >
-            <h3>Guardados neste celular</h3>
+            <h3>Guardados neste aparelho</h3>
             <p className="hint">
               {queue.online
-                ? "Esperando para enviar. Tente agora, ou deixe: vai sozinho."
-                : "Sem sinal agora. Vai sozinho quando o sinal voltar."}
+                ? "Aguardando envio. Mantenha o aplicativo aberto ou toque em Enviar agora."
+                : "Sem sinal. Ao recuperar a conexão, abra o aplicativo para enviar o que ficou guardado."}
             </p>
+            <p className="hint">Guardado aqui ainda não significa recebido pelo servidor. Após o envio, fotos e áudios precisam de leitura e conferência.</p>
             <ul>
               {queue.pending.map((item) => (
                 <li key={item.id} className={item.error ? "is-refused" : undefined}>
@@ -117,7 +117,7 @@ export function OutboxButton(): JSX.Element | null {
                       </button>
                     </>
                   ) : (
-                    <small>esperando sinal</small>
+                    <small>{queue.online ? "Aguardando envio" : "Aguardando conexão"}</small>
                   )}
                 </li>
               ))}

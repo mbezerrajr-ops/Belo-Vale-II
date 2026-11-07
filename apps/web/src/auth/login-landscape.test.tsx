@@ -50,7 +50,7 @@ describe("Paisagem do login", () => {
     expect(container.querySelectorAll("video")).toHaveLength(1);
   });
 
-  it("no celular, só a paisagem parada, sem vídeo e fora dos leitores de tela", () => {
+  it("no aparelho, só a paisagem parada, sem vídeo e fora dos leitores de tela", () => {
     ambiente();
 
     const { container } = render(<LoginLandscape />);
