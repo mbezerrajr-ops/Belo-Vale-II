@@ -21,6 +21,8 @@ import {
 import { Icons } from "../../ui/Brand";
 import { usePanelFocus } from "../../ui/usePanelFocus";
 import { brDate, farmToday } from "../../ui/dates";
+import { useActiveFarm } from '../workspace/context';
+import { FarmLotSelect } from '../workspace/FarmLotSelect';
 import { MergeFichas } from "./MergeFichas";
 import { ProductionHistory } from "./ProductionHistory";
 import type { ProductionHistoryEntry, Reading } from "../../api/types";
@@ -132,7 +134,12 @@ export function AnimalDetailPanel({
   const moreToggle = useRef<HTMLButtonElement>(null);
   const moreGroup = useRef<HTMLDivElement>(null);
   usePanelFocus(moreActions, moreGroup, moreToggle, () => setMoreActions(false));
+  const farm = useActiveFarm();
+  const actionOrigin = useRef<HTMLElement | null>(null);
+  const cancel = (): void => { setPanel('none'); setError(null); actionOrigin.current?.focus(); };
   const open = (next: typeof panel): void => {
+    actionOrigin.current = document.activeElement as HTMLElement;
+    setError(null);
     setPanel(next);
     setMoreActions(false);
   };
@@ -190,7 +197,7 @@ export function AnimalDetailPanel({
     }
     if (!evidence.trim()) {
       // Vincular brinco muda a identidade do animal: sem justificativa, não vai.
-      setError("Informe a evidência que sustenta o vínculo.");
+      setError("Explique o motivo para registrar ou trocar o brinco.");
       return;
     }
     void guard(() => onLinkBrinco(token, animal.id, brinco.trim(), evidence.trim()));
@@ -199,14 +206,14 @@ export function AnimalDetailPanel({
   function submitUnlinkBrinco(): void {
     if (!evidence.trim()) {
       // Tirar o brinco muda a identidade do animal, como vincular.
-      setError("Informe a evidência que sustenta tirar o brinco.");
+      setError("Explique por que está retirando o brinco.");
       return;
     }
     void guard(() => onUnlinkBrinco(token, animal.id, evidence.trim()));
   }
 
   function submitLot(): void {
-    if (!lote.trim()) {
+    if (!(farm?.lot_settings ?? []).some(item => item.name === lote)) {
       setError("Informe o lote.");
       return;
     }
@@ -350,7 +357,7 @@ export function AnimalDetailPanel({
               <Icons.lote /> Mudar de lote
             </button>
             <button type="button" className="secondary" onClick={() => open("brinco")}>
-              <Icons.brinco /> {animal.brinco ? "Trocar brinco" : "Vincular brinco"}
+              <Icons.brinco /> {animal.brinco ? "Trocar brinco" : "Registrar brinco"}
             </button>
             <button type="button" className="secondary" onClick={() => open("cadastro")}>
               <Icons.editar /> Editar cadastro
@@ -399,7 +406,7 @@ export function AnimalDetailPanel({
             submitBrinco();
           }}
         >
-          <h3>Vincular brinco</h3>
+          <h3>{animal.brinco ? 'Trocar brinco' : 'Registrar brinco'}</h3><p className="hint">Animal: {animal.name ?? 'sem nome'} · Brinco atual: {animal.brinco ?? 'sem brinco'}.</p>
           <label htmlFor="novo-brinco">Novo brinco</label>
           <input
             id="novo-brinco"
@@ -407,7 +414,7 @@ export function AnimalDetailPanel({
             onChange={(event) => setBrinco(event.target.value)}
             autoComplete="off"
           />
-          <label htmlFor="evidencia">Evidência</label>
+          <label htmlFor="evidencia">Motivo da alteração</label>
           <input
             id="evidencia"
             value={evidence}
@@ -419,8 +426,9 @@ export function AnimalDetailPanel({
             Isso muda a identidade do animal e fica registrado com seu nome.
           </p>
           <button type="submit" disabled={busy}>
-            Confirmar vínculo
+            {animal.brinco ? 'Confirmar troca' : 'Confirmar registro'}
           </button>
+          <button type="button" className="secondary" disabled={busy} onClick={cancel}>Cancelar</button>
         </form>
       )}
 
@@ -436,17 +444,18 @@ export function AnimalDetailPanel({
             Para brinco que caiu da orelha ou que estava na vaca errada. O número {animal.brinco}{" "}
             fica livre, e esta vaca deixa de receber leitura automática até ganhar outro.
           </p>
-          <label htmlFor="evidencia-tirar">Evidência</label>
+          <label htmlFor="evidencia-tirar">Motivo da alteração</label>
           <input
             id="evidencia-tirar"
             value={evidence}
             onChange={(event) => setEvidence(event.target.value)}
-            placeholder="Ex.: o 649 é da BRANQUINHA; esta será conferida no curral"
+            placeholder="Ex.: brinco perdido; o animal será identificado novamente no curral"
             autoComplete="off"
           />
           <button type="submit" className="danger" disabled={busy}>
             Confirmar e tirar o brinco
           </button>
+          <button type="button" className="secondary" disabled={busy} onClick={cancel}>Cancelar</button>
         </form>
       )}
 
@@ -459,12 +468,10 @@ export function AnimalDetailPanel({
         >
           <h3>Mudar de lote ou grupo</h3>
           <label htmlFor="novo-lote">Novo lote ou grupo</label>
-          <input
-            id="novo-lote"
-            value={lote}
-            onChange={(event) => setLote(event.target.value)}
-            autoComplete="off"
-          />
+          <FarmLotSelect id="novo-lote" value={lote} onChange={setLote} />
+          {lote && <p className="notice">{farm?.lot_settings?.find(item => item.name === lote)?.kind === 'diet'
+            ? `Lote de ordenha: ${animal.lote_atual ?? 'sem lote'} → ${lote}. O grupo de manejo permanece igual.`
+            : `Grupo de manejo: ${animal.grupo_manejo ?? 'sem grupo'} → ${lote}. O lote de ordenha permanece igual.`}</p>}
           <label htmlFor="valid-from">A partir de</label>
           <input
             id="valid-from"
@@ -480,6 +487,7 @@ export function AnimalDetailPanel({
           <button type="submit" disabled={busy}>
             Confirmar lote
           </button>
+          <button type="button" className="secondary" disabled={busy} onClick={cancel}>Cancelar</button>
         </form>
       )}
 
@@ -526,6 +534,7 @@ export function AnimalDetailPanel({
           <button type="submit" disabled={busy}>
             Confirmar baixa
           </button>
+          <button type="button" className="secondary" disabled={busy} onClick={cancel}>Cancelar</button>
         </form>
       )}
 
@@ -551,6 +560,7 @@ export function AnimalDetailPanel({
           <button type="submit" disabled={busy}>
             Confirmar e trazer de volta
           </button>
+          <button type="button" className="secondary" disabled={busy} onClick={cancel}>Cancelar</button>
         </form>
       )}
 
@@ -608,6 +618,7 @@ export function AnimalDetailPanel({
           <button type="submit" disabled={busy}>
             Salvar cadastro
           </button>
+          <button type="button" className="secondary" disabled={busy} onClick={cancel}>Cancelar</button>
         </form>
       )}
 

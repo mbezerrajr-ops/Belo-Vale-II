@@ -5,7 +5,10 @@ import { ApiError, type LoginResult } from "../api/types";
 
 export function apiMessage(error: unknown): string {
   const detail = error instanceof ApiError ? error.body.detail : null;
-  return typeof detail === "string" ? detail : "Não foi possível concluir. Confira a conexão e tente novamente.";
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) return detail.map(item => String(item.msg ?? 'Confira o preenchimento.').replace(/^Value error, /, '')).join(' ');
+  if (error instanceof TypeError) return 'Sem conexão. Confira a internet e tente novamente.';
+  return 'Não foi possível concluir. Confira os dados e tente novamente.';
 }
 
 export function AccountEntry({ onLoggedIn }: { onLoggedIn: (result: LoginResult) => void | Promise<void> }): JSX.Element {

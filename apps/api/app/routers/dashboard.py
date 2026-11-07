@@ -19,7 +19,7 @@ from app.core.farm_clock import farm_today
 from app.core.security import require_minimum_role
 from app.db.models import AuditEvent, Farm, Supply, SupplyDiet, SupplyPrice, User
 from app.db.session import get_db_session
-from app.routers.registry import resolve_current_farm
+from app.routers.registry import configured_destination, resolve_current_farm
 from app.schemas.dashboard import (
     DashboardRead,
     DietUpdate,
@@ -206,7 +206,7 @@ async def set_diet(
     user: Annotated[User, Depends(require_minimum_role("reviewer"))],
 ) -> SupplyRead:
     supply = await _supply_or_404(session, supply_id, farm.id)
-    lote = payload.lote.strip()
+    lote = configured_destination(farm, payload.lote, "diet")["name"]
 
     diet = await session.scalar(
         select(SupplyDiet).where(

@@ -4965,3 +4965,18 @@ img.upload-preview {
 .farm-settings summary { cursor: pointer; padding-block: 12px; }
 .farm-settings form { display: grid; gap: 10px; max-width: 640px; }
 .farm-settings input, .farm-settings textarea { min-height: 44px; max-width: 100%; font: inherit; font-size: 16px; padding: 8px; }
+
+/* Revisão de usabilidade: controles explícitos e a mesma identidade da fazenda. */
+.ux-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:14px;}
+.farm-lot-row{min-width:0;border:1px solid var(--line);border-radius:var(--radius-sm);padding:14px;margin:16px 0;background:var(--surface);}
+.farm-lot-row legend{font-weight:600;padding:0 6px;color:var(--ink-2);}
+.farm-lot-row input,.farm-lot-row select,.farm-settings select{width:100%;max-width:100%;box-sizing:border-box;}
+.ux-first-steps{padding:20px 24px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:var(--radius);margin-bottom:22px;box-shadow:var(--shadow);}
+.ux-first-steps h3{margin-top:0;}.ux-first-steps ol{padding-left:24px;}.ux-first-steps li{padding:8px 0;}
+.production-photo-link{padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);line-height:1.65;}
+.prod-modes{flex-wrap:wrap;max-width:100%;}.prod-modes button{white-space:normal;}
+.kpi>span{overflow-wrap:anywhere;}
+.warning a{color:inherit;text-decoration:underline;}
+.supply-price h4{margin-top:0;}.supply-price select{width:100%;max-width:100%;}
+@media(max-width:500px){.ux-actions>*{flex:1 1 auto;}.farm-settings .ux-actions>*{width:100%;}.ux-first-steps{padding:18px;}.production-photo-link a{display:inline-block;padding:4px 0;}}
+.warning a,.production-photo-link a,.ux-first-steps a{display:inline-flex;align-items:center;min-height:44px;}

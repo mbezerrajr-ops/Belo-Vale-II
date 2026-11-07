@@ -211,7 +211,7 @@ describe("Conta nova", () => {
       />,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: /nova conta/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /adicionar pessoa/i }));
     expect(screen.getByText(/no primeiro acesso/i)).toBeInTheDocument();
   });
 });

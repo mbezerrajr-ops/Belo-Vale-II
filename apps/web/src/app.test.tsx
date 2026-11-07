@@ -146,7 +146,7 @@ describe("App", () => {
     expect(api.listProposals).toHaveBeenCalledWith("token-de-teste", "pending");
   });
 
-  it("no celular, o que não cabe na barra fica em Mais", async () => {
+  it("no aparelho, o que não cabe na barra fica em Mais", async () => {
     // Oito destinos numa barra de 390 px cortavam o último rótulo e
     // escondiam os seguintes, sem sinal de que existiam.
     signedIn({ role: "admin", email: "dono@belovale" });
@@ -157,13 +157,13 @@ describe("App", () => {
 
     fireEvent.click(mais);
     const painel = screen.getByRole("group", { name: /mais áreas/i });
-    expect(within(painel).getByRole("button", { name: /contas/i })).toBeInTheDocument();
+    expect(within(painel).getByRole("button", { name: /equipe/i })).toBeInTheDocument();
     expect(within(painel).queryByRole("button", { name: /produção/i })).not.toBeInTheDocument();
     fireEvent.click(within(painel).getByRole("button", { name: /insumos/i }));
 
     expect(screen.queryByRole("group", { name: /mais áreas/i })).not.toBeInTheDocument();
-    // O botão diz em que área a pessoa está.
-    expect(screen.getByRole("button", { name: /^insumos$/i, expanded: false })).toHaveAttribute(
+    // O rótulo Mais permanece estável, com a seleção marcada.
+    expect(screen.getByRole("button", { name: /^mais$/i, expanded: false })).toHaveAttribute(
       "aria-current",
       "true",
     );
@@ -171,7 +171,7 @@ describe("App", () => {
 
   it("Minha conta abre pelo avatar, não pela barra, e tem o Sair do celular", async () => {
     // Na barra seria um terceiro caminho para o mesmo lugar; e o Sair do
-    // topo, no celular, era o botão mais fácil de tocar sem querer.
+    // topo, no aparelho, era o botão mais fácil de tocar sem querer.
     signedIn({ role: "admin", email: "dono@belovale" });
     render(<App />);
     const nav = await screen.findByRole("navigation", { name: "Áreas" });

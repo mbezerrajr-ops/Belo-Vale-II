@@ -861,6 +861,7 @@ export function ReviewInbox({
         <div className="send-uploads">
           <SendPhoto
             token={token}
+            canReview={canDecide}
             farmId={farmId}
             onUpload={onUpload}
             onReprocess={onReprocess}
@@ -869,6 +870,7 @@ export function ReviewInbox({
           />
           <SendAudio
             token={token}
+            canReview={canDecide}
             farmId={farmId}
             onUpload={onUpload}
             onReprocess={onReprocess}

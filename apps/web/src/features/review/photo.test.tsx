@@ -91,10 +91,10 @@ function chooseFile(): void {
 describe("Enviar foto pela Revisão", () => {
   it("permite escolher da biblioteca sem direcionar para a câmera", async () => {
     setup();
-    fireEvent.click(await screen.findByRole("button", { name: /enviar foto/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /ler foto da folha/i }));
     expect(screen.getByLabelText(/foto da folha/i)).not.toHaveAttribute("capture");
     expect(screen.getByLabelText("Câmera da folha")).toHaveAttribute("capture", "environment");
-    expect(screen.getByRole("button", { name: "Escolher da biblioteca" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Escolher foto" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tirar foto" })).toBeInTheDocument();
     chooseFile();
     expect(screen.getByText(/foto escolhida: folha.jpg/i)).toBeInTheDocument();
@@ -102,10 +102,10 @@ describe("Enviar foto pela Revisão", () => {
   it("manda a foto e avisa que a leitura está em andamento", async () => {
     const { onUpload } = setup();
 
-    fireEvent.click(await screen.findByRole("button", { name: /enviar foto/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /ler foto da folha/i }));
     chooseFile();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^enviar$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^enviar (áudio )?para leitura$/i }));
     });
 
     expect(onUpload).toHaveBeenCalledWith(
@@ -123,10 +123,10 @@ describe("Enviar foto pela Revisão", () => {
       );
     const { onReprocess } = setup({ onUpload });
 
-    fireEvent.click(await screen.findByRole("button", { name: /enviar foto/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /ler foto da folha/i }));
     chooseFile();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^enviar$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^enviar (áudio )?para leitura$/i }));
     });
 
     expect(await screen.findByText(/j[áa] foi enviada/i)).toBeInTheDocument();
@@ -140,10 +140,10 @@ describe("Enviar foto pela Revisão", () => {
     const onUpload = vi.fn().mockRejectedValue(new Error("sem rede"));
     setup({ onUpload });
 
-    fireEvent.click(await screen.findByRole("button", { name: /enviar foto/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /ler foto da folha/i }));
     chooseFile();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^enviar$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^enviar (áudio )?para leitura$/i }));
     });
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/n[ãa]o foi poss[íi]vel enviar/i);

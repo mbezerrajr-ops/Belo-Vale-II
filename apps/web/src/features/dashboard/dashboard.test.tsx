@@ -15,6 +15,21 @@ import type { DashboardSummary, Supply } from "../../api/types";
 
 const TOKEN = "token-de-teste";
 
+it('distingue dieta ausente de um custo de alimentação conhecido igual a zero', async () => {
+  const missing = summary({ missing_diet_lots: ['LOTE 1'] });
+  const view = render(<HerdDashboard token={TOKEN} onLoad={vi.fn().mockResolvedValue(missing)} />);
+  const result = await screen.findByText('Resultado após alimentação/dia');
+  expect(result.closest('.kpi')).toHaveTextContent('—');
+  expect(screen.getByText(/Dieta não cadastrada: LOTE 1/)).toBeInTheDocument();
+  const known = summary({ missing_diet_lots: [], total_feed_cost: 0, total_profit: 50,
+    lots: [{ ...missing.lots[0], feed_cost: 0, profit: 50, cost_per_animal: 0, cost_ratio: 0 }],
+  });
+  view.rerender(<HerdDashboard token={TOKEN} onLoad={vi.fn().mockResolvedValue(known)} />);
+  await waitFor(() => expect(screen.queryByText(/Dieta não cadastrada: LOTE 1/)).not.toBeInTheDocument());
+  expect(screen.getByText('Alimentação/dia').closest('.kpi')).toHaveTextContent(/0,00/);
+  expect(screen.queryByText('Nenhum lote com dieta cadastrada.')).not.toBeInTheDocument();
+});
+
 function summary(overrides: Partial<DashboardSummary> = {}): DashboardSummary {
   return {
     measured_on: "2026-08-25",
@@ -297,7 +312,7 @@ describe("HerdDashboard", () => {
 
     render(<HerdDashboard token={TOKEN} onLoad={vi.fn().mockResolvedValue(vazio)} />);
 
-    expect(await screen.findByText(/nenhuma medi[çc][ãa]o/i)).toBeInTheDocument();
+    expect(await screen.findByText(/nenhuma produção/i)).toBeInTheDocument();
   });
 });
 

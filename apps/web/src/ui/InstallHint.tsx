@@ -35,7 +35,7 @@ export function InstallHint(): JSX.Element | null {
       <h3 id="instalar-titulo">Usar como aplicativo</h3>
       <p className="hint">
         Na tela inicial, o Belo Vale abre em tela cheia e funciona mesmo quando o sinal cai no
-        curral.
+        curral. Faça o primeiro acesso com conexão e carregue as folhas que usará. A leitura automática de fotos e áudios precisa de internet.
       </p>
       {qual === "iphone" ? (
         <ol>

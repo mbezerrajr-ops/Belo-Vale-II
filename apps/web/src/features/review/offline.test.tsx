@@ -1,5 +1,5 @@
 /**
- * Foto e gravação sem sinal: o arquivo inteiro fica no celular e sobe
+ * Foto e gravação sem sinal: o arquivo inteiro fica no aparelho e sobe
  * sozinho quando der. Antes, a gravação da ordenha se perdia ao sair da tela.
  */
 
@@ -23,26 +23,26 @@ function page(outbox: Outbox, send: Senders) {
 }
 
 async function sendPhoto(): Promise<File> {
-  fireEvent.click(await screen.findByRole("button", { name: /enviar foto/i }));
+  fireEvent.click(await screen.findByRole("button", { name: /ler foto da folha/i }));
   const file = new File(["folha do curral"], "folha.jpg", { type: "image/jpeg" });
   fireEvent.change(screen.getByLabelText(/foto da folha/i), { target: { files: [file] } });
   fireEvent.change(screen.getByLabelText(/lote/i), { target: { value: "LOTE 2" } });
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: /^enviar$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^enviar (áudio )?para leitura$/i }));
   });
   return file;
 }
 
 describe("Foto sem sinal", () => {
-  it("fica guardada no celular, com o lote, e o formulário fecha", async () => {
+  it("fica guardada no aparelho, com o lote, e o formulário fecha", async () => {
     const outbox = new Outbox(memoryStore());
     const uploadImport = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
     page(outbox, { enterReading: vi.fn(), uploadImport });
 
     const file = await sendPhoto();
 
-    expect(await screen.findByRole("status")).toHaveTextContent(/a foto ficou guardada neste celular/i);
-    expect(screen.queryByRole("button", { name: /^enviar$/i })).not.toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent(/a foto ficou guardada neste aparelho/i);
+    expect(screen.queryByRole("button", { name: /^enviar (áudio )?para leitura$/i })).not.toBeInTheDocument();
     const [item] = await outbox.list(USER);
     expect(item).toMatchObject({ kind: "upload", arquivo: "foto", farmId: FARM, declaredLot: "LOTE 2", fileName: "folha.jpg" });
     expect(item.kind === "upload" && item.blob.size).toBe(file.size);

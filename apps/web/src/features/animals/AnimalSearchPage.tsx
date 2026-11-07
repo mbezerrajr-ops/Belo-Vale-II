@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 
+import { FarmLotSelect } from '../workspace/FarmLotSelect';
 import { createAnimal, searchAnimals } from "../../api/client";
 import { EXIT_REASON_LABEL, type Animal, type AnimalPage, type AnimalSearch } from "../../api/types";
 import { Icons } from "../../ui/Brand";
@@ -271,18 +272,14 @@ export function AnimalSearchPage({
             autoComplete="off"
           />
           <label htmlFor="new-lote">Lote ou grupo (opcional)</label>
-          <input
-            id="new-lote"
-            value={newLote}
-            onChange={(event) => setNewLote(event.target.value)}
-            autoComplete="off"
-          />
+          <FarmLotSelect id="new-lote" value={newLote} onChange={setNewLote} optional />
           <p className="hint">
             O animal pode ser cadastrado sem brinco e receber um depois.
           </p>
           <button type="submit" disabled={busy}>
             Salvar animal
           </button>
+          <button type="button" className="secondary" onClick={() => { setCreating(false); setNewBrinco(''); setNewName(''); setNewLote(''); }}>Cancelar</button>
         </form>
       )}
 
@@ -297,7 +294,7 @@ export function AnimalSearchPage({
       {result && (
         <>
           {result.items.length === 0 ? (
-            <p className="chart-empty">Nenhum animal encontrado para essa busca.</p>
+            <div className="chart-empty">{searching ? <p>Nenhum animal encontrado para essa busca. Tente outro brinco ou nome.</p> : <><p>Seu rebanho ainda não tem animais cadastrados.</p>{canEdit ? <button type="button" onClick={() => setCreating(true)}>Cadastrar primeiro animal</button> : <p>Peça ao administrador para cadastrar os animais.</p>}</>}</div>
           ) : (
             <ul className="animal-list">
               {result.items.map((item, index) => (

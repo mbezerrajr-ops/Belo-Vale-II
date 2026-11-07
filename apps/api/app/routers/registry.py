@@ -72,6 +72,20 @@ def _conflict(error: AnimalRegistryError) -> HTTPException:
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error))
 
 
+def configured_destination(farm: Farm, name: str, kind: str | None = None) -> dict:
+    """A digitação manual nunca cria uma categoria de manejo por inferência."""
+    folded = " ".join(name.split()).casefold()
+    destination = next(
+        (lot for lot in (farm.lot_settings or []) if lot["name"].casefold() == folded),
+        None,
+    )
+    if destination is None:
+        raise HTTPException(422, "Escolha um lote ou grupo cadastrado na configuração da fazenda.")
+    if kind is not None and kind != destination["kind"]:
+        raise HTTPException(422, "O tipo informado não corresponde ao destino cadastrado.")
+    return destination
+
+
 async def _read_model(session: AsyncSession, animal: Animal) -> AnimalRead:
     # Lote de ordenha e grupo de manejo vêm separados: dizer que uma vaca seca
     # está "no lote BEZERREIRO" seria falso — ela não está em lote nenhum.
@@ -107,6 +121,7 @@ async def create_animal_endpoint(
     farm: Annotated[Farm, Depends(resolve_current_farm)],
     user: Annotated[User, Depends(require_minimum_role("reviewer"))],
 ) -> AnimalRead:
+    destination = configured_destination(farm, payload.lote) if payload.lote else None
     try:
         animal = await create_animal(
             session,
@@ -121,7 +136,7 @@ async def create_animal_endpoint(
             nascimento=payload.nascimento,
             peso=payload.peso,
             observacoes=payload.observacoes,
-            lote=payload.lote,
+            lote=destination["name"] if destination else None,
             lote_valid_from=payload.lote_valid_from,
         )
     except AnimalRegistryError as error:
@@ -373,15 +388,16 @@ async def assign_lot_endpoint(
     farm: Annotated[Farm, Depends(resolve_current_farm)],
     user: Annotated[User, Depends(require_minimum_role("reviewer"))],
 ) -> AnimalRead:
+    destination = configured_destination(farm, payload.lote, payload.kind)
     try:
         await assign_lot(
             session,
             animal_id=animal_id,
             farm_id=farm.id,
             actor=user.email,
-            lote=payload.lote,
+            lote=destination["name"],
             valid_from=payload.valid_from,
-            kind=payload.kind,
+            kind=destination["kind"],
         )
     except AnimalRegistryError as error:
         raise _conflict(error) from error

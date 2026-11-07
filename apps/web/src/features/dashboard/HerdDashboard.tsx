@@ -1,5 +1,7 @@
+import { AppLink } from '../../ui/AppLink';
 import { useEffect, useState } from "react";
 
+import { useActiveFarm } from '../workspace/context';
 import { getDashboard } from "../../api/client";
 import type { DashboardFilters, DashboardSummary } from "../../api/types";
 import {
@@ -20,7 +22,7 @@ import { PageHeader } from "../../ui/PageHeader";
  * Porta os indicadores da plataforma legada sobre os dados no banco, com as
  * mesmas fórmulas. Cada gráfico tem tooltip por marca e visão em tabela.
  *
- * Quando falta o preço do leite, receita e lucro aparecem como "—", nunca como
+ * Quando falta o preço do leite, receita e resultado após alimentação aparecem como "—", nunca como
  * R$ 0,00 — não saber quanto se recebe é diferente de não receber nada.
  */
 
@@ -50,6 +52,7 @@ export function HerdDashboard({
   token,
   onLoad = getDashboard,
 }: Props): JSX.Element {
+  const farm = useActiveFarm();
   const [panel, setPanel] = useState<DashboardSummary | null>(null);
   const [filters, setFilters] = useState<DashboardFilters>({});
   const [error, setError] = useState<string | null>(null);
@@ -130,8 +133,10 @@ export function HerdDashboard({
     panel.lot_animals_with_reading > 0 &&
     panel.lot_animals_with_reading < panel.lot_animals;
 
+  const missingDiets = panel.missing_diet_lots ?? [];
+  const costIncomplete = missingDiets.length > 0 || panel.lots.length === 0;
   const lotsWithData = panel.lots.filter((lot) => lot.animals > 0 || lot.feed_cost > 0);
-  const lotsWithCost = lotsWithData.filter((lot) => lot.feed_cost > 0);
+  const lotsWithCost = lotsWithData.filter((lot) => !missingDiets.includes(lot.lote));
   // Topo comum das duas listas de produção (maiores e menores).
   const producerScale = Math.max(
     1,
@@ -142,6 +147,16 @@ export function HerdDashboard({
   return (
     <section className="dashboard" aria-busy={loading}>
       <PageHeader title="Painel do rebanho" />
+      {panel.total_animals === 0 && <section className="ux-first-steps" aria-labelledby="first-steps-title">
+        <h3 id="first-steps-title">Vamos começar sua fazenda</h3>
+        <p>Prepare o cadastro e depois registre a primeira produção.</p>
+        <ol>
+          <li>{farm?.role === 'admin' ? <AppLink href="/minha-conta/fazenda">Configurar os lotes da fazenda</AppLink> : 'Peça ao administrador para configurar os lotes.'}</li>
+          <li><AppLink href="/animais">Cadastrar os animais</AppLink></li>
+          <li><AppLink href="/producao">Lançar a produção</AppLink> ou <AppLink href="/revisao/foto">ler uma foto da folha</AppLink></li>
+        </ol>
+        <p className="hint">Depois, em Insumos, informe os preços e as dietas para acompanhar o custo de alimentação.</p>
+      </section>}
 
       <div className="filters">
         <div>
@@ -207,14 +222,13 @@ export function HerdDashboard({
 
       {panel.measured_on === null && (
         <p className="warning">
-          Nenhuma medição registrada ainda. Envie uma ficha para ver produção e
-          receita.
+          Nenhuma produção registrada ainda. Cadastre os animais e lance a produção ou envie uma foto da folha para leitura.
         </p>
       )}
 
       {panel.milk_price === null && (
         <p className="warning">
-          Preço do leite não definido — receita e lucro não podem ser
+          Preço do leite não definido — receita e resultado após alimentação não podem ser
           calculados. Ajuste em Insumos.
         </p>
       )}
@@ -225,11 +239,13 @@ export function HerdDashboard({
         <p className="warning coverage">
           Leitura de {fmt.int(panel.lot_animals_with_reading)} de {fmt.int(panel.lot_animals)}{" "}
           animais dos lotes de ordenha (
-          {fmt.pct(panel.lot_animals_with_reading / panel.lot_animals)}) — receita e lucro saem
+          {fmt.pct(panel.lot_animals_with_reading / panel.lot_animals)}) — receita e resultado após alimentação saem
           subestimados; compare datas com cobertura parecida.
         </p>
       )}
 
+      <p className="hint">O resultado considera a receita do leite menos a alimentação cadastrada. Outros gastos da fazenda, como mão de obra e energia, não estão incluídos.</p>
+      {costIncomplete && <p className="warning"><span>{missingDiets.length > 0 ? `Dieta não cadastrada: ${missingDiets.join(', ')}.` : 'Ainda não há base para calcular o custo de alimentação.'} O custo e o resultado ficam incompletos. <AppLink href="/insumos">Definir dietas em Insumos</AppLink>.</span></p>}
       {/* O que o dono quer saber primeiro: quanto saiu de leite e quanto
           sobrou. O resto explica esses dois. */}
       <div className="kpis kpis-hero">
@@ -244,8 +260,8 @@ export function HerdDashboard({
         <StatTile
           index={1}
           size="hero"
-          label="Lucro/dia"
-          value={panel.total_profit}
+          label="Resultado após alimentação/dia"
+          value={costIncomplete ? null : panel.total_profit}
           format={fmt.brl}
           color={
             panel.total_profit !== null && panel.total_profit < 0
@@ -264,8 +280,8 @@ export function HerdDashboard({
         />
         <StatTile
           index={3}
-          label="Custo/dia"
-          value={panel.total_feed_cost}
+          label="Alimentação/dia"
+          value={costIncomplete ? null : panel.total_feed_cost}
           format={fmt.brl}
           color="var(--series-2)"
         />
@@ -322,7 +338,7 @@ export function HerdDashboard({
       <ChartCard
         index={2}
         title="Comparativo por lote de ordenha"
-        description="Custo da dieta e receita da produção lida, por dia. Abaixo de cada lote, o lucro."
+        description="Custo da dieta e receita da produção lida, por dia. Abaixo de cada lote, o resultado após alimentação."
       >
         {lotsWithCost.length === 0 ? (
           <p className="chart-empty">Nenhum lote com dieta cadastrada.</p>
@@ -337,21 +353,21 @@ export function HerdDashboard({
                 lot.profit === null
                   ? undefined
                   : {
-                      text: fmt.brl(lot.profit),
+                      text: missingDiets.includes(lot.lote) ? "Incompleto" : fmt.brl(lot.profit),
                       sign: lot.profit < 0 ? "neg" : lot.profit > 0 ? "pos" : "zero",
                     },
             }))}
           />
         )}
         <TableView
-          columns={["Lote", "Vacas", "Produção", "Custo", "Receita", "Lucro"]}
+          columns={["Lote", "Vacas", "Produção", "Alimentação", "Receita", "Resultado após alimentação"]}
           rows={lotsWithData.map((lot) => [
             lot.lote,
             lot.animals,
             fmt.liters(lot.production),
-            fmt.brl(lot.feed_cost),
+            missingDiets.includes(lot.lote) ? "Dieta não cadastrada" : fmt.brl(lot.feed_cost),
             fmt.brl(lot.revenue),
-            fmt.brl(lot.profit),
+            missingDiets.includes(lot.lote) ? "Incompleto" : fmt.brl(lot.profit),
           ])}
         />
       </ChartCard>
@@ -360,7 +376,7 @@ export function HerdDashboard({
         <ChartCard
           index={3}
           title="Onde os animais estão"
-          description="Áreas e categorias da fazenda. Não são lotes de ordenha: não têm dieta nem custo."
+          description="Áreas e categorias da fazenda. Não são lotes de ordenha: não possuem dieta de ordenha neste cálculo."
         >
           <BarList
             // Os maiores grupos primeiro: é onde está a maior parte do rebanho.

@@ -54,7 +54,7 @@ describe("Enviar a gravação pela Revisão", () => {
 
     abrirEEscolher();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^enviar$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^enviar (áudio )?para leitura$/i }));
     });
 
     expect(onUpload).toHaveBeenCalledWith(
@@ -97,7 +97,7 @@ describe("Enviar a gravação pela Revisão", () => {
 
     abrirEEscolher();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^enviar$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^enviar (áudio )?para leitura$/i }));
     });
 
     expect(await screen.findByText(/esta grava[çc][ãa]o j[áa] foi enviada/i)).toBeInTheDocument();
@@ -113,7 +113,7 @@ describe("Enviar a gravação pela Revisão", () => {
 
     abrirEEscolher();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^enviar$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^enviar (áudio )?para leitura$/i }));
     });
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/grave em peda[çc]os menores/i);
@@ -130,7 +130,7 @@ async function passar(ms: number): Promise<void> {
 async function enviarGravacao(): Promise<void> {
   abrirEEscolher();
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: /^enviar$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^enviar (áudio )?para leitura$/i }));
   });
 }
 
@@ -157,7 +157,7 @@ describe("Acompanhar a leitura até o fim", () => {
     expect(screen.getByText(/ouvindo a grava[çc][ãa]o/i)).toBeInTheDocument();
     await passar(2100);
 
-    expect(screen.getByRole("status")).toHaveTextContent(/pronto: 4 propostas da grava[çc][ãa]o/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/4 registros da grava[çc][ãa]o.*aguardando conferência/i);
     expect(onSent).toHaveBeenCalledTimes(1);
     expect(onWatch).toHaveBeenCalledWith("i-1", TOKEN);
   });
@@ -210,7 +210,7 @@ describe("Acompanhar a leitura até o fim", () => {
     await passar(1600);
     await passar(2100);
 
-    expect(screen.getByRole("status")).toHaveTextContent(/1 proposta da grava[çc][ãa]o/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/1 registro da grava[çc][ãa]o/i);
   });
 
   it("o token renovado vale para a próxima pergunta", async () => {
@@ -269,7 +269,7 @@ describe("Gravação mais longa que o limite", () => {
 
     expect(measureDuration).toHaveBeenCalledWith(expect.any(File));
     expect(screen.getByText(/tem 7:12; s[óo] os primeiros 5:00 ser[ãa]o ouvidos/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^enviar$/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^enviar (áudio )?para leitura$/i })).toBeEnabled();
   });
 
   it("dentro do limite, não avisa nada", async () => {

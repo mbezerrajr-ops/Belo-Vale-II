@@ -105,10 +105,10 @@ export function LoginForm({
   return (
     <form onSubmit={handleSubmit} aria-label="Entrar">
       <h2>Entrar</h2>
-      <p className="sub">Use a conta criada pelo administrador da fazenda.</p>
+      <p className="sub">Entre com seu e-mail e senha para acessar sua fazenda.</p>
       {!online && (
         <p className="warning login-offline" role="status">
-          Sem sinal. Para entrar o celular precisa de conexão; depois de entrar, o que você lançar
+          Sem sinal. Para entrar, este aparelho precisa de conexão; depois de entrar, o que você lançar
           sem sinal fica guardado.
         </p>
       )}
@@ -179,7 +179,7 @@ export function LoginForm({
         {state === "submitting" ? "Entrando…" : "Entrar"}
       </button>
       <p className="login-help">
-        Esqueceu a senha? Peça ao administrador uma senha provisória — ele gera em Contas.
+        Você também pode pedir ao administrador uma senha provisória, gerada em Equipe.
       </p>
     </form>
   );

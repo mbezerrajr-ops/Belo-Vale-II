@@ -105,7 +105,7 @@ export function UsersPage({
     confirmBox.current?.scrollIntoView?.({ block: "nearest" });
   }, [confirmingId]);
 
-  // A lista primeiro: é o que se consulta. Criar conta é de vez em quando.
+  // A lista primeiro: é o que se consulta. Adicionar à equipe é de vez em quando.
   const [creating, setCreating] = useState(false);
 
   async function handleCreate(): Promise<void> {
@@ -167,7 +167,7 @@ export function UsersPage({
   return (
     <section className="users">
       <PageHeader
-        title="Contas"
+        title="Equipe"
         actions={
           <button
             type="button"
@@ -175,7 +175,7 @@ export function UsersPage({
             aria-expanded={creating}
             onClick={() => setCreating((open) => !open)}
           >
-            <Icons.novo /> Nova conta
+            <Icons.novo /> Adicionar pessoa
           </button>
         }
       >
@@ -189,7 +189,7 @@ export function UsersPage({
             void handleCreate();
           }}
         >
-          <h3>Criar conta</h3>
+          <h3>Adicionar à equipe</h3>
           <label htmlFor="user-email">E-mail</label>
           <input
             id="user-email"
@@ -223,7 +223,7 @@ export function UsersPage({
           </select>
           <p className="hint">{ROLE_LABEL[role]}</p>
           <button type="submit" disabled={busy}>
-            Criar conta
+            Adicionar à equipe
           </button>
         </form>
       )}
@@ -273,7 +273,7 @@ export function UsersPage({
         </div>
       )}
 
-      <h3 className="sr-only">Contas existentes</h3>
+      <h3 className="sr-only">Pessoas da equipe</h3>
       {page === null ? (
         error ? (
           <button type="button" className="secondary" onClick={() => void reload()}>

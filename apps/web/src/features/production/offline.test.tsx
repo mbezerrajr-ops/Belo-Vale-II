@@ -71,7 +71,7 @@ afterEach(() => {
 });
 
 describe("Produção sem sinal", () => {
-  it("sem sinal, guarda no celular em vez de pedir para tentar de novo", async () => {
+  it("sem sinal, guarda no aparelho em vez de pedir para tentar de novo", async () => {
     const outbox = new Outbox(memoryStore());
     const send: Senders = { enterReading: vi.fn(offline), uploadImport: vi.fn() };
     page(outbox, send);
@@ -80,13 +80,13 @@ describe("Produção sem sinal", () => {
     fireEvent.change(field, { target: { value: "21,5" } });
     fireEvent.blur(field);
 
-    expect(await screen.findByText(/guardado neste celular/i)).toBeInTheDocument();
-    expect(screen.getByLabelText("guardado no celular")).toBeInTheDocument();
+    expect(await screen.findByText(/guardado neste aparelho/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("guardado no aparelho")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /tentar de novo/i })).not.toBeInTheDocument();
     expect(await outbox.list(USER)).toEqual([
       expect.objectContaining({ animalId: "a-027", measuredOn: DAY, producao: 21.5, label: "BORBOREMA" }),
     ]);
-    expect(screen.getByText(/1 guardada no celular/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 guardada no aparelho/i)).toBeInTheDocument();
   });
 
   it("recarregar a tela não perde o valor guardado", async () => {
@@ -96,7 +96,7 @@ describe("Produção sem sinal", () => {
 
     const field = await screen.findByLabelText("Litros de BORBOREMA");
     await waitFor(() => expect(field).toHaveValue("19"));
-    expect(screen.getByLabelText("guardado no celular")).toBeInTheDocument();
+    expect(screen.getByLabelText("guardado no aparelho")).toBeInTheDocument();
   });
 
   it("quando o sinal volta, o guardado vira lançado", async () => {
@@ -107,7 +107,7 @@ describe("Produção sem sinal", () => {
     const field = await screen.findByLabelText("Litros de BORBOREMA");
     fireEvent.change(field, { target: { value: "21,5" } });
     fireEvent.blur(field);
-    await screen.findByLabelText("guardado no celular");
+    await screen.findByLabelText("guardado no aparelho");
 
     enterReading.mockResolvedValue(reading(21.5));
     await act(async () => {
@@ -132,7 +132,7 @@ describe("Produção sem sinal", () => {
     expect(screen.getByText(/folha guardada/i)).toBeInTheDocument();
   });
 
-  it("a observação também fica guardada no celular", async () => {
+  it("a observação também fica guardada no aparelho", async () => {
     const outbox = new Outbox(memoryStore());
     page(outbox, { enterReading: vi.fn(offline), uploadImport: vi.fn() });
 
@@ -142,7 +142,7 @@ describe("Produção sem sinal", () => {
     fireEvent.change(note, { target: { value: "→ Seca" } });
     fireEvent.blur(note);
 
-    await screen.findByLabelText("guardado no celular");
+    await screen.findByLabelText("guardado no aparelho");
     expect(await outbox.list(USER)).toEqual([
       expect.objectContaining({ animalId: "a-027", producao: 7, observacao: "→ Seca" }),
     ]);
@@ -163,7 +163,7 @@ describe("Produção sem sinal", () => {
     });
     const send: Senders = { enterReading, uploadImport: vi.fn() };
     page(outbox, send);
-    await screen.findByLabelText("guardado no celular");
+    await screen.findByLabelText("guardado no aparelho");
 
     online = true;
     const field = screen.getByLabelText("Litros de BORBOREMA");

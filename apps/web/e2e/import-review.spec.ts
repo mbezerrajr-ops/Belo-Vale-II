@@ -41,11 +41,11 @@ test.describe("foto da folha até a medição oficial", () => {
     await loginAsAdmin(page);
     await openArea(page, /Revisão/);
 
-    await page.getByRole("button", { name: "Enviar foto" }).click();
+    await page.getByRole("button", { name: "Ler foto da folha" }).click();
     // Uma cópia com sufixo único: Postgres e MinIO persistem entre execuções,
     // e os mesmos bytes cairiam na proteção contra foto duplicada.
     await page.getByLabel(/foto da folha/i).setInputFiles(uniqueFixtureCopy(FIXTURE_SHEET));
-    await page.getByRole("button", { name: "Enviar", exact: true }).click();
+    await page.getByRole("button", { name: /Enviar (áudio )?para leitura/,  exact: true }).click();
     await expect(page.getByText(/lendo a folha/i)).toBeVisible();
 
     // O worker lê em segundo plano: a tela pergunta como está a leitura e,
@@ -68,8 +68,8 @@ test.describe("foto da folha até a medição oficial", () => {
     // prova a aprovação é a medição oficial, conferida logo abaixo.
 
     // A medição aprovada aparece na leitura oficial, não só na revisão.
-    await openArea(page, "Medições");
-    const official = page.getByRole("region", { name: "Medições oficiais" });
+    await openArea(page, "Histórico");
+    const official = page.getByRole("region", { name: "Histórico de produção" });
     await expect(async () => {
       await official.getByRole("button", { name: "Atualizar", exact: true }).click();
       await expect(official).toContainText("18,0 L");
@@ -82,15 +82,15 @@ test.describe("foto da folha até a medição oficial", () => {
     await openArea(page, /Revisão/);
 
     const sheet = uniqueFixtureCopy(FIXTURE_SHEET_2);
-    await page.getByRole("button", { name: "Enviar foto" }).click();
+    await page.getByRole("button", { name: "Ler foto da folha" }).click();
     await page.getByLabel(/foto da folha/i).setInputFiles(sheet);
-    await page.getByRole("button", { name: "Enviar", exact: true }).click();
+    await page.getByRole("button", { name: /Enviar (áudio )?para leitura/,  exact: true }).click();
     await expect(page.getByText(/lendo a folha/i)).toBeVisible();
 
     // Mesmos bytes: o backend reconhece pelo hash e não cria outra cópia.
-    await page.getByRole("button", { name: "Enviar foto" }).click();
+    await page.getByRole("button", { name: "Ler foto da folha" }).click();
     await page.getByLabel(/foto da folha/i).setInputFiles(sheet);
-    await page.getByRole("button", { name: "Enviar", exact: true }).click();
+    await page.getByRole("button", { name: /Enviar (áudio )?para leitura/,  exact: true }).click();
     await expect(page.getByText(/já foi enviada/i)).toBeVisible();
 
     // Ler de novo é deliberado. Se a primeira leitura ainda estiver rodando,
@@ -109,14 +109,14 @@ test.describe("foto da folha até a medição oficial", () => {
 
     await page.getByRole("button", { name: /enviar [áa]udio/i }).click();
     await page.getByLabel(/grava[çc][ãa]o da ordenha/i).setInputFiles(uniqueFixtureCopy(FIXTURE_AUDIO));
-    await page.getByRole("button", { name: "Enviar", exact: true }).click();
+    await page.getByRole("button", { name: /Enviar (áudio )?para leitura/,  exact: true }).click();
     await expect(page.getByText(/ouvindo a grava[çc][ãa]o/i)).toBeVisible();
 
     // Sem apertar "Atualizar": a tela pergunta ao servidor como está a
     // leitura e, quando termina, diz quantas propostas saíram e relê a caixa.
     // A frase do transcritor falso ("A 497 deu 18 litros de manhã e 15 à
     // tarde") vira, pelo tradutor de verdade, uma produção de 33 L.
-    await expect(page.getByText(/pronto: 1 proposta da grava[çc][ãa]o/i)).toBeVisible({
+    await expect(page.getByText(/1 registro da grava[çc][ãa]o.*aguardando conferência/i)).toBeVisible({
       timeout: 45_000,
     });
     await expect(page.getByText(/^[ÁA]udio de /).first()).toBeVisible();

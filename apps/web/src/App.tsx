@@ -219,7 +219,7 @@ export function App(): JSX.Element {
       }),
       new Promise((resolve) => window.setTimeout(resolve, LOGOUT_WAIT_MS)),
     ]);
-    // O próximo a entrar neste celular não abre na ficha que ficou na tela.
+    // O próximo a entrar neste aparelho não abre na ficha que ficou na tela.
     window.history.replaceState(null, "", "/");
     setSession({ status: "signed-out" });
   };
@@ -342,8 +342,8 @@ const AREA_LABEL: Record<Area, string> = {
   revisao: "Revisão",
   animais: "Animais",
   insumos: "Insumos",
-  medicoes: "Medições",
-  contas: "Contas",
+  medicoes: "Histórico",
+  contas: "Equipe",
   "minha-conta": "Minha conta",
 };
 
@@ -399,8 +399,8 @@ function AppShell({
     if (
       waiting > 0 &&
       !window.confirm(
-        `Há ${waiting} ${waiting === 1 ? "envio guardado" : "envios guardados"} neste celular esperando sinal. ` +
-          "Eles continuam guardados e vão quando você entrar de novo neste celular. Sair agora?",
+        `Há ${waiting} ${waiting === 1 ? "envio guardado" : "envios guardados"} neste aparelho esperando sinal. ` +
+          "Eles continuam guardados e vão quando você entrar de novo neste aparelho. Sair agora?",
       )
     ) {
       return;
@@ -437,7 +437,7 @@ function AppShell({
     let cancelled = false;
     getCurrentFarm(token)
       .then((resolved) => {
-        if (!cancelled) setFarm(resolved);
+        if (!cancelled) setFarm({ ...resolved, role: user.role });
       })
       .catch((error: unknown) => {
         if (selectedFarm && (!(error instanceof ApiError) || error.status >= 500)) return;
@@ -621,7 +621,7 @@ function AppShell({
             onClick={() => setMoreOpen((open) => !open)}
           >
             <Icons.mais />
-            {moreAreas.includes(area) ? AREA_LABEL[area] : "Mais"}
+            Mais
           </button>
         )}
       </nav>

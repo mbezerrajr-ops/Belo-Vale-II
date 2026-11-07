@@ -40,12 +40,12 @@ test.beforeAll(() => {
 
 test("conta nova escolhe a própria senha no primeiro acesso", async ({ page }) => {
   await loginAsAdmin(page);
-  await openArea(page, "Contas");
-  await page.getByRole("button", { name: "Nova conta" }).click();
+  await openArea(page, "Equipe");
+  await page.getByRole("button", { name: "Adicionar pessoa" }).click();
   await page.getByLabel("E-mail").fill(OPERATOR);
   await page.getByLabel("Senha", { exact: true }).fill(INITIAL);
   await page.getByLabel("Função").selectOption("operator");
-  await page.getByRole("button", { name: "Criar conta" }).click();
+  await page.getByRole("button", { name: "Adicionar à equipe" }).click();
   await expect(page.getByText(`Conta criada para ${OPERATOR}.`)).toBeVisible();
   await logout(page);
 
@@ -108,7 +108,7 @@ test("revisor corrige a leitura pela ficha do animal", async ({ page }) => {
 test("importação de planilha com prévia antes de gravar", async ({ page }) => {
   await loginAsAdmin(page);
   await openArea(page, "Produção");
-  await page.getByRole("button", { name: "Importar arquivo" }).click();
+  await page.getByRole("button", { name: "Importar planilha/PDF" }).click();
 
   await page.getByLabel("Arquivo (CSV, XLSX ou PDF)").setInputFiles({
     name: `coleta-${TAG}.csv`,
@@ -148,7 +148,7 @@ test("baixa de animal e desfazer", async ({ page }) => {
 
 test("senha provisória gerada pelo administrador", async ({ page }) => {
   await loginAsAdmin(page);
-  await openArea(page, "Contas");
+  await openArea(page, "Equipe");
   const account = page.locator("li", { hasText: OPERATOR });
   await account.getByRole("button", { name: "Redefinir senha" }).click();
   await page.getByRole("button", { name: "Gerar senha provisória" }).click();
