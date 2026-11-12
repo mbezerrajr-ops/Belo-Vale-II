@@ -767,6 +767,39 @@ class SupplyDiet(TimestampedModel, Base):
     supply: Mapped[Supply] = relationship(back_populates="diets")
 
 
+class MilkPriceHistory(TimestampedModel, Base):
+    """Preço do leite com vigência; snapshots nunca são retroagidos."""
+
+    __tablename__ = "milk_price_history"
+    __table_args__ = (
+        Index("uq_milk_price_history_date", "farm_id", "effective_on", unique=True),
+        CheckConstraint("price_per_liter >= 0", name="ck_milk_price_history_nonnegative"),
+    )
+    id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()"))
+    farm_id: Mapped[UUID] = mapped_column(ForeignKey("farms.id", ondelete="CASCADE"), nullable=False)
+    effective_on: Mapped[date] = mapped_column(Date, nullable=False)
+    price_per_liter: Mapped[float | None] = mapped_column(Numeric(10, 5))
+    recorded_by: Mapped[str | None] = mapped_column(String(255))
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="manual")
+
+
+class SupplyDietHistory(TimestampedModel, Base):
+    """Quantidade diária de um insumo no lote, a partir de uma data."""
+
+    __tablename__ = "supply_diet_history"
+    __table_args__ = (
+        Index("uq_supply_diet_history_date", "supply_id", "lote", "effective_on", unique=True),
+        CheckConstraint("kg_per_day >= 0", name="ck_supply_diet_history_nonnegative"),
+    )
+    id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()"))
+    supply_id: Mapped[UUID] = mapped_column(ForeignKey("supplies.id", ondelete="CASCADE"), nullable=False)
+    lote: Mapped[str] = mapped_column(String(64), nullable=False)
+    effective_on: Mapped[date] = mapped_column(Date, nullable=False)
+    kg_per_day: Mapped[float] = mapped_column(Numeric(10, 3), nullable=False)
+    recorded_by: Mapped[str | None] = mapped_column(String(255))
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="manual")
+
+
 class RefreshToken(TimestampedModel, Base):
     """Sessão longa, revogável.
 

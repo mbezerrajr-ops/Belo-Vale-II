@@ -67,6 +67,9 @@ const ICON_PROPS = {
 };
 
 export const Icons = {
+  relatorios: (): JSX.Element => (
+    <svg {...ICON_PROPS}><path d="M6 3h9l4 4v14H6zM15 3v5h4M9 17v-3M12 17v-6M15 17v-4" /></svg>
+  ),
   painel: (): JSX.Element => (
     <svg {...ICON_PROPS}>
       <path d="M4 19V10M10 19V5M16 19v-7M22 19H2" />

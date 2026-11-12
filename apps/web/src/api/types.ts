@@ -286,6 +286,24 @@ export interface DashboardFilters {
   situacao?: string;
 }
 
+export interface MonthlyResult {
+  month: string; start: string; end: string; elapsed_days: number; calendar_days: number; in_progress: boolean;
+  reading_days: number; reading_count: number; animals_read: number;
+  animals_per_collection_min: number | null; animals_per_collection_max: number | null;
+  recorded_liters: number; average_liters_per_collection: number | null; average_liters_per_animal_reading: number | null;
+  estimated_liters: number | null; estimated_revenue: number | null; estimated_feed_cost: number | null; estimated_result: number | null;
+  margin_pct: number | null; production_change_pct: number | null; result_change: number | null;
+  status: 'positive' | 'negative' | 'balanced' | 'insufficient';
+  milk_price_days: number; diet_days: number; assumed_days: number; warnings: string[];
+}
+
+export interface MonthlyReport {
+  generated_on: string; farm_name: string; start_month: string; end_month: string;
+  current_values_simulation: boolean; method: string; months: MonthlyResult[];
+  best_month: string | null; worst_month: string | null;
+  positive_months: number; negative_months: number; balanced_months: number; insufficient_months: number;
+}
+
 export interface SupplyDiet {
   lote: string;
   kg_per_day: number;

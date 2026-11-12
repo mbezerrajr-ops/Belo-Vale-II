@@ -4980,3 +4980,25 @@ img.upload-preview {
 .supply-price h4{margin-top:0;}.supply-price select{width:100%;max-width:100%;}
 @media(max-width:500px){.ux-actions>*{flex:1 1 auto;}.farm-settings .ux-actions>*{width:100%;}.ux-first-steps{padding:18px;}.production-photo-link a{display:inline-block;padding:4px 0;}}
 .warning a,.production-photo-link a,.ux-first-steps a{display:inline-flex;align-items:center;min-height:44px;}
+
+/* Fechamento mensal: dados registrados e estimativas permanecem identificados. */
+.monthly-filters{align-items:end;flex-wrap:wrap;}
+.monthly-filters>div{min-width:0;}.monthly-filters input{max-width:100%;}
+.monthly-simulation{display:flex;align-items:center;gap:12px;min-height:48px;cursor:pointer;}
+.monthly-simulation input{width:24px;height:24px;min-height:24px;flex:0 0 24px;}
+.monthly-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:20px 0;}
+.monthly-overview article{padding:18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);}
+.monthly-overview span{display:block;color:var(--muted);font-size:13px;}.monthly-overview strong{display:block;margin-top:8px;font-size:24px;}
+.monthly-method{padding:14px 18px;margin:20px 0;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);}
+.monthly-method summary,.monthly-card summary{display:flex;align-items:center;min-height:44px;cursor:pointer;}
+.monthly-method a{display:inline-flex;min-height:44px;align-items:center;}
+.monthly-months{display:grid;gap:18px;}.monthly-card{min-width:0;}.monthly-card header{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;}
+.monthly-card h4{margin:0;font-family:var(--font-display);font-size:23px;}.monthly-card h4 small{display:block;font:13px var(--font-body);color:var(--muted);margin-top:5px;}
+.monthly-status{display:inline-block;padding:7px 12px;border-radius:20px;background:var(--surface-2);font-size:13px;color:var(--ink);}
+.monthly-status.positive{color:var(--good);background:var(--good-soft);}.monthly-status.negative{color:var(--danger);background:var(--danger-soft);}
+.monthly-values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:20px 0;}
+.monthly-values div{min-width:0;}.monthly-values dt{font-size:12px;color:var(--muted);line-height:1.5;}.monthly-values dd{margin:5px 0 0;font-size:20px;font-weight:600;overflow-wrap:anywhere;}
+.monthly-card details{border-top:1px solid var(--line);margin-top:14px;padding-top:8px;}.monthly-card li{margin:8px 0;}.monthly-pending{opacity:.65;}
+.monthly-finance-chart{overflow-x:auto;max-width:100%;}.monthly-report .columns{min-width:0;}
+@media(max-width:700px){.monthly-overview,.monthly-values{grid-template-columns:repeat(2,minmax(0,1fr));}.monthly-values dd{font-size:18px;}.monthly-filters{display:flex;}.monthly-filters>div{flex:1 1 130px;}.monthly-filters>button{flex:1 1 100%;}.monthly-report .page-head button{max-width:100%;white-space:normal;}}
+@media(max-width:500px){.monthly-filters>div{flex-basis:100%;}}

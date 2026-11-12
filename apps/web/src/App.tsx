@@ -44,6 +44,7 @@ import { OfflineBanner, OutboxButton } from "./offline/OutboxStatus";
 const HerdDashboard = lazy(() =>
   import("./features/dashboard/HerdDashboard").then((m) => ({ default: m.HerdDashboard })),
 );
+const MonthlyReportPage = lazy(() => import('./features/reports/MonthlyReportPage').then(m => ({ default: m.MonthlyReportPage })));
 const ReviewInbox = lazy(() =>
   import("./features/review/ReviewInbox").then((m) => ({ default: m.ReviewInbox })),
 );
@@ -333,6 +334,7 @@ type Area =
   | "animais"
   | "insumos"
   | "medicoes"
+  | "relatorios"
   | "contas"
   | "minha-conta";
 
@@ -343,6 +345,7 @@ const AREA_LABEL: Record<Area, string> = {
   animais: "Animais",
   insumos: "Insumos",
   medicoes: "Histórico",
+  relatorios: "Relatórios",
   contas: "Equipe",
   "minha-conta": "Minha conta",
 };
@@ -497,6 +500,7 @@ function AppShell({
     "animais",
     "insumos",
     "medicoes",
+    "relatorios",
     ...(isAdmin ? (["contas"] as Area[]) : []),
     "minha-conta",
   ];
@@ -661,6 +665,7 @@ function AppShell({
         <AreaBoundary>
           <Suspense fallback={<div className="skeleton skeleton-card" role="status" aria-label="Carregando" />}>
           {area === "painel" && <HerdDashboard token={token} />}
+          {area === 'relatorios' && <MonthlyReportPage token={token} canExport={canEdit} />}
 
           {area === "producao" && <ProductionPage token={token} canCorrect={canEdit} />}
 

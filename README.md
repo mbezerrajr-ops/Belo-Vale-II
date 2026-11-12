@@ -30,6 +30,9 @@ animais, produção, custos). Trate como confidencial e mantenha-o **privado**.
   (fica guardado no celular e sobe quando o sinal volta); importar a coleta
   de uma planilha ou PDF; imprimir a folha de coleta, em branco ou preenchida;
   exportar a produção de um período para planilha (revisor e administrador).
+- **Relatório mensal:** compara meses, médias e saldo estimado após alimentação,
+  identifica falta de histórico e exporta o fechamento para Excel.
+  Método, vigências e limites: [relatório mensal](docs/relatorio-mensal.md).
 - **Revisão:** fotografar a folha, escolher uma foto da biblioteca ou gravar a ordenha pelo próprio app;
   o que for lido chega como proposta, com a foto ou o áudio ao lado, para
   aprovar, corrigir ou rejeitar.

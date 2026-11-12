@@ -3,16 +3,18 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 import {
   createSupply,
+  getCurrentFarm,
   getSupplyPrices,
   listSupplies,
   setMilkPrice,
   updateSupplyPrice,
 } from "../../api/client";
 import type { Supply, SupplyPrice } from "../../api/types";
-import { brDate } from "../../ui/dates";
+import { brDate, farmToday } from "../../ui/dates";
 import { Icons } from "../../ui/Brand";
 import { BarList, TableView, fmt } from "../../ui/charts";
 import { PageHeader } from "../../ui/PageHeader";
+import { apiMessage } from '../../auth/AccountEntry';
 
 /**
  * Insumos e dieta.
@@ -27,15 +29,16 @@ interface Props {
   canEdit: boolean;
   milkPrice?: number | null;
   /** O preço do leite foi salvo: quem guarda a fazenda atualiza o seu. */
-  onMilkPriceSaved?: (pricePerLiter: number) => void;
+  onMilkPriceSaved?: (pricePerLiter: number | null) => void;
   onList?: (token: string) => Promise<Supply[]>;
   onUpdatePrice?: (
     token: string,
     supplyId: string,
     pricePerKg: number,
+    effectiveOn?: string,
   ) => Promise<Supply>;
   onCreate?: (token: string, name: string, pricePerKg: number) => Promise<Supply>;
-  onSetMilkPrice?: (token: string, pricePerLiter: number) => Promise<void>;
+  onSetMilkPrice?: (token: string, pricePerLiter: number, effectiveOn?: string) => Promise<void>;
   onLoadPrices?: (token: string, supplyId: string) => Promise<SupplyPrice[]>;
 }
 
@@ -48,7 +51,7 @@ const precise = new Intl.NumberFormat("pt-BR", {
 
 function errorMessage(error: unknown): string {
   const body = (error as { body?: { detail?: string } })?.body;
-  return body?.detail ?? "Não foi possível completar a ação. Tente novamente.";
+  return typeof body?.detail === 'string' ? body.detail : apiMessage(error);
 }
 
 export function SuppliesPage({
@@ -81,6 +84,8 @@ export function SuppliesPage({
   // olhada — antes cada um ocupava quase uma tela do celular.
   const [editing, setEditing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [milkSince, setMilkSince] = useState(farmToday());
+  const [priceSince, setPriceSince] = useState(farmToday());
   const [dietEditor, setDietEditor] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -193,14 +198,23 @@ export function SuppliesPage({
             const price = Number(milk);
             setMilkSaved(null);
             void guard(async () => {
-              await onSetMilkPrice(token, price);
+              if (milkSince === farmToday()) await onSetMilkPrice(token, price);
+              else await onSetMilkPrice(token, price, milkSince);
               setMilkSaved(price);
-              onMilkPriceSaved?.(price);
+              if (milkSince === farmToday()) onMilkPriceSaved?.(price);
+              else try {
+                const current = await getCurrentFarm(token);
+                setMilk(current.milk_price_per_liter == null ? '' : String(current.milk_price_per_liter));
+                onMilkPriceSaved?.(current.milk_price_per_liter ?? null);
+              } catch { setNotice('O preço foi registrado. Reabra a tela para conferir o valor atualmente em vigor.'); }
             });
           }}
         >
           <h3>Preço do leite</h3>
           <p className="hint">Base da receita do leite e do resultado após alimentação.</p>
+          <label htmlFor="milk-price-since">Preço do leite válido a partir de</label>
+          <input id="milk-price-since" type="date" max={farmToday()} required value={milkSince} onChange={e => setMilkSince(e.target.value)} />
+          <p className="hint">Informe a vigência para preservar o fechamento dos meses anteriores.</p>
           <label htmlFor="milk-price">Preço por litro (R$)</label>
           <div className="inline-field">
             <input
@@ -219,7 +233,7 @@ export function SuppliesPage({
           {milkSaved !== null && (
             <p role="status">
               Preço do leite salvo: R$ {milkSaved.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}{" "}
-              por litro.
+              por litro, com vigência em {brDate(milkSince)}.
             </p>
           )}
         </form>
@@ -288,7 +302,7 @@ export function SuppliesPage({
                 />
               )}
 
-              {dietEditor === item.id && <SupplyDietForm supply={item} token={token} onCancel={() => setDietEditor(null)} onSaved={() => { setDietEditor(null); setNotice(`Dieta de ${item.name} salva. O painel usará a quantidade informada.`); void reload(); }} />}
+              {dietEditor === item.id && <SupplyDietForm supply={item} token={token} onCancel={() => setDietEditor(null)} onSaved={() => { setDietEditor(null); setNotice(`Dieta de ${item.name} salva. O painel usa a vigência mais recente.`); void reload(); }} />}
               <div className="supply-actions">
                 {canEdit && <button type="button" className="secondary" aria-expanded={dietEditor === item.id} onClick={() => { setDietEditor(item.id); setEditing(null); setNotice(null); }}>Definir dieta</button>}
                 {canEdit && (
@@ -296,7 +310,7 @@ export function SuppliesPage({
                     type="button"
                     className="secondary"
                     aria-expanded={editing === item.id}
-                    onClick={() => setEditing((open) => (open === item.id ? null : item.id))}
+                    onClick={() => { setEditing((open) => (open === item.id ? null : item.id)); setPriceSince(farmToday()); }}
                   >
                     <Icons.editar /> Alterar preço
                   </button>
@@ -317,7 +331,8 @@ export function SuppliesPage({
                   onSubmit={(event) => {
                     event.preventDefault();
                     void guard(async () => {
-                      await onUpdatePrice(token, item.id, Number(prices[item.id]));
+                      if (priceSince === farmToday()) await onUpdatePrice(token, item.id, Number(prices[item.id]));
+                      else await onUpdatePrice(token, item.id, Number(prices[item.id]), priceSince);
                       setEditing(null);
                     });
                   }}
@@ -342,6 +357,8 @@ export function SuppliesPage({
                   <p className="hint">
                     O preço anterior fica no histórico, com a data em que valia.
                   </p>
+                  <label htmlFor={`price-since-${item.id}`}>Preço do insumo válido a partir de</label>
+                  <input id={`price-since-${item.id}`} type="date" max={farmToday()} required value={priceSince} onChange={e => setPriceSince(e.target.value)} />
                   <button type="submit" disabled={busy || !prices[item.id]}>
                     Salvar preço
                   </button><button type="button" className="secondary" onClick={() => setEditing(null)}>Cancelar</button>

@@ -5,6 +5,7 @@ import type { Supply } from '../../api/types';
 import { apiMessage } from '../../auth/AccountEntry';
 import { useActiveFarm } from '../workspace/context';
 import { fmt } from '../../ui/charts';
+import { farmToday } from '../../ui/dates';
 
 export function SupplyDietForm({ supply, token, onSaved, onCancel }: { supply: Supply; token: string; onSaved: () => void; onCancel: () => void }): JSX.Element {
   const farm = useActiveFarm();
@@ -13,11 +14,12 @@ export function SupplyDietForm({ supply, token, onSaved, onCancel }: { supply: S
   const current = (name: string) => supply.diets.find(diet => diet.lote === name)?.kg_per_day;
   const [kg, setKg] = useState(String(current(lote) ?? ''));
   const [busy, setBusy] = useState(false);
+  const [effective, setEffective] = useState(farmToday());
   const [error, setError] = useState<string | null>(null);
   const id = `diet-${supply.id}`;
   return <form className="supply-price" onSubmit={event => {
     event.preventDefault(); setBusy(true); setError(null);
-    void setSupplyDiet(token, supply.id, lote, Number(kg)).then(onSaved).catch(caught => setError(apiMessage(caught))).finally(() => setBusy(false));
+    void setSupplyDiet(token, supply.id, lote, Number(kg), effective).then(onSaved).catch(caught => setError(apiMessage(caught))).finally(() => setBusy(false));
   }}>
     <h4>Dieta — {supply.name}</h4>
     {lots.length === 0 ? <p>Cadastre um lote de ordenha antes de definir a dieta. {farm?.role === 'admin' ? <AppLink href="/minha-conta/fazenda">Configurar minha fazenda</AppLink> : 'Peça ao administrador da fazenda.'}</p> : <>
@@ -26,8 +28,11 @@ export function SupplyDietForm({ supply, token, onSaved, onCancel }: { supply: S
       <label htmlFor={`${id}-kg`}>Quantidade diária para o lote inteiro (kg)</label>
       <input id={`${id}-kg`} type="number" inputMode="decimal" min="0" step="0.001" required value={kg} onChange={e => setKg(e.target.value)} />
       <p className="hint">Some o consumo de todos os animais do lote. Use 0 se este insumo não faz parte da dieta.</p>
+      <label htmlFor={`${id}-since`}>Dieta válida a partir de</label>
+      <input id={`${id}-since`} type="date" required max={farmToday()} value={effective} onChange={e => setEffective(e.target.value)} />
+      <p className="hint">Essa data vale para os relatórios mensais. Uma edição antiga preserva as vigências posteriores.</p>
       {kg !== '' && Number.isFinite(Number(kg)) && <p>Este insumo custará <strong>{fmt.brl(Number(kg) * supply.price_per_kg)} por dia</strong> para {lote}.</p>}
-      <p className="hint">Salvar atualiza a dieta usada no painel da fazenda.</p>
+      <p className="hint">A prévia usa o preço atual do insumo. O relatório usa o preço vigente em cada dia. O painel mantém a dieta de vigência mais recente.</p>
     </>}
     {error && <p role="alert">{error}</p>}
     <div className="ux-actions">{lots.length > 0 && <button disabled={busy || kg === ''}>{busy ? 'Salvando…' : 'Salvar dieta'}</button>}<button type="button" className="secondary" disabled={busy} onClick={onCancel}>Cancelar</button></div>
