@@ -116,9 +116,11 @@ class DietUpdate(BaseModel):
 
     lote: str = Field(min_length=1, max_length=64)
     kg_per_day: float = Field(ge=0)
+    effective_on: date | None = None
 
 
 class MilkPriceUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     milk_price_per_liter: float = Field(ge=0)
+    effective_on: date | None = None

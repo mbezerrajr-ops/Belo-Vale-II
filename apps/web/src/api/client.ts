@@ -12,6 +12,7 @@ import {
   type MergePreview,
   type DashboardFilters,
   type DashboardSummary,
+  type MonthlyReport,
   type ApproveProposalInput,
   type ExitReason,
   type Proposal,
@@ -55,6 +56,24 @@ export async function accountRequest(path: string, body: unknown): Promise<{ mes
 }
 
 export function listFarms(token: string): Promise<Farm[]> { return workspaceRequest("/farms", token); }
+
+function monthlyQuery(inicio: string, fim: string, simulate: boolean): string {
+  return new URLSearchParams({ inicio, fim, simular_atuais: String(simulate) }).toString();
+}
+
+export function getMonthlyReport(token: string, inicio: string, fim: string, simulate = false): Promise<MonthlyReport> {
+  return workspaceRequest(`/reports/monthly?${monthlyQuery(inicio, fim, simulate)}`, token);
+}
+
+export async function downloadMonthlyReport(token: string, inicio: string, fim: string, simulate = false): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/reports/monthly/export?${monthlyQuery(inicio, fim, simulate)}`, { headers: authHeaders(token) });
+  if (!response.ok) { await parseJsonOrThrow(response); return; }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url; link.download = `relatorio-mensal-${inicio}-a-${fim}.xlsx`;
+  document.body.appendChild(link); link.click(); link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
 
 async function parseJsonOrThrow<T>(response: Response): Promise<T> {
   // Nem toda resposta vem da nossa API: um envio grande demais morre no
@@ -447,11 +466,12 @@ export async function updateSupplyPrice(
   token: string,
   supplyId: string,
   pricePerKg: number,
+  effectiveOn?: string,
 ): Promise<Supply> {
   const response = await fetch(`${API_BASE_URL}/api/supplies/${supplyId}`, {
     method: "PATCH",
     headers: jsonHeaders(token),
-    body: JSON.stringify({ price_per_kg: pricePerKg }),
+    body: JSON.stringify({ price_per_kg: pricePerKg, ...(effectiveOn ? { effective_on: effectiveOn } : {}) }),
   });
   return parseJsonOrThrow<Supply>(response);
 }
@@ -461,11 +481,12 @@ export async function setSupplyDiet(
   supplyId: string,
   lote: string,
   kgPerDay: number,
+  effectiveOn?: string,
 ): Promise<Supply> {
   const response = await fetch(`${API_BASE_URL}/api/supplies/${supplyId}/diet`, {
     method: "PUT",
     headers: jsonHeaders(token),
-    body: JSON.stringify({ lote, kg_per_day: kgPerDay }),
+    body: JSON.stringify({ lote, kg_per_day: kgPerDay, ...(effectiveOn ? { effective_on: effectiveOn } : {}) }),
   });
   return parseJsonOrThrow<Supply>(response);
 }
@@ -473,11 +494,12 @@ export async function setSupplyDiet(
 export async function setMilkPrice(
   token: string,
   pricePerLiter: number,
+  effectiveOn?: string,
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/api/farms/current/milk-price`, {
     method: "PATCH",
     headers: jsonHeaders(token),
-    body: JSON.stringify({ milk_price_per_liter: pricePerLiter }),
+    body: JSON.stringify({ milk_price_per_liter: pricePerLiter, ...(effectiveOn ? { effective_on: effectiveOn } : {}) }),
   });
   await parseJsonOrThrow(response);
 }

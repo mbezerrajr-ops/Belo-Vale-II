@@ -16,6 +16,7 @@ export type AreaRoute =
   | "animais"
   | "insumos"
   | "medicoes"
+  | "relatorios"
   | "contas"
   | "minha-conta";
 
@@ -33,6 +34,7 @@ const AREAS: readonly AreaRoute[] = [
   "animais",
   "insumos",
   "medicoes",
+  "relatorios",
   "contas",
   "minha-conta",
 ];

@@ -146,7 +146,7 @@ export function HerdDashboard({
 
   return (
     <section className="dashboard" aria-busy={loading}>
-      <PageHeader title="Painel do rebanho" />
+      <PageHeader title="Painel do rebanho" actions={<AppLink className="link-btn" href="/relatorios">Relatório mensal</AppLink>} />
       {panel.total_animals === 0 && <section className="ux-first-steps" aria-labelledby="first-steps-title">
         <h3 id="first-steps-title">Vamos começar sua fazenda</h3>
         <p>Prepare o cadastro e depois registre a primeira produção.</p>

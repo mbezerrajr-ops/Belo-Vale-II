@@ -17,6 +17,7 @@ from app.routers.production import router as production_router
 from app.routers.production_import import router as production_import_router
 from app.routers.proposals import router as proposals_router
 from app.routers.tenancy import router as tenancy_router
+from app.routers.monthly_report import router as monthly_report_router
 from app.services.ingestion import (
     DuplicateImageError,
     FarmNotFoundError,
@@ -78,6 +79,7 @@ def create_app() -> FastAPI:
     app.include_router(registry_router)
     app.include_router(users_router)
     app.include_router(dashboard_router)
+    app.include_router(monthly_report_router)
     app.include_router(production_router)
     app.include_router(production_import_router)
     app.include_router(proposals_router)

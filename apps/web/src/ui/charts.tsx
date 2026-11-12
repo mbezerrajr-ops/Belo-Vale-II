@@ -310,6 +310,7 @@ export interface ColumnGroup {
 }
 
 interface ColumnsProps {
+  ariaLabel?: string;
   groups: ColumnGroup[];
   series: string[];
   format?: (value: number) => string;
@@ -318,6 +319,7 @@ interface ColumnsProps {
 }
 
 export function Columns({
+  ariaLabel = 'Comparativo por lote',
   groups,
   series,
   format = fmt.brl,
@@ -339,7 +341,7 @@ export function Columns({
             </span>
           ))}
         </div>
-      <div className="plot" role="img" aria-label="Comparativo por lote">
+      <div className="plot" role="img" aria-label={ariaLabel}>
         {groups.map((group, groupIndex) => (
           <div className="group" key={group.label}>
             {group.values.map((value, seriesIndex) => (

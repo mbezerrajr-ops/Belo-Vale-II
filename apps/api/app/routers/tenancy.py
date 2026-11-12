@@ -396,6 +396,10 @@ async def configure_farm(payload: FarmSettings, session: DB, access: AdminAccess
             409, "Mova os animais antes de remover ou mudar o tipo de um lote em uso."
         )
     previous = farm_output(farm, access.role)
+    if payload.milk_price_per_liter != farm.milk_price_per_liter:
+        from app.services.financial_history import record_milk_price
+        from app.core.farm_clock import farm_today
+        await record_milk_price(session, farm, payload.milk_price_per_liter, farm_today(), access.user.email)
     for key, value in payload.model_dump().items():
         setattr(farm, key, value)
     audit(

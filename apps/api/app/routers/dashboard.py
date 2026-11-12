@@ -29,6 +29,7 @@ from app.schemas.dashboard import (
     SupplyUpdate,
 )
 from app.services.dashboard import build_dashboard
+from app.services.financial_history import record_diet, record_milk_price
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
@@ -181,6 +182,9 @@ async def update_supply(
         else:
             existing.price_per_kg = payload.price_per_kg
             existing.recorded_by = user.email
+        await session.flush()
+        latest_price = await session.scalar(select(SupplyPrice).where(SupplyPrice.supply_id == supply.id).order_by(SupplyPrice.effective_on.desc()).limit(1))
+        supply.price_per_kg = latest_price.price_per_kg
 
     session.add(
         AuditEvent(
@@ -207,6 +211,9 @@ async def set_diet(
 ) -> SupplyRead:
     supply = await _supply_or_404(session, supply_id, farm.id)
     lote = configured_destination(farm, payload.lote, "diet")["name"]
+    effective = payload.effective_on or farm_today()
+    if effective > farm_today():
+        raise HTTPException(422, "A vigência da dieta não pode ser no futuro.")
 
     diet = await session.scalar(
         select(SupplyDiet).where(
@@ -215,11 +222,9 @@ async def set_diet(
     )
     previous = float(diet.kg_per_day) if diet is not None else None
     if diet is None:
-        session.add(
-            SupplyDiet(supply_id=supply.id, lote=lote, kg_per_day=payload.kg_per_day)
-        )
-    else:
-        diet.kg_per_day = payload.kg_per_day
+        diet = SupplyDiet(supply_id=supply.id, lote=lote, kg_per_day=payload.kg_per_day)
+        session.add(diet)
+    await record_diet(session, diet, payload.kg_per_day, effective, user.email)
 
     session.add(
         AuditEvent(
@@ -229,14 +234,14 @@ async def set_diet(
             entity_type="supply",
             entity_id=supply.id,
             previous_value={"lote": lote, "kg_per_day": previous},
-            new_value={"lote": lote, "kg_per_day": payload.kg_per_day},
+            new_value={"lote": lote, "kg_per_day": payload.kg_per_day, "effective_on": effective.isoformat()},
         )
     )
     await session.commit()
     return await _read_supply(session, supply)
 
 
-@router.patch("/farms/current/milk-price", response_model=MilkPriceUpdate)
+@router.patch("/farms/current/milk-price", response_model=MilkPriceUpdate, response_model_exclude_none=True)
 async def set_milk_price(
     payload: MilkPriceUpdate,
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -248,7 +253,10 @@ async def set_milk_price(
         if farm.milk_price_per_liter is not None
         else None
     )
-    farm.milk_price_per_liter = payload.milk_price_per_liter
+    effective = payload.effective_on or farm_today()
+    if effective > farm_today():
+        raise HTTPException(422, "A vigência do preço do leite não pode ser no futuro.")
+    await record_milk_price(session, farm, payload.milk_price_per_liter, effective, user.email)
     session.add(
         AuditEvent(
             farm_id=farm.id,
@@ -257,7 +265,7 @@ async def set_milk_price(
             entity_type="farm",
             entity_id=farm.id,
             previous_value={"milk_price_per_liter": previous},
-            new_value={"milk_price_per_liter": payload.milk_price_per_liter},
+            new_value={"milk_price_per_liter": payload.milk_price_per_liter, "effective_on": effective.isoformat()},
         )
     )
     await session.commit()
